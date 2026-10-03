@@ -1,0 +1,26 @@
+{
+  "name": "pocketly",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p packages/core-contract && tsc -p packages/core-js && tsc -p packages/core-kmp && tsc -p apps/mobile --noEmit && tsc -p benchmarks/scripts",
+    "test": "yarn workspace @pocketly/core-js test && yarn workspace @pocketly/mobile test",
+    "test:shared": "cd shared && ./gradlew allTests",
+    "contract:golden": "yarn workspace @pocketly/core-js golden",
+    "fixtures": "yarn workspace @pocketly/core-js fixtures",
+    "nitrogen": "yarn workspace @pocketly/core-kmp nitrogen",
+    "android:js": "yarn workspace @pocketly/mobile android:js",
+    "android:kmp": "yarn workspace @pocketly/mobile android:kmp",
+    "ios:framework": "yarn workspace @pocketly/core-kmp build:ios-framework"
+  },
+  "engines": {
+    "node": ">= 22.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "@types/node": "^22.0.0"
+  }
+}

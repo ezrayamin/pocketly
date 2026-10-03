@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node scripts run with tsx, not bundled for React Native.
+    "types": ["node"]
+  },
+  "include": ["*.ts"]
+}

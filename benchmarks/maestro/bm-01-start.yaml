@@ -1,0 +1,11 @@
+# BM-01 smoke flow: cold start → Home rendered.
+# APP_ID: com.pocketly.js | com.pocketly.kmp
+#   maestro test -e APP_ID=com.pocketly.kmp benchmarks/maestro/bm-01-start.yaml
+# Startup *timing* comes from Macrobenchmark; this flow only drives Flashlight runs.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+- assertVisible:
+    id: "balance"

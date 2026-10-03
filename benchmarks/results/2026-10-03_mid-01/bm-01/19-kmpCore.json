@@ -1,0 +1,4 @@
+{ "round": 19, "build": "kmpCore", "package": "com.pocketly.kmp", "launchState": "COLD",
+  "timeToInitialDisplayMs": 290, "timeToFullDisplayMs": 312,
+  "amTotalTimeMs": 290, "batteryTenthsCelsius": 349, "batteryPct": 94,
+  "at": "2026-10-03T16:20:30Z" }

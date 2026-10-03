@@ -1,0 +1,10 @@
+{
+  "name": "@pocketly/core-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Core interface + shared types. The only package the RN UI imports.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "files": ["src", "fixtures"]
+}

@@ -1,0 +1,26 @@
+node_modules/
+.DS_Store
+*.log
+.idea/
+.vscode/
+local.properties
+
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+!benchmarks/results/**
+
+# TypeScript
+*.tsbuildinfo
+lib/
+
+# Generated benchmark datasets (`yarn fixtures` recreates them byte-for-byte)
+benchmarks/fixtures/*.json
+
+# Built KMP XCFramework (`yarn ios:framework`)
+packages/core-kmp/ios/Frameworks/
+
+# Machine-local: debug signing key and Xcode node path (see README "First-time setup")
+apps/mobile/android/app/debug.keystore
+apps/mobile/ios/.xcode.env

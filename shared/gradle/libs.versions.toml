@@ -1,0 +1,19 @@
+[versions]
+# Kotlin + AGP are pinned to what React Native 0.87 uses
+# (node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml), because this
+# build is included into apps/mobile/android as a composite build.
+kotlin = "2.2.0"
+agp = "9.2.1"
+coroutines = "1.10.2"
+serialization = "1.9.0"
+koin = "4.1.1"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }

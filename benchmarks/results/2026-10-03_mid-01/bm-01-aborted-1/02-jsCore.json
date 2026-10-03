@@ -1,0 +1,4 @@
+{ "round": 2, "build": "jsCore", "package": "com.pocketly.js", "launchState": "COLD",
+  "timeToInitialDisplayMs": 265, "timeToFullDisplayMs": 265,
+  "amTotalTimeMs": 265, "batteryTenthsCelsius": 346, "batteryPct": 73,
+  "at": "2026-10-03T15:31:08Z" }

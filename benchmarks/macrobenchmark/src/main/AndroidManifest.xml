@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Lets the self-instrumenting test APK see and launch both Pocketly apps. -->
+    <queries>
+        <package android:name="com.pocketly.js" />
+        <package android:name="com.pocketly.kmp" />
+    </queries>
+</manifest>

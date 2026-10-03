@@ -1,0 +1,24 @@
+{
+  "name": "@pocketly/core-kmp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "kmpCore build: TS wrapper around the Kotlin Multiplatform core, bridged with Nitro Modules.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "scripts": {
+    "nitrogen": "nitrogen --logLevel=\"debug\"",
+    "build:ios-framework": "scripts/build-ios-framework.sh"
+  },
+  "dependencies": {
+    "@pocketly/core-contract": "0.1.0"
+  },
+  "peerDependencies": {
+    "react-native": "*",
+    "react-native-nitro-modules": "*"
+  },
+  "devDependencies": {
+    "nitrogen": "0.37.1",
+    "react-native-nitro-modules": "0.37.1"
+  }
+}

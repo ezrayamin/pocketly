@@ -1,0 +1,31 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "pocketly"
+  ],
+  "ios": {
+    "iosModuleName": "PocketlyCoreKmp"
+  },
+  "android": {
+    "androidNamespace": [
+      "pocketly",
+      "corekmp"
+    ],
+    "androidCxxLibName": "PocketlyCoreKmp"
+  },
+  "autolinking": {
+    "PocketlyCore": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridPocketlyCore"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridPocketlyCore"
+      }
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

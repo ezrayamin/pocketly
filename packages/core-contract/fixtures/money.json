@@ -1,0 +1,227 @@
+{
+  "$comment": "Hand-written. Source of truth for MoneyFormatter in both cores (NFR-MONEY-02).",
+  "format": [
+    {
+      "minor": 0,
+      "expected": "$0.00"
+    },
+    {
+      "minor": 1,
+      "expected": "$0.01"
+    },
+    {
+      "minor": 99,
+      "expected": "$0.99"
+    },
+    {
+      "minor": 100,
+      "expected": "$1.00"
+    },
+    {
+      "minor": 150000,
+      "expected": "$1,500.00"
+    },
+    {
+      "minor": 123456789,
+      "expected": "$1,234,567.89"
+    },
+    {
+      "minor": -2550,
+      "expected": "-$25.50"
+    },
+    {
+      "minor": 100000000,
+      "expected": "$1,000,000.00"
+    },
+    {
+      "minor": 9999999999999,
+      "expected": "$99,999,999,999.99"
+    },
+    {
+      "minor": 9007199254740991,
+      "expected": "$90,071,992,547,409.91"
+    }
+  ],
+  "formatInvalid": [
+    1.5,
+    -0.25,
+    9007199254740992
+  ],
+  "parse": [
+    {
+      "input": "",
+      "expected": {
+        "ok": false,
+        "error": "EMPTY"
+      }
+    },
+    {
+      "input": "   ",
+      "expected": {
+        "ok": false,
+        "error": "EMPTY"
+      }
+    },
+    {
+      "input": "0",
+      "expected": {
+        "ok": true,
+        "minor": 0
+      }
+    },
+    {
+      "input": "1",
+      "expected": {
+        "ok": true,
+        "minor": 100
+      }
+    },
+    {
+      "input": "1.5",
+      "expected": {
+        "ok": true,
+        "minor": 150
+      }
+    },
+    {
+      "input": "1.50",
+      "expected": {
+        "ok": true,
+        "minor": 150
+      }
+    },
+    {
+      "input": "$1,500.00",
+      "expected": {
+        "ok": true,
+        "minor": 150000
+      }
+    },
+    {
+      "input": "1,500",
+      "expected": {
+        "ok": true,
+        "minor": 150000
+      }
+    },
+    {
+      "input": "1500.05",
+      "expected": {
+        "ok": true,
+        "minor": 150005
+      }
+    },
+    {
+      "input": " 12.34 ",
+      "expected": {
+        "ok": true,
+        "minor": 1234
+      }
+    },
+    {
+      "input": "007",
+      "expected": {
+        "ok": true,
+        "minor": 700
+      }
+    },
+    {
+      "input": "99,999,999,999.99",
+      "expected": {
+        "ok": true,
+        "minor": 9999999999999
+      }
+    },
+    {
+      "input": "-5",
+      "expected": {
+        "ok": false,
+        "error": "NEGATIVE"
+      }
+    },
+    {
+      "input": "-$5",
+      "expected": {
+        "ok": false,
+        "error": "NEGATIVE"
+      }
+    },
+    {
+      "input": "1.234",
+      "expected": {
+        "ok": false,
+        "error": "TOO_MANY_DECIMALS"
+      }
+    },
+    {
+      "input": "1,50",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "12a",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "1.2.3",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": ".5",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "5.",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "$",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "$-5",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "1e3",
+      "expected": {
+        "ok": false,
+        "error": "INVALID_FORMAT"
+      }
+    },
+    {
+      "input": "100000000000",
+      "expected": {
+        "ok": false,
+        "error": "OUT_OF_RANGE"
+      }
+    },
+    {
+      "input": "1,000,000,000,000",
+      "expected": {
+        "ok": false,
+        "error": "OUT_OF_RANGE"
+      }
+    }
+  ]
+}

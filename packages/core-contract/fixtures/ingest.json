@@ -1,0 +1,379 @@
+{
+  "$comment": "Hand-written. Ingested on top of DEFAULT_DATASET. Validation runs field by field in a fixed order and the first failure is the reason (see ingest rules in docs/contract.md).",
+  "input": [
+    {
+      "id": "ing-0000",
+      "idempotencyKey": "ingest-0",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0001",
+      "idempotencyKey": "ingest-1",
+      "type": "QR_PAYMENT",
+      "category": "FOOD",
+      "amount": 1875,
+      "counterparty": {
+        "kind": "MERCHANT",
+        "id": "m-01",
+        "name": "Corner Coffee"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000,
+      "note": "Iced latte"
+    },
+    {
+      "id": "ing-0000",
+      "idempotencyKey": "ingest-0",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "",
+      "idempotencyKey": "ingest-3",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0004",
+      "idempotencyKey": "ingest-4",
+      "type": "REFUND",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0005",
+      "idempotencyKey": "ingest-5",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 0,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0006",
+      "idempotencyKey": "ingest-6",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 1.5,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0007",
+      "idempotencyKey": "ingest-7",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": "100",
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0008",
+      "idempotencyKey": "ingest-8",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "FAILED",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0009",
+      "idempotencyKey": "ingest-9",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000,
+      "failureReason": "SERVER_ERROR"
+    },
+    {
+      "id": "ing-0010",
+      "idempotencyKey": "ingest-10",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1789999999999
+    },
+    {
+      "id": "ing-0011",
+      "idempotencyKey": "ingest-11",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "ALIEN",
+        "id": "x",
+        "name": "x"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0012",
+      "idempotencyKey": "ingest-12",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000,
+      "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    null,
+    {
+      "id": "ing-0014",
+      "idempotencyKey": "ingest-14",
+      "type": "TRANSFER_IN",
+      "category": "CRYPTO",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "tx-000001",
+      "idempotencyKey": "ingest-15",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0016",
+      "idempotencyKey": "ingest-16",
+      "type": "TOP_UP",
+      "category": "TOP_UP",
+      "amount": 50000,
+      "counterparty": {
+        "kind": "PAYMENT_METHOD",
+        "id": "pm-card",
+        "name": "Card"
+      },
+      "status": "FAILED",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000,
+      "failureReason": "SERVER_ERROR"
+    },
+    {
+      "id": "ing-0017",
+      "idempotencyKey": "ingest-17",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "DONE",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0018",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 2500,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    },
+    {
+      "id": "ing-0019",
+      "idempotencyKey": "ingest-19",
+      "type": "TRANSFER_IN",
+      "category": "TRANSFER",
+      "amount": 10000000000000,
+      "counterparty": {
+        "kind": "USER",
+        "id": "u-03",
+        "name": "Citra Lestari",
+        "phone": "+15550000003"
+      },
+      "status": "SUCCESS",
+      "createdAt": 1790000000000,
+      "updatedAt": 1790000000000
+    }
+  ],
+  "expected": {
+    "accepted": 3,
+    "rejected": 15,
+    "duplicates": 2,
+    "errors": [
+      {
+        "index": 3,
+        "reason": "INVALID_ID"
+      },
+      {
+        "index": 4,
+        "reason": "INVALID_TYPE"
+      },
+      {
+        "index": 5,
+        "reason": "INVALID_AMOUNT"
+      },
+      {
+        "index": 6,
+        "reason": "INVALID_AMOUNT"
+      },
+      {
+        "index": 7,
+        "reason": "INVALID_AMOUNT"
+      },
+      {
+        "index": 8,
+        "reason": "INVALID_FAILURE_REASON"
+      },
+      {
+        "index": 9,
+        "reason": "INVALID_FAILURE_REASON"
+      },
+      {
+        "index": 10,
+        "reason": "INVALID_TIMESTAMP"
+      },
+      {
+        "index": 11,
+        "reason": "INVALID_COUNTERPARTY"
+      },
+      {
+        "index": 12,
+        "reason": "INVALID_NOTE"
+      },
+      {
+        "index": 13,
+        "reason": "INVALID_SHAPE"
+      },
+      {
+        "index": 14,
+        "reason": "INVALID_CATEGORY"
+      },
+      {
+        "index": 17,
+        "reason": "INVALID_STATUS"
+      },
+      {
+        "index": 18,
+        "reason": "INVALID_ID"
+      },
+      {
+        "index": 19,
+        "reason": "INVALID_AMOUNT"
+      }
+    ]
+  },
+  "$balanceDelta": "Accepted entries: +2500 (TRANSFER_IN) -1875 (QR_PAYMENT) +0 (FAILED top-up) = +625",
+  "expectedBalanceDelta": 625
+}

@@ -1,0 +1,76 @@
+{
+  "$comment": "Hand-written from requirements §3.2. Every (state, event) pair NOT listed is invalid (NFR-MONEY-04).",
+  "states": [
+    "DRAFT",
+    "AUTHORIZING",
+    "SUBMITTING",
+    "PENDING",
+    "SUCCESS",
+    "FAILED",
+    "REVERSED"
+  ],
+  "events": [
+    "CONFIRM",
+    "CANCEL",
+    "AUTH_OK",
+    "SUBMIT_OK",
+    "SUBMIT_ERROR",
+    "TIMEOUT",
+    "RETRY",
+    "STATUS_SUCCESS",
+    "STATUS_FAILED",
+    "SERVER_REVERSAL"
+  ],
+  "transitions": [
+    {
+      "from": "DRAFT",
+      "event": "CONFIRM",
+      "to": "AUTHORIZING"
+    },
+    {
+      "from": "AUTHORIZING",
+      "event": "CANCEL",
+      "to": "DRAFT"
+    },
+    {
+      "from": "AUTHORIZING",
+      "event": "AUTH_OK",
+      "to": "SUBMITTING"
+    },
+    {
+      "from": "SUBMITTING",
+      "event": "SUBMIT_OK",
+      "to": "SUCCESS"
+    },
+    {
+      "from": "SUBMITTING",
+      "event": "SUBMIT_ERROR",
+      "to": "FAILED"
+    },
+    {
+      "from": "SUBMITTING",
+      "event": "TIMEOUT",
+      "to": "PENDING"
+    },
+    {
+      "from": "FAILED",
+      "event": "RETRY",
+      "to": "SUBMITTING"
+    },
+    {
+      "from": "PENDING",
+      "event": "STATUS_SUCCESS",
+      "to": "SUCCESS"
+    },
+    {
+      "from": "PENDING",
+      "event": "STATUS_FAILED",
+      "to": "FAILED"
+    },
+    {
+      "from": "SUCCESS",
+      "event": "SERVER_REVERSAL",
+      "to": "REVERSED"
+    }
+  ]
+}

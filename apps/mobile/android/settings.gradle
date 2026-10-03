@@ -1,0 +1,19 @@
+pluginManagement { includeBuild("../../../node_modules/@react-native/gradle-plugin") }
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'Pocketly'
+include ':app'
+includeBuild('../../../node_modules/@react-native/gradle-plugin')
+
+// ── kmpCore only ────────────────────────────────────────────────────────────
+// The Nitro adapter is linked manually (autolinking is disabled for it in
+// react-native.config.js) so only the kmpCore flavor depends on it.
+include ':pocketly_core-kmp'
+project(':pocketly_core-kmp').projectDir = new File(rootDir, '../../../packages/core-kmp/android')
+
+// The KMP module, as a composite build: "com.pocketly:pocketly-shared" resolves to it.
+includeBuild('../../../shared')
+
+// ── Benchmarks ──────────────────────────────────────────────────────────────
+include ':macrobenchmark'
+project(':macrobenchmark').projectDir = new File(rootDir, '../../../benchmarks/macrobenchmark')

@@ -1,0 +1,79 @@
+// kmpCore-only Android library: the Nitro adapter + the KMP `shared` module.
+// Linked ONLY into the kmpCore flavor (see apps/mobile/android/app/build.gradle and
+// apps/mobile/react-native.config.js), so jsCore ships zero Kotlin core code.
+
+def reactNativeArchitectures() {
+  def value = rootProject.getProperties().get("reactNativeArchitectures")
+  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
+}
+
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+apply from: "../nitrogen/generated/android/PocketlyCoreKmp+autolinking.gradle"
+apply from: "./fix-prefab.gradle"
+
+def ext(name) { rootProject.ext.get(name) }
+
+android {
+  namespace "com.margelo.nitro.pocketly.corekmp"
+  ndkVersion ext("ndkVersion")
+  compileSdk ext("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion ext("minSdkVersion")
+    consumerProguardFiles "consumer-rules.pro"
+
+    externalNativeBuild {
+      cmake {
+        cppFlags "-frtti -fexceptions -Wall -Wextra -fstack-protector-all"
+        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        abiFilters(*reactNativeArchitectures())
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake { path "CMakeLists.txt" }
+  }
+
+  // Provided by react-native / react-native-nitro-modules at the app level.
+  packagingOptions {
+    excludes = [
+      "META-INF",
+      "META-INF/**",
+      "**/libc++_shared.so",
+      "**/libNitroModules.so",
+      "**/libfbjni.so",
+      "**/libjsi.so",
+      "**/libfolly_json.so",
+      "**/libfolly_runtime.so",
+      "**/libglog.so",
+      "**/libhermes.so",
+      "**/libhermesvm.so",
+      "**/libreactnative.so",
+      "**/libreactnativejni.so",
+      "**/libturbomodulejsijni.so",
+      "**/libreact_nativemodule_core.so",
+    ]
+  }
+
+  buildFeatures {
+    prefab true
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
+
+kotlin {
+  jvmToolchain(17)
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+  implementation project(":react-native-nitro-modules")
+  // Resolved from the included build ../../../shared (composite-build substitution).
+  implementation "com.pocketly:pocketly-shared:0.1.0"
+}
