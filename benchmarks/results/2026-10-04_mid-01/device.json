@@ -1,0 +1,11 @@
+{
+  "model": "V2538",
+  "manufacturer": "vivo",
+  "chipset": "SM7750",
+  "ramMb": 7282,
+  "androidVersion": "16",
+  "sdkInt": 36,
+  "buildNumber": "PD2529DF_EX_A_16.0.19.3.W20",
+  "capturedAt": "2026-10-04T11:48:34Z",
+  "temperatureLog": [{ "at": "2026-10-04T11:48:34Z", "tenthsCelsius": 347, "batteryPct": 82 }]
+}

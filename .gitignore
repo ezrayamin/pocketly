@@ -27,3 +27,6 @@ apps/mobile/ios/.xcode.env
 
 # Local tooling (bundletool jar)
 .tools/
+
+# Perfetto traces are large; keep locally next to their results
+benchmarks/results/**/*.pftrace
