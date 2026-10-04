@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "../..", "types": ["jest", "node"] },
-  "include": ["src", "__tests__", "scripts"]
+  "include": ["src", "__tests__", "scripts", "jest.setup.ts"]
 }

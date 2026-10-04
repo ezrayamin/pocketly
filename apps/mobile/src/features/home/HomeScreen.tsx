@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FullyDrawnMarker } from '../../FullyDrawnMarker';
-import { TAB_BAR_HEIGHT, TabBar } from '../../components/TabBar';
+import { TAB_BAR_HEIGHT } from '../../components/TabBar';
 import { colors, radius, spacing } from '../../theme/tokens';
 import { BalanceCard } from './components/BalanceCard';
 import { HomeHeader } from './components/HomeHeader';
@@ -17,8 +17,14 @@ import { useHomeData } from './useHomeData';
  * quick actions and tab bar (their features come later). No live price card: Invest (F10)
  * is a stretch feature, hidden until it ships (product.md §7.1).
  */
-export function HomeScreen() {
+export function HomeScreen({ refreshToken = 0 }: { refreshToken?: number }) {
   const { data, error, refreshing, balanceHidden, refresh, toggleBalanceHidden } = useHomeData();
+
+  // Reload when asked from outside (e.g. after the developer menu changed the backend).
+  const firstToken = useRef(refreshToken);
+  useEffect(() => {
+    if (refreshToken !== firstToken.current) refresh();
+  }, [refreshToken, refresh]);
   const latestIncoming = data?.recent.find((tx) => tx.type === 'TRANSFER_IN' && tx.status === 'SUCCESS');
 
   return (
@@ -41,10 +47,17 @@ export function HomeScreen() {
         {latestIncoming && <IncomingBanner transaction={latestIncoming} />}
 
         {error && (
-          <View style={styles.error} accessibilityRole="alert">
-            <Text style={styles.errorText}>{error}</Text>
-            <Pressable onPress={refresh} accessibilityRole="button">
-              <Text style={styles.retry}>Retry</Text>
+          <View style={[styles.error, error.offline && styles.offline]} accessibilityRole="alert" testID="home-error">
+            <View style={styles.errorBody}>
+              <Text style={[styles.errorText, error.offline && styles.offlineText]}>{error.message}</Text>
+              {data && (
+                <Text style={styles.staleText}>
+                  Showing data from {new Date(data.loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              )}
+            </View>
+            <Pressable onPress={refresh} accessibilityRole="button" disabled={refreshing}>
+              <Text style={styles.retry}>{refreshing ? '…' : 'Retry'}</Text>
             </Pressable>
           </View>
         )}
@@ -62,7 +75,6 @@ export function HomeScreen() {
         {/* BM-01: Home is "fully drawn" once it shows real data. */}
         {data && <FullyDrawnMarker />}
       </ScrollView>
-      <TabBar />
     </SafeAreaView>
   );
 }
@@ -78,6 +90,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  errorText: { color: colors.danger, flex: 1, fontWeight: '600' },
+  offline: { backgroundColor: colors.tertiaryDim },
+  errorBody: { flex: 1, gap: 2 },
+  errorText: { color: colors.danger, fontWeight: '600' },
+  offlineText: { color: colors.tertiary },
+  staleText: { color: colors.textSecondary, fontSize: 12 },
   retry: { color: colors.textPrimary, fontWeight: '700', marginLeft: spacing.md },
 });

@@ -13,6 +13,7 @@ import com.pocketly.shared.domain.IngestResult
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
+import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.SpendingCalculator
 import com.pocketly.shared.domain.SpendingSummary
@@ -71,6 +72,20 @@ class PocketlyCore internal constructor(
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getTransaction(id: String): Transaction = api.getTransaction(id)
+
+    // ── Developer menu / fake backend controls (F11) ──────────────────────
+
+    /** FR-DEV-02/03, FR-FAKE-04. resetData leaves it alone. */
+    @Throws(CoreException::class)
+    fun setNetworkSimulation(simulation: NetworkSimulation) {
+        backend.networkSimulation = simulation
+    }
+
+    fun getNetworkSimulation(): NetworkSimulation = backend.networkSimulation
+
+    /** FR-DEV-04. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun simulateIncomingTransfer(): Transaction = withContext(Dispatchers.Default) { backend.simulateIncomingTransfer() }
 
     // ── Time (ADR-0006) ───────────────────────────────────────────────────
 

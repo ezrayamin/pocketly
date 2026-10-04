@@ -4,6 +4,7 @@ import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.FakeBackendControls
 import com.pocketly.shared.data.InMemoryTransactionStore
 import com.pocketly.shared.data.TimeZoneHolder
+import com.pocketly.shared.data.TimeoutWalletApi
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.data.TransactionIngestor
 import com.pocketly.shared.data.TransactionStore
@@ -22,7 +23,12 @@ import org.koin.dsl.module
 internal fun coreModule(initialDataset: DatasetConfig) = module {
     single { TimeZoneHolder() }
     single<TransactionStore> { InMemoryTransactionStore() }
-    single { FakeWalletApi(get(), get()) } binds arrayOf(WalletApi::class, FakeBackendControls::class)
+    single { FakeWalletApi(get(), get()) } binds arrayOf(FakeBackendControls::class)
+    // NFR-REL-01: the core only talks to the backend through a timeout.
+    single<WalletApi> {
+        val backend = get<FakeWalletApi>()
+        TimeoutWalletApi(backend) { backend.networkSimulation.readTimeoutMs.toLong() }
+    }
     single { TransactionIngestor(get()) }
     single {
         PocketlyCore(api = get(), backend = get(), store = get(), ingestor = get(), timeZone = get(), initialDataset = initialDataset)

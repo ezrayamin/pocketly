@@ -11,6 +11,8 @@ import com.pocketly.shared.domain.DayTotal
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.IngestResult
 import com.pocketly.shared.domain.MoneyParseResult
+import com.pocketly.shared.domain.NetworkMode
+import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.SpendingSummary
 import com.pocketly.shared.domain.Transaction
@@ -57,6 +59,7 @@ class ContractFixturesTest {
     private val ingest = fixture("ingest.json")
     private val golden = fixture("golden.json")
     private val timeZones = fixture("time-zones.json")
+    private val network = fixture("network.json")
 
     private lateinit var core: PocketlyCore
 
@@ -136,6 +139,26 @@ class ContractFixturesTest {
     }
 
     @Test
+    fun rowAddedMidScrollCausesNoDuplicatesOrGaps() = runTest {
+        val ids = mutableListOf<String>()
+        var cursor: String? = null
+        repeat(3) {
+            val p = core.getTransactions(cursor, 20, null)
+            ids += p.items.map { it.id }
+            cursor = p.nextCursor
+        }
+        val added = core.simulateIncomingTransfer()
+        while (cursor != null) {
+            val p = core.getTransactions(cursor, 20, null)
+            ids += p.items.map { it.id }
+            cursor = p.nextCursor
+        }
+        assertEquals(ids.size, ids.toSet().size)
+        assertEquals(golden["defaultDataset"]!!.jsonObject["allIds"]!!.jsonArray.map { it.jsonPrimitive.content }, ids)
+        kotlin.test.assertFalse(added.id in ids)
+    }
+
+    @Test
     fun spendingSummaries() = runTest {
         for ((month, expected) in golden["summaries"]!!.jsonObject) {
             assertEquals(expected, core.computeSpendingSummary(month).toJson(), month)
@@ -168,6 +191,83 @@ class ContractFixturesTest {
 
         val second = core.ingestTransactions(ingest["input"].toString())
         assertEquals(0, second.accepted)
+    }
+
+    // ── developer menu (F11) ───────────────────────────────────────────────
+
+    private fun simulation(o: JsonObject) = NetworkSimulation(
+        mode = NetworkMode.entries.firstOrNull { it.name == o["mode"]!!.jsonPrimitive.content }
+            ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "Unknown network mode"),
+        failureRatePercent = o["failureRatePercent"]!!.jsonPrimitive.double.let {
+            if (it != kotlin.math.floor(it)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not an integer") else it.toInt()
+        },
+        normalLatencyMs = o["normalLatencyMs"]?.jsonPrimitive?.int ?: 0,
+        readTimeoutMs = o["readTimeoutMs"]?.jsonPrimitive?.int ?: 10_000,
+        seed = o["seed"]?.jsonPrimitive?.int ?: 1,
+    )
+
+    @Test
+    fun networkSimulationDefaultsAndValidation() {
+        val d = network["defaultSimulation"]!!.jsonObject
+        assertEquals(simulation(d), core.getNetworkSimulation())
+        for (bad in network["invalid"]!!.jsonArray) {
+            val e = assertFailsWith<CoreException> { core.setNetworkSimulation(simulation(bad.jsonObject)) }
+            assertEquals(ErrorCode.INVALID_ARGUMENT, e.code)
+        }
+    }
+
+    @Test
+    fun networkModeErrors() = runTest {
+        for (case in network["modeErrors"]!!.jsonArray.map { it.jsonObject }) {
+            core.setNetworkSimulation(simulation(case))
+            val expected = case["error"]!!.jsonPrimitive.content
+            assertEquals(expected, assertFailsWith<CoreException> { core.getWallet() }.code.name)
+            assertEquals(expected, assertFailsWith<CoreException> { core.getTransactions(null, 20, null) }.code.name)
+            core.computeSpendingSummary("2026-09") // local work isn't a backend call
+        }
+    }
+
+    @Test
+    fun networkFailureSequenceMatchesGolden() = runTest {
+        val g = golden["network"]!!.jsonObject
+        core.setNetworkSimulation(simulation(g["simulation"]!!.jsonObject))
+        val outcomes = g["outcomes"]!!.jsonArray.map { it.jsonPrimitive.content }
+        val actual = outcomes.map {
+            try {
+                core.getWallet(); "OK"
+            } catch (e: CoreException) {
+                e.code.name
+            }
+        }
+        assertEquals(outcomes, actual)
+    }
+
+    @Test
+    fun lateResponsesHaveNoEffect() = runTest {
+        val late = network["lateResponse"]!!.jsonObject
+        for (failureRate in listOf(0, 100)) {
+            val c = PocketlyCore.create()
+            val before = c.getWallet()
+            c.setNetworkSimulation(simulation(late["simulation"]!!.jsonObject).copy(failureRatePercent = failureRate))
+            assertEquals(ErrorCode.NETWORK_TIMEOUT, assertFailsWith<CoreException> { c.getWallet() }.code)
+            kotlinx.coroutines.delay(late["waitAfterTimeoutMs"]!!.jsonPrimitive.long) // backend would answer now
+            c.setNetworkSimulation(NetworkSimulation.NORMAL)
+            assertEquals(before, c.getWallet(), "failureRate=$failureRate")
+        }
+    }
+
+    @Test
+    fun simulatedIncomingTransfers() = runTest {
+        val before = core.getWallet().balance.minor
+        val made = listOf(core.simulateIncomingTransfer(), core.simulateIncomingTransfer())
+        val expected = network["incoming"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(expected.map { it["id"]!!.jsonPrimitive.content }, made.map { it.id })
+        assertEquals(expected.map { it["amount"]!!.jsonPrimitive.long }, made.map { it.amount.minor })
+        assertEquals(expected.map { it["counterpartyId"]!!.jsonPrimitive.content }, made.map { it.counterparty?.id })
+        assertEquals(network["incomingBalanceDelta"]!!.jsonPrimitive.long, core.getWallet().balance.minor - before)
+        assertEquals(listOf("sim-000002", "sim-000001"), core.getTransactions(null, 2, null).items.map { it.id })
+        core.resetData(DatasetConfig.DEFAULT)
+        assertEquals("sim-000001", core.simulateIncomingTransfer().id)
     }
 
     // ── time zones (ADR-0006) ──────────────────────────────────────────────

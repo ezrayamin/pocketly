@@ -38,6 +38,10 @@ namespace margelo::nitro::pocketly { struct IngestResult; }
 namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
+// Forward declaration of `NetworkMode` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NetworkMode; }
+// Forward declaration of `NetworkSimulation` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
@@ -71,6 +75,8 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "IngestResult.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
+#include "NetworkMode.hpp"
+#include "NetworkSimulation.hpp"
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
 #include "Transaction.hpp"

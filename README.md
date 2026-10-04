@@ -33,7 +33,9 @@ Start with [docs/architecture.md](docs/architecture.md), then read the ADRs:
 [0003 linking](docs/adr/0003-linking-and-build-selection.md) ·
 [0004 parity](docs/adr/0004-parity-rules-in-practice.md) ·
 [0005 where state lives](docs/adr/0005-where-state-lives.md) ·
-[0006 time zones & clocks](docs/adr/0006-time-zones-and-clocks.md).
+[0006 time zones & clocks](docs/adr/0006-time-zones-and-clocks.md) ·
+[0007 timeouts](docs/adr/0007-timeouts-and-late-responses.md) ·
+[0008 dev tools in release](docs/adr/0008-developer-tools-in-release-builds.md).
 
 ## Prerequisites
 
@@ -90,6 +92,16 @@ cd apps/mobile/ios && bundle exec pod install                # jsCore
 yarn workspace @pocketly/mobile start:kmp                    # Metro :8082 for kmpCore
 yarn workspace @pocketly/mobile ios --port 8082
 ```
+
+### Developer menu (F11)
+
+In every build we produce (debug, demo, benchmarks; ADR-0008): **Profile → tap the app version 7 times**. It drives the fake backend
+(network mode: normal / slow 2–5 s / always fail / timeout / offline, a failure-rate slider,
+"Trigger incoming transfer", "Reset data"). Settings last for the app session. Both cores
+implement the same controls (`setNetworkSimulation`, `simulateIncomingTransfer`) with the
+same seeded failure sequence, and every backend read times out after 10 s (NFR-REL-01);
+late responses are discarded (ADR-0007). Scriptable: `pocketly://dev/network?normalLatencyMs=300`,
+`pocketly://dev/reset`, `pocketly://dev/incoming`.
 
 ## Verified so far
 

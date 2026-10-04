@@ -197,6 +197,24 @@ export interface Subscription {
   unsubscribe(): void;
 }
 
+/** FR-DEV-02: how the fake backend behaves. */
+export type NetworkMode = 'NORMAL' | 'SLOW' | 'ALWAYS_FAIL' | 'TIMEOUT' | 'OFFLINE';
+
+export interface NetworkSimulation {
+  mode: NetworkMode;
+  /** FR-DEV-03: 0–100. In NORMAL/SLOW, each call fails with SERVER_ERROR at this rate. */
+  failureRatePercent: number;
+  /** Fixed latency in NORMAL mode (BM-07 uses 300). 0–60000. Default 0. */
+  normalLatencyMs?: number;
+  /**
+   * Client-side read timeout (NFR-REL-01), 100–60000. Default READ_TIMEOUT_MS (10 s).
+   * A latency above it produces a *late* response, which must have no effect (ADR-0007).
+   */
+  readTimeoutMs?: number;
+  /** Seed for the latency/failure draws, so both cores produce the same sequence. Default 1. */
+  seed?: number;
+}
+
 export interface DatasetConfig {
   seed: number;
   /** Total ledger entries, including the opening top-up. Must be >= 1. */

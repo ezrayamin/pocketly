@@ -1,0 +1,80 @@
+{
+  "$comment": "Hand-written (F11). simulateIncomingTransfer: n-th transfer \u2192 id sim-<n>, amount 1000 + (n*7919 % 49000), contact CONTACTS[(n-1) % 10], createdAt = backend now. Network failures are checked against golden.json (generated).",
+  "defaultSimulation": {
+    "mode": "NORMAL",
+    "failureRatePercent": 0,
+    "normalLatencyMs": 0,
+    "readTimeoutMs": 10000,
+    "seed": 1
+  },
+  "invalid": [
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 101
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": -1
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 12.5
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "normalLatencyMs": -5
+    },
+    {
+      "mode": "SOMETIMES",
+      "failureRatePercent": 0
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "readTimeoutMs": 50
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "readTimeoutMs": 60001
+    }
+  ],
+  "modeErrors": [
+    {
+      "mode": "OFFLINE",
+      "failureRatePercent": 0,
+      "error": "NETWORK_UNAVAILABLE"
+    },
+    {
+      "mode": "ALWAYS_FAIL",
+      "failureRatePercent": 0,
+      "error": "SERVER_ERROR"
+    }
+  ],
+  "incoming": [
+    {
+      "id": "sim-000001",
+      "amount": 8919,
+      "counterpartyId": "u-01",
+      "counterpartyName": "Andi Pratama"
+    },
+    {
+      "id": "sim-000002",
+      "amount": 16838,
+      "counterpartyId": "u-02",
+      "counterpartyName": "Budi Santoso"
+    }
+  ],
+  "incomingBalanceDelta": 25757,
+  "lateResponse": {
+    "$comment": "ADR-0007: latency above the read timeout. The call fails with NETWORK_TIMEOUT; when the response arrives later it changes nothing.",
+    "simulation": {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "normalLatencyMs": 400,
+      "readTimeoutMs": 150
+    },
+    "waitAfterTimeoutMs": 600
+  }
+}

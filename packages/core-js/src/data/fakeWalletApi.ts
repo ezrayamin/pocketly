@@ -1,7 +1,8 @@
 import { CoreError, MAX_PAGE_SIZE } from '@pocketly/core-contract';
 import type { DatasetConfig, Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
 import { localEpochDay, localMidnight } from '../domain/zonedCalendar';
-import { DAILY_LIMIT, WALLET_ID, generateTransactions } from './seedData';
+import { NetworkSimulator } from './fake/networkSimulator';
+import { DAILY_LIMIT, WALLET_ID, generateTransactions, simulatedIncomingTransfer } from './seedData';
 import type { UserTimeZone } from './timeZone';
 import type { TransactionStore } from './transactionStore';
 import type { FakeBackendControls, WalletApi } from './walletApi';
@@ -13,7 +14,9 @@ import type { FakeBackendControls, WalletApi } from './walletApi';
  * with the developer menu. Mirrors shared/.../data/fake/FakeWalletApi.kt.
  */
 export class FakeWalletApi implements WalletApi, FakeBackendControls {
+  readonly network = new NetworkSimulator();
   private frozenNow: number | undefined;
+  private simulatedIncoming = 0;
 
   constructor(
     private readonly store: TransactionStore,
@@ -32,10 +35,18 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       throw new CoreError('INVALID_ARGUMENT', 'nowMillis must be a safe integer');
     }
     this.frozenNow = config.nowMillis;
+    this.simulatedIncoming = 0;
     this.store.replaceAll(generateTransactions(config, this.now()));
   }
 
+  simulateIncomingTransfer(): Transaction {
+    const tx = simulatedIncomingTransfer(++this.simulatedIncoming, this.now());
+    this.store.insertAll([tx]);
+    return tx;
+  }
+
   async getWallet(): Promise<Wallet> {
+    await this.network.beforeCall();
     const now = this.now();
     const offsetAt = this.timeZone().offsetAt;
     // FR-TRF-10: the daily limit resets at local midnight in the user's zone (ADR-0006).
@@ -50,6 +61,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   async getTransactions(cursor: string | undefined, limit: number, filter?: TxFilter): Promise<TransactionPage> {
+    await this.network.beforeCall();
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
       throw new CoreError('INVALID_ARGUMENT', `limit must be 1..${MAX_PAGE_SIZE}, got ${limit}`);
     }
@@ -57,6 +69,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   async getTransaction(id: string): Promise<Transaction> {
+    await this.network.beforeCall();
     const tx = this.store.get(id);
     if (tx === undefined) {
       throw new CoreError('NOT_FOUND', `No transaction ${id}`);

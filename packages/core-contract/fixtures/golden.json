@@ -1260,5 +1260,38 @@
         }
       ]
     ]
+  },
+  "network": {
+    "simulation": {
+      "mode": "NORMAL",
+      "failureRatePercent": 30,
+      "seed": 7
+    },
+    "outcomes": [
+      "OK",
+      "OK",
+      "OK",
+      "SERVER_ERROR",
+      "SERVER_ERROR",
+      "SERVER_ERROR",
+      "OK",
+      "SERVER_ERROR",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "SERVER_ERROR",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK",
+      "OK"
+    ]
   }
 }

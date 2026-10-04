@@ -13,3 +13,5 @@ jest.mock('@pocketly/native-preferences', () => {
     },
   };
 });
+// Developer tools are on in every build this project produces (ADR-0008).
+jest.mock('@pocketly/native-build-info', () => ({ buildInfo: { devToolsEnabled: true } }));

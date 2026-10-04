@@ -57,6 +57,21 @@ internal object SeedData {
     private val FAILURE_REASONS =
         listOf(ErrorCode.INSUFFICIENT_FUNDS, ErrorCode.SERVER_ERROR, ErrorCode.RECIPIENT_NOT_FOUND)
 
+    /** FR-DEV-04: the n-th simulated incoming transfer (n ≥ 1). Deterministic, so both cores agree. */
+    fun simulatedIncomingTransfer(n: Int, now: Long) = Transaction(
+        id = "sim-" + n.toString().padStart(6, '0'),
+        idempotencyKey = "sim-key-$n",
+        type = TransactionType.TRANSFER_IN,
+        category = Category.TRANSFER,
+        amount = Money(1_000L + (n.toLong() * 7_919) % 49_000),
+        counterparty = CONTACTS[(n - 1) % CONTACTS.size],
+        note = "Simulated incoming transfer",
+        status = TransactionStatus.SUCCESS,
+        failureReason = null,
+        createdAt = now,
+        updatedAt = now,
+    )
+
     private fun txId(i: Int) = "tx-" + i.toString().padStart(6, '0')
 
     private fun pickType(roll: Int) = when {

@@ -27,6 +27,7 @@ The plan is [docs/benchmarking.md](../docs/benchmarking.md). This folder holds t
 | BM-04 | `ingestTransactions(<ingest-5k.json>)` | `DEFAULT_DATASET` + 5,000 entries |
 | BM-05 | `subscribePrices(20 symbols, …, { intervalMs: 100 })` | — |
 | BM-06 | 10,000 × `formatMoney()` vs 1 × `formatMoneyBatch(10,000)` | — |
+| BM-07 | transfer flow with `setNetworkSimulation({ mode: 'NORMAL', failureRatePercent: 0, normalLatencyMs: 300 })` | `LIVE_DATASET` |
 
 ## Pre-run
 

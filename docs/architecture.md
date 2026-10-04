@@ -44,7 +44,7 @@ flowchart TB
 | Layer | Kotlin (`shared/src/commonMain/.../shared/`) | TypeScript (`packages/core-js/src/`) |
 |---|---|---|
 | `domain/` (pure, depends on nothing) | `Money`, `MoneyFormatter`, `TransferStateMachine`, `UtcCalendar`, `Ledger`, `SpendingCalculator` | `money`, `transferStateMachine`, `calendar`, `ledger`, `spendingSummary` |
-| `data/` | `WalletApi`, `fake/FakeWalletApi`, `fake/SeedData`, `fake/SeededRandom`, `TransactionStore`, `TransactionDtoValidator`, `TransactionIngestor` | same names in camelCase |
+| `data/` | `WalletApi`, `TimeoutWalletApi` (NFR-REL-01), `fake/FakeWalletApi`, `fake/NetworkSimulator` (F11), `fake/SeedData`, `fake/SeededRandom`, `TransactionStore`, `TransactionDtoValidator`, `TransactionIngestor`, `UserTimeZone` | same names in camelCase |
 | `sync/` | `PriceFeed` (exposes a `Flow`) | `priceFeed` |
 | `security/` | `SecureStore` (interface; Keystore/Keychain `actual`s come in M3) | — (the JS build will call the same native secure storage) |
 | `bridge/` | `PocketlyCore` facade, `BridgeConversions`, `di/CoreModule` (Koin) | `jsCore.ts` (composition root) |

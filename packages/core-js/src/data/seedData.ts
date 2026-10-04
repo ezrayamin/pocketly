@@ -63,6 +63,23 @@ const PAYMENT_METHODS: readonly Counterparty[] = [
 const NOTES = ['Lunch', 'Rent share', 'Thanks!', 'Groceries', 'Birthday gift', 'Dinner split'];
 const FAILURE_REASONS: readonly ErrorCode[] = ['INSUFFICIENT_FUNDS', 'SERVER_ERROR', 'RECIPIENT_NOT_FOUND'];
 
+/** FR-DEV-04: the n-th simulated incoming transfer (n ≥ 1). Deterministic, so both cores agree. */
+export function simulatedIncomingTransfer(n: number, now: number): Transaction {
+  const counterparty = CONTACTS[(n - 1) % CONTACTS.length];
+  return {
+    id: `sim-${String(n).padStart(6, '0')}`,
+    idempotencyKey: `sim-key-${n}`,
+    type: 'TRANSFER_IN',
+    category: 'TRANSFER',
+    amount: 1_000 + ((n * 7_919) % 49_000),
+    counterparty,
+    note: 'Simulated incoming transfer',
+    status: 'SUCCESS',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function txId(i: number): string {
   return `tx-${String(i).padStart(6, '0')}`;
 }

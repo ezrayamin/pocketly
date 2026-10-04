@@ -48,6 +48,9 @@ kotlin {
 
 // Fixtures shared with the TypeScript contract suite (packages/core-contract/fixtures).
 tasks.named<Test>("jvmTest") {
-    systemProperty("pocketly.fixtures", rootDir.resolve("../packages/core-contract/fixtures").absolutePath)
+    val fixtures = rootDir.resolve("../packages/core-contract/fixtures")
+    // Declared as an input so editing a fixture re-runs the parity tests.
+    inputs.dir(fixtures).withPropertyName("contractFixtures")
+    systemProperty("pocketly.fixtures", fixtures.absolutePath)
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

@@ -3,6 +3,7 @@ import type {
   IngestResult,
   MinorUnits,
   MoneyParseResult,
+  NetworkSimulation,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -33,6 +34,18 @@ export interface Core {
   /** Newest first. FR-HIST-01: default limit 20, no duplicates across pages. */
   getTransactions(cursor?: string, limit?: number, filter?: TxFilter): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
+
+  // ── Developer menu / fake backend controls (F11) ──────────────────────
+  /**
+   * FR-DEV-02/03, FR-FAKE-04: applies to every backend call (getWallet, getTransactions,
+   * getTransaction). Calls give up after `readTimeoutMs` with NETWORK_TIMEOUT; a response
+   * arriving after that is discarded and has no effect (ADR-0007).
+   * Starts as NETWORK_NORMAL; resetData leaves it alone. Throws INVALID_ARGUMENT for bad values.
+   */
+  setNetworkSimulation(simulation: NetworkSimulation): void;
+  getNetworkSimulation(): NetworkSimulation;
+  /** FR-DEV-04: the fake backend receives a deterministic incoming transfer, now. */
+  simulateIncomingTransfer(): Promise<Transaction>;
 
   // ── Time (ADR-0006) ───────────────────────────────────────────────────
   /**

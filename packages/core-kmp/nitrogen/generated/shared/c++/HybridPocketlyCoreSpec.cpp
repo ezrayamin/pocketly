@@ -18,6 +18,9 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("getWallet", &HybridPocketlyCoreSpec::getWallet);
       prototype.registerHybridMethod("getTransactions", &HybridPocketlyCoreSpec::getTransactions);
       prototype.registerHybridMethod("getTransaction", &HybridPocketlyCoreSpec::getTransaction);
+      prototype.registerHybridMethod("setNetworkSimulation", &HybridPocketlyCoreSpec::setNetworkSimulation);
+      prototype.registerHybridMethod("getNetworkSimulation", &HybridPocketlyCoreSpec::getNetworkSimulation);
+      prototype.registerHybridMethod("simulateIncomingTransfer", &HybridPocketlyCoreSpec::simulateIncomingTransfer);
       prototype.registerHybridMethod("setTimeZone", &HybridPocketlyCoreSpec::setTimeZone);
       prototype.registerHybridMethod("computeSpendingSummary", &HybridPocketlyCoreSpec::computeSpendingSummary);
       prototype.registerHybridMethod("ingestTransactions", &HybridPocketlyCoreSpec::ingestTransactions);

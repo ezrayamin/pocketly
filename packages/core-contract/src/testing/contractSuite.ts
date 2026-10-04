@@ -9,13 +9,14 @@
  *
  * Uses Jest globals; never import this from app code.
  */
-import { DEFAULT_DATASET } from '../constants';
+import { DEFAULT_DATASET, NETWORK_NORMAL } from '../constants';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
-import type { PriceTick, Transaction } from '../types';
+import type { NetworkSimulation, PriceTick, Transaction } from '../types';
 import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
+import network from '../../fixtures/network.json';
 import timeZones from '../../fixtures/time-zones.json';
 
 type CoreFactory = () => Core | Promise<Core>;
@@ -115,6 +116,26 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         }
       });
 
+      it('a row added at the top mid-scroll causes no duplicates or gaps (FR-HIST-01)', async () => {
+        const seen: Transaction[] = [];
+        let cursor: string | undefined;
+        for (let page = 0; page < 3; page++) {
+          const p = await core.getTransactions(cursor, 20);
+          seen.push(...p.items);
+          cursor = p.nextCursor;
+        }
+        const added = await core.simulateIncomingTransfer(); // newest: lands above page 1
+        while (cursor !== undefined) {
+          const p = await core.getTransactions(cursor, 20);
+          seen.push(...p.items);
+          cursor = p.nextCursor;
+        }
+        const ids = seen.map((t) => t.id);
+        expect(new Set(ids).size).toBe(ids.length); // no duplicates
+        expect(ids).toEqual(golden.defaultDataset.allIds); // no gaps, same order
+        expect(ids).not.toContain(added.id); // it's above where we started; a refresh shows it
+      });
+
       it('filters by status and type (FR-HIST-03)', async () => {
         const page = await core.getTransactions(undefined, 100, {
           statuses: ['PENDING', 'FAILED'],
@@ -177,6 +198,79 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       it('rejects payloads that are not a JSON array', async () => {
         await expectCoreError(core.ingestTransactions('{not json'), 'INVALID_ARGUMENT');
         await expectCoreError(core.ingestTransactions('{"a":1}'), 'INVALID_ARGUMENT');
+      });
+    });
+
+    describe('developer menu: network simulation (FR-DEV-02/03, FR-FAKE-04)', () => {
+      it('starts NORMAL with no failures', () => {
+        expect(core.getNetworkSimulation()).toEqual(network.defaultSimulation);
+      });
+
+      it.each(network.invalid)('rejects %j', (sim) => {
+        expectCoreErrorSync(() => core.setNetworkSimulation(sim as NetworkSimulation), 'INVALID_ARGUMENT');
+      });
+
+      it.each(network.modeErrors)('$mode → $error on every backend call', async ({ mode, failureRatePercent, error }) => {
+        core.setNetworkSimulation({ mode: mode as NetworkSimulation['mode'], failureRatePercent });
+        await expectCoreError(core.getWallet(), error as CoreError['code']);
+        await expectCoreError(core.getTransactions(), error as CoreError['code']);
+        // Local work isn't a backend call.
+        await expect(core.computeSpendingSummary('2026-09')).resolves.toBeDefined();
+      });
+
+      it('failure rate follows the seeded golden sequence', async () => {
+        const { simulation, outcomes } = golden.network;
+        core.setNetworkSimulation(simulation as NetworkSimulation);
+        const actual: string[] = [];
+        for (let i = 0; i < outcomes.length; i++) {
+          actual.push(await core.getWallet().then(() => 'OK', (e: CoreError) => e.code));
+        }
+        expect(actual).toEqual(outcomes);
+      });
+
+      it.each([
+        ['response', 0],
+        ['failure', 100],
+      ])('a late %s (after the timeout) has no effect (ADR-0007)', async (_kind, failureRatePercent) => {
+        const { simulation, waitAfterTimeoutMs } = network.lateResponse;
+        const before = await core.getWallet();
+        core.setNetworkSimulation({ ...(simulation as NetworkSimulation), failureRatePercent });
+
+        const settlements: string[] = [];
+        await core.getWallet().then(
+          () => settlements.push('resolved'),
+          (e: CoreError) => settlements.push(e.code),
+        );
+        expect(settlements).toEqual(['NETWORK_TIMEOUT']);
+
+        // The backend answers during this wait. Nothing may settle again or change.
+        await new Promise((r) => setTimeout(r, waitAfterTimeoutMs));
+        expect(settlements).toEqual(['NETWORK_TIMEOUT']);
+        core.setNetworkSimulation(NETWORK_NORMAL);
+        expect(await core.getWallet()).toEqual(before);
+      });
+
+      it('resetData keeps the simulation', async () => {
+        core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+        await core.resetData(DEFAULT_DATASET);
+        expect(core.getNetworkSimulation().mode).toBe('OFFLINE');
+      });
+    });
+
+    describe('developer menu: incoming transfer (FR-DEV-04)', () => {
+      it('adds deterministic incoming transfers, newest first, and updates the balance', async () => {
+        const before = (await core.getWallet()).balance;
+        const made = [await core.simulateIncomingTransfer(), await core.simulateIncomingTransfer()];
+        expect(made.map((t) => ({ id: t.id, amount: t.amount, counterpartyId: t.counterparty?.id, counterpartyName: t.counterparty?.name }))).toEqual(network.incoming);
+        expect(made.every((t) => t.type === 'TRANSFER_IN' && t.status === 'SUCCESS' && t.createdAt === DEFAULT_DATASET.nowMillis)).toBe(true);
+        expect((await core.getWallet()).balance - before).toBe(network.incomingBalanceDelta);
+        expect((await core.getTransactions(undefined, 2)).items.map((t) => t.id)).toEqual(['sim-000002', 'sim-000001']);
+      });
+
+      it('numbering restarts after resetData', async () => {
+        await core.simulateIncomingTransfer();
+        await core.resetData(DEFAULT_DATASET);
+        expect((await core.simulateIncomingTransfer()).id).toBe('sim-000001');
       });
     });
 

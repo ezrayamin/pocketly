@@ -86,6 +86,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // ADR-0008: developer tools (menu + pocketly://dev links) in every build we produce
+        // (debug, demo, benchmarks). A store build passes -PproductionBuild to remove them.
+        resValue "bool", "pocketly_dev_tools", project.hasProperty("productionBuild") ? "false" : "true"
     }
 
     // BM-08: one APK per ABI (≈ what a device downloads). Opt-in: -PsplitApksByAbi

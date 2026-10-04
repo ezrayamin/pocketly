@@ -4,6 +4,7 @@ import type {
   DatasetConfig,
   IngestResult,
   MoneyParseResult,
+  NetworkSimulation,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -15,6 +16,7 @@ import type {
 } from '@pocketly/core-contract';
 import { FakeWalletApi } from './data/fakeWalletApi';
 import { ingestTransactions } from './data/transactionIngestor';
+import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { InMemoryTransactionStore } from './data/transactionStore';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
@@ -36,15 +38,17 @@ export class JsCore implements Core {
 
   private readonly store = new InMemoryTransactionStore();
   private zone = new UserTimeZone('UTC');
-  private readonly api = new FakeWalletApi(this.store, () => this.zone);
+  private readonly backend = new FakeWalletApi(this.store, () => this.zone);
+  /** NFR-REL-01: the core only talks to the backend through a timeout. */
+  private readonly api = new TimeoutWalletApi(this.backend, () => this.backend.network.get().readTimeoutMs!);
   private computeMs = 0;
 
   constructor(options: JsCoreOptions = {}) {
-    this.api.reset(options.dataset ?? DEFAULT_DATASET);
+    this.backend.reset(options.dataset ?? DEFAULT_DATASET);
   }
 
   async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
-    this.api.reset(config);
+    this.backend.reset(config);
   }
 
   getWallet(): Promise<Wallet> {
@@ -67,6 +71,18 @@ export class JsCore implements Core {
 
   async ingestTransactions(json: string): Promise<IngestResult> {
     return this.timed(() => ingestTransactions(json, this.store));
+  }
+
+  setNetworkSimulation(simulation: NetworkSimulation): void {
+    this.backend.network.set(simulation);
+  }
+
+  getNetworkSimulation(): NetworkSimulation {
+    return this.backend.network.get();
+  }
+
+  async simulateIncomingTransfer(): Promise<Transaction> {
+    return this.backend.simulateIncomingTransfer();
   }
 
   setTimeZone(zoneId: string): void {

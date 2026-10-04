@@ -208,6 +208,48 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func setNetworkSimulation(simulation: NetworkSimulation) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.setNetworkSimulation(simulation: simulation)
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getNetworkSimulation() -> bridge.Result_NetworkSimulation_ {
+    do {
+      let __result = try self.__implementation.getNetworkSimulation()
+      let __resultCpp = __result
+      return bridge.create_Result_NetworkSimulation_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_NetworkSimulation_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func simulateIncomingTransfer() -> bridge.Result_std__shared_ptr_Promise_Transaction___ {
+    do {
+      let __result = try self.__implementation.simulateIncomingTransfer()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_Transaction__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_Transaction__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_Transaction__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_Transaction___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_Transaction___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func setTimeZone(zoneId: std.string) -> bridge.Result_void_ {
     do {
       try self.__implementation.setTimeZone(zoneId: String(zoneId))

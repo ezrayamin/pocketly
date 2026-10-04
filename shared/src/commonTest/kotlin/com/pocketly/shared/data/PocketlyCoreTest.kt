@@ -4,6 +4,8 @@ import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
+import com.pocketly.shared.domain.NetworkMode
+import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.TransactionStatus
 import com.pocketly.shared.domain.TxFilter
@@ -72,6 +74,32 @@ class PocketlyCoreTest {
         assertEquals("SOL", received.await().first().symbol)
         sub.cancel()
         assertNull(core.priceTicks(emptyList(), 1, 1).first().firstOrNull())
+    }
+
+    // Timing on runTest's virtual clock (the JS mirror uses Jest fake timers).
+
+    @Test
+    fun slowModeAnswersAfterTwoToFiveSeconds() = runTest {
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.SLOW, failureRatePercent = 0))
+        val start = testScheduler.currentTime
+        core.getWallet()
+        assertTrue(testScheduler.currentTime - start in 2_000L..5_000L)
+    }
+
+    @Test
+    fun timeoutModeFailsWithNetworkTimeoutAfterTenSeconds() = runTest {
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.TIMEOUT, failureRatePercent = 0))
+        val start = testScheduler.currentTime
+        assertEquals(ErrorCode.NETWORK_TIMEOUT, assertFailsWith<CoreException> { core.getWallet() }.code)
+        assertEquals(10_000L, testScheduler.currentTime - start)
+    }
+
+    @Test
+    fun normalLatencyIsExact() = runTest {
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0, normalLatencyMs = 300))
+        val start = testScheduler.currentTime
+        core.getWallet()
+        assertEquals(300L, testScheduler.currentTime - start)
     }
 
     @Test

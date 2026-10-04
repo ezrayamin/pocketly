@@ -121,3 +121,20 @@ data class DatasetConfig(val seed: Int, val transactionCount: Int, val nowMillis
         val LIVE = DatasetConfig(seed = 42, transactionCount = 200, nowMillis = null)
     }
 }
+
+/** FR-DEV-02. Mirrors core-contract's NetworkMode. */
+enum class NetworkMode { NORMAL, SLOW, ALWAYS_FAIL, TIMEOUT, OFFLINE }
+
+/** FR-DEV-02/03, FR-FAKE-04. Mirrors core-contract's NetworkSimulation. */
+data class NetworkSimulation(
+    val mode: NetworkMode,
+    val failureRatePercent: Int,
+    val normalLatencyMs: Int = 0,
+    /** Client-side read timeout (NFR-REL-01, ADR-0007). Same default as READ_TIMEOUT_MS. */
+    val readTimeoutMs: Int = 10_000,
+    val seed: Int = 1,
+) {
+    companion object {
+        val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
+    }
+}

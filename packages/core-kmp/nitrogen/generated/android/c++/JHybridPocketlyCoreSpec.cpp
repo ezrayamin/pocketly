@@ -25,6 +25,10 @@ namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 namespace margelo::nitro::pocketly { enum class TransactionStatus; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `NetworkSimulation` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `NetworkMode` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NetworkMode; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `CategoryTotal` to properly resolve imports.
@@ -76,6 +80,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JTransactionStatus.hpp"
 #include "ErrorCode.hpp"
 #include "JErrorCode.hpp"
+#include "NetworkSimulation.hpp"
+#include "JNetworkSimulation.hpp"
+#include "NetworkMode.hpp"
+#include "JNetworkMode.hpp"
 #include "SpendingSummary.hpp"
 #include "JSpendingSummary.hpp"
 #include "CategoryTotal.hpp"
@@ -190,6 +198,31 @@ namespace margelo::nitro::pocketly {
   std::shared_ptr<Promise<Transaction>> JHybridPocketlyCoreSpec::getTransaction(const std::string& id) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* id */)>("getTransaction");
     auto __result = method(_javaPart, jni::make_jstring(id));
+    return [&]() {
+      auto __promise = Promise<Transaction>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTransaction>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  void JHybridPocketlyCoreSpec::setNetworkSimulation(const NetworkSimulation& simulation) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JNetworkSimulation> /* simulation */)>("setNetworkSimulation");
+    method(_javaPart, JNetworkSimulation::fromCpp(simulation));
+  }
+  NetworkSimulation JHybridPocketlyCoreSpec::getNetworkSimulation() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JNetworkSimulation>()>("getNetworkSimulation");
+    auto __result = method(_javaPart);
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<Transaction>> JHybridPocketlyCoreSpec::simulateIncomingTransfer() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("simulateIncomingTransfer");
+    auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<Transaction>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {

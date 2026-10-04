@@ -5,6 +5,7 @@ import type {
   DatasetConfig,
   IngestResult,
   MoneyParseResult,
+  NetworkSimulation,
   PriceTick,
   SpendingSummary,
   Transaction,
@@ -32,6 +33,10 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   getWallet(): Promise<Wallet>;
   getTransactions(cursor: string | undefined, limit: number, filter: TxFilter | undefined): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
+
+  setNetworkSimulation(simulation: NetworkSimulation): void;
+  getNetworkSimulation(): NetworkSimulation;
+  simulateIncomingTransfer(): Promise<Transaction>;
 
   setTimeZone(zoneId: string): void;
 

@@ -36,6 +36,8 @@ namespace margelo::nitro::pocketly { struct IngestResult; }
 namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
+// Forward declaration of `NetworkSimulation` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
@@ -74,6 +76,7 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "IngestResult.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
+#include "NetworkSimulation.hpp"
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
 #include "Transaction.hpp"
@@ -632,6 +635,15 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_Transaction___ create_Result_std__shared_ptr_Promise_Transaction___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<Transaction>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<NetworkSimulation>
+  using Result_NetworkSimulation_ = Result<NetworkSimulation>;
+  inline Result_NetworkSimulation_ create_Result_NetworkSimulation_(const NetworkSimulation& value) noexcept {
+    return Result<NetworkSimulation>::withValue(value);
+  }
+  inline Result_NetworkSimulation_ create_Result_NetworkSimulation_(const std::exception_ptr& error) noexcept {
+    return Result<NetworkSimulation>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<Promise<SpendingSummary>>>

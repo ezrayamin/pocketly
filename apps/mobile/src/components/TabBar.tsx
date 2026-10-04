@@ -5,42 +5,47 @@ import { colors, radius } from '../theme/tokens';
 import { History, House, ScanLine, User, type LucideIcon } from './icons';
 
 /**
- * STATIC PLACEHOLDER for the bottom tab bar (product.md §7.1): the MVP's 4 tabs, with Pay
- * as the raised center button. Invest becomes a 5th tab only once F10 ships. Navigation
- * (React Navigation) arrives with History/Profile; until then only Home is active.
+ * Bottom tab bar (product.md §7.1): the MVP's 4 tabs, Pay as the raised center button.
+ * Invest becomes a 5th tab once F10 ships. Home and Profile work; History and Pay are
+ * placeholders until their features exist. React Navigation replaces this with History.
  */
-const TABS: { key: string; label: string; Icon: LucideIcon }[] = [
+export type TabKey = 'home' | 'history' | 'pay' | 'profile';
+const ENABLED: readonly TabKey[] = ['home', 'profile'];
+const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'home', label: 'Home', Icon: House },
   { key: 'history', label: 'History', Icon: History },
   { key: 'pay', label: 'Pay', Icon: ScanLine },
   { key: 'profile', label: 'Profile', Icon: User },
 ];
 
-export function TabBar() {
+export function TabBar({ active, onSelect }: { active: TabKey; onSelect: (tab: TabKey) => void }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]} accessibilityRole="tablist">
       <View style={styles.bar}>
         {TABS.map(({ key, label, Icon }) => {
-          const active = key === 'home';
+          const selected = key === active;
+          const enabled = ENABLED.includes(key);
           const isPay = key === 'pay';
           return (
             <Pressable
               key={key}
               style={styles.tab}
+              onPress={enabled ? () => onSelect(key) : undefined}
               accessibilityRole="tab"
               accessibilityLabel={label}
-              accessibilityState={{ selected: active, disabled: !active }}
-              accessibilityHint={active ? undefined : 'Coming soon'}
+              accessibilityState={{ selected, disabled: !enabled }}
+              accessibilityHint={enabled ? undefined : 'Coming soon'}
+              testID={`tab-${key}`}
             >
               {isPay ? (
                 <View style={styles.payButton}>
                   <Icon color={colors.onPrimary} size={24} />
                 </View>
               ) : (
-                <Icon color={active ? colors.primary : colors.textSecondary} size={22} />
+                <Icon color={selected ? colors.primary : colors.textSecondary} size={22} />
               )}
-              <Text style={[styles.label, active && styles.labelActive, isPay && styles.payLabel]}>{label}</Text>
+              <Text style={[styles.label, selected && styles.labelActive, isPay && styles.payLabel]}>{label}</Text>
             </Pressable>
           );
         })}

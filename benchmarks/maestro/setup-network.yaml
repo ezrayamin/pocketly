@@ -1,0 +1,8 @@
+# Reusable setup: configure the fake backend through a dev link (ADR-0008), no hidden menu.
+#   - runFlow:
+#       file: setup-network.yaml
+#       env: { APP_ID: com.pocketly.kmp, LATENCY_MS: "300" }
+appId: ${APP_ID}
+---
+- launchApp
+- openLink: "pocketly://dev/network?mode=NORMAL&failureRatePercent=0&normalLatencyMs=${LATENCY_MS}"

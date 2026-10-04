@@ -1,0 +1,12 @@
+{
+  "name": "@pocketly/native-build-info",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Build-time switches exposed to JS (ADR-0008): developer tools on/off.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "peerDependencies": {
+    "react-native": "*"
+  }
+}

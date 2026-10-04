@@ -8,6 +8,8 @@ import com.pocketly.shared.domain.DatasetConfig as KDatasetConfig
 import com.pocketly.shared.domain.DayTotal as KDayTotal
 import com.pocketly.shared.domain.IngestResult as KIngestResult
 import com.pocketly.shared.domain.MoneyParseResult as KMoneyParseResult
+import com.pocketly.shared.domain.NetworkMode as KNetworkMode
+import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
 import com.pocketly.shared.domain.SpendingSummary as KSpendingSummary
 import com.pocketly.shared.domain.Transaction as KTransaction
@@ -26,6 +28,22 @@ internal fun DatasetConfig.toDomain() = KDatasetConfig(
     seed = BridgeConversions.toIntExact(seed, "seed"),
     transactionCount = BridgeConversions.toIntExact(transactionCount, "transactionCount"),
     nowMillis = nowMillis?.let { BridgeConversions.toLongExact(it, "nowMillis") },
+)
+
+internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
+    mode = KNetworkMode.valueOf(mode.name),
+    failureRatePercent = BridgeConversions.toIntExact(failureRatePercent, "failureRatePercent"),
+    normalLatencyMs = normalLatencyMs?.let { BridgeConversions.toIntExact(it, "normalLatencyMs") } ?: 0,
+    readTimeoutMs = readTimeoutMs?.let { BridgeConversions.toIntExact(it, "readTimeoutMs") } ?: 10_000,
+    seed = seed?.let { BridgeConversions.toIntExact(it, "seed") } ?: 1,
+)
+
+internal fun KNetworkSimulation.toNitro() = NetworkSimulation(
+    mode = NetworkMode.valueOf(mode.name),
+    failureRatePercent = failureRatePercent.toDouble(),
+    normalLatencyMs = normalLatencyMs.toDouble(),
+    readTimeoutMs = readTimeoutMs.toDouble(),
+    seed = seed.toDouble(),
 )
 
 internal fun TxFilter.toDomain() = KTxFilter(

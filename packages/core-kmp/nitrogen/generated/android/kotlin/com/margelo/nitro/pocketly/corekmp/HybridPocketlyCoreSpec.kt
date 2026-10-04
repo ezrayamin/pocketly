@@ -48,6 +48,18 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun setNetworkSimulation(simulation: NetworkSimulation): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getNetworkSimulation(): NetworkSimulation
+  
+  @DoNotStrip
+  @Keep
+  abstract fun simulateIncomingTransfer(): Promise<Transaction>
+  
+  @DoNotStrip
+  @Keep
   abstract fun setTimeZone(zoneId: String): Unit
   
   @DoNotStrip

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SpendingSummary, Transaction, Wallet } from '@pocketly/core-contract';
-import { toCoreError } from '@pocketly/core-contract';
 import { uiPreferences } from '@pocketly/native-preferences';
 import { core } from '../../core';
+import { toUserError, type UserError } from '../errors';
 import { localMonth } from './presentation';
 
 export const RECENT_COUNT = 5; // FR-HOME-04
@@ -17,7 +17,8 @@ export interface HomeData {
 
 export interface HomeState {
   data: HomeData | null;
-  error: string | null;
+  /** Latest load/refresh failure. Data from the last success stays on screen (FR-HIST-04). */
+  error: UserError | null;
   refreshing: boolean;
   balanceHidden: boolean;
   refresh: () => Promise<void>;
@@ -33,21 +34,28 @@ async function load(): Promise<HomeData> {
 /** Home screen state. Wallet data comes from the core; hide/show is a UI preference (ADR-0005). */
 export function useHomeData(): HomeState {
   const [data, setData] = useState<HomeData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UserError | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [balanceHidden, setBalanceHidden] = useState(false);
   const mounted = useRef(true);
+  // Only the newest load may touch the screen: an older one finishing late (slow, timed
+  // out, or failed) must not overwrite newer data or show a stale error (ADR-0007).
+  const latest = useRef(0);
 
+  /** Loads and applies; returns false if a newer load superseded this one. */
   const run = useCallback(async () => {
+    const id = ++latest.current;
+    const isCurrent = () => mounted.current && id === latest.current;
     try {
       const next = await load();
-      if (mounted.current) {
+      if (isCurrent()) {
         setData(next);
         setError(null);
       }
     } catch (e) {
-      if (mounted.current) setError(toCoreError(e).message);
+      if (isCurrent()) setError(toUserError(e));
     }
+    return isCurrent();
   }, []);
 
   useEffect(() => {
@@ -61,8 +69,7 @@ export function useHomeData(): HomeState {
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
-    await run();
-    if (mounted.current) setRefreshing(false);
+    if (await run()) setRefreshing(false);
   }, [run]);
 
   const toggleBalanceHidden = useCallback(() => {

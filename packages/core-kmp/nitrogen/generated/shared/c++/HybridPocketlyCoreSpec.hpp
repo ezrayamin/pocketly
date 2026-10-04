@@ -23,6 +23,8 @@ namespace margelo::nitro::pocketly { struct TransactionPage; }
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `Transaction` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Transaction; }
+// Forward declaration of `NetworkSimulation` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `IngestResult` to properly resolve imports.
@@ -42,6 +44,7 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include <optional>
 #include "TxFilter.hpp"
 #include "Transaction.hpp"
+#include "NetworkSimulation.hpp"
 #include "SpendingSummary.hpp"
 #include "IngestResult.hpp"
 #include <vector>
@@ -86,6 +89,9 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<Wallet>> getWallet() = 0;
       virtual std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) = 0;
       virtual std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) = 0;
+      virtual void setNetworkSimulation(const NetworkSimulation& simulation) = 0;
+      virtual NetworkSimulation getNetworkSimulation() = 0;
+      virtual std::shared_ptr<Promise<Transaction>> simulateIncomingTransfer() = 0;
       virtual void setTimeZone(const std::string& zoneId) = 0;
       virtual std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) = 0;
       virtual std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) = 0;

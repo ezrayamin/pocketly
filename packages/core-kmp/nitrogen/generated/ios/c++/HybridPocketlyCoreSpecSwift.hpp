@@ -34,6 +34,10 @@ namespace margelo::nitro::pocketly { enum class TransactionStatus; }
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
+// Forward declaration of `NetworkSimulation` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `NetworkMode` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NetworkMode; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `CategoryTotal` to properly resolve imports.
@@ -72,6 +76,8 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransactionStatus.hpp"
 #include "ErrorCode.hpp"
 #include "TxFilter.hpp"
+#include "NetworkSimulation.hpp"
+#include "NetworkMode.hpp"
 #include "SpendingSummary.hpp"
 #include "CategoryTotal.hpp"
 #include "DayTotal.hpp"
@@ -162,6 +168,28 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) override {
       auto __result = _swiftPart.getTransaction(id);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline void setNetworkSimulation(const NetworkSimulation& simulation) override {
+      auto __result = _swiftPart.setNetworkSimulation(std::forward<decltype(simulation)>(simulation));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline NetworkSimulation getNetworkSimulation() override {
+      auto __result = _swiftPart.getNetworkSimulation();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<Transaction>> simulateIncomingTransfer() override {
+      auto __result = _swiftPart.simulateIncomingTransfer();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

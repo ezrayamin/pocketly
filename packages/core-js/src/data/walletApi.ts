@@ -15,4 +15,6 @@ export interface WalletApi {
 export interface FakeBackendControls {
   /** FR-DEV-05: reset to a seeded state. */
   reset(config: DatasetConfig): void;
+  /** FR-DEV-04: the backend receives a deterministic incoming transfer, now. */
+  simulateIncomingTransfer(): Transaction;
 }

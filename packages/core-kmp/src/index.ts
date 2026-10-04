@@ -10,6 +10,7 @@ import type {
   DatasetConfig,
   IngestResult,
   MoneyParseResult,
+  NetworkSimulation,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -46,6 +47,22 @@ export class KmpCore implements Core {
 
   getTransaction(id: string): Promise<Transaction> {
     return this.native.getTransaction(id).catch(rethrow);
+  }
+
+  setNetworkSimulation(simulation: NetworkSimulation): void {
+    try {
+      this.native.setNetworkSimulation(simulation);
+    } catch (e) {
+      throw toCoreError(e);
+    }
+  }
+
+  getNetworkSimulation(): NetworkSimulation {
+    return this.native.getNetworkSimulation();
+  }
+
+  simulateIncomingTransfer(): Promise<Transaction> {
+    return this.native.simulateIncomingTransfer().catch(rethrow);
   }
 
   setTimeZone(zoneId: string): void {

@@ -21,6 +21,7 @@
     "@pocketly/core-contract": "0.1.0",
     "@pocketly/core-js": "0.1.0",
     "@pocketly/core-kmp": "0.1.0",
+    "@pocketly/native-build-info": "0.1.0",
     "@pocketly/native-preferences": "0.1.0",
     "@react-native/new-app-screen": "0.87.1",
     "lucide-react-native": "1.51.0",

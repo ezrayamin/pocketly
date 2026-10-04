@@ -32,6 +32,13 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun getTransaction(id: String): Promise<Transaction> =
         Promise.async { core.getTransaction(id).toNitro() }
 
+    override fun setNetworkSimulation(simulation: NetworkSimulation) = core.setNetworkSimulation(simulation.toDomain())
+
+    override fun getNetworkSimulation(): NetworkSimulation = core.getNetworkSimulation().toNitro()
+
+    override fun simulateIncomingTransfer(): Promise<Transaction> =
+        Promise.async { core.simulateIncomingTransfer().toNitro() }
+
     override fun setTimeZone(zoneId: String) = core.setTimeZone(zoneId)
 
     override fun computeSpendingSummary(month: String): Promise<SpendingSummary> =

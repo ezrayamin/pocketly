@@ -1,6 +1,7 @@
 package com.pocketly.shared.data
 
 import com.pocketly.shared.domain.DatasetConfig
+import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
@@ -22,4 +23,10 @@ interface WalletApi {
 interface FakeBackendControls {
     /** FR-DEV-05: reset to a seeded state. */
     fun reset(config: DatasetConfig)
+
+    /** FR-DEV-04: the backend receives a deterministic incoming transfer, now. */
+    fun simulateIncomingTransfer(): Transaction
+
+    /** FR-DEV-02/03. */
+    var networkSimulation: NetworkSimulation
 }

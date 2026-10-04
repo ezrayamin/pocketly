@@ -51,6 +51,32 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.getTransaction(id: id).toNitro() }
   }
 
+  func setNetworkSimulation(simulation: NetworkSimulation) throws {
+    let mode = PocketlyShared.NetworkMode.entries.first { $0.name == simulation.mode.stringValue }!
+    try core.setNetworkSimulation(simulation: PocketlyShared.NetworkSimulation(
+      mode: mode,
+      failureRatePercent: try convert.toIntExact(value: simulation.failureRatePercent, field: "failureRatePercent"),
+      normalLatencyMs: try convert.toIntExact(value: simulation.normalLatencyMs ?? 0, field: "normalLatencyMs"),
+      readTimeoutMs: try convert.toIntExact(value: simulation.readTimeoutMs ?? 10_000, field: "readTimeoutMs"),
+      seed: try convert.toIntExact(value: simulation.seed ?? 1, field: "seed")
+    ))
+  }
+
+  func getNetworkSimulation() throws -> NetworkSimulation {
+    let s = core.getNetworkSimulation()
+    return NetworkSimulation(
+      mode: NetworkMode(fromString: s.mode.name)!,
+      failureRatePercent: Double(s.failureRatePercent),
+      normalLatencyMs: Double(s.normalLatencyMs),
+      readTimeoutMs: Double(s.readTimeoutMs),
+      seed: Double(s.seed)
+    )
+  }
+
+  func simulateIncomingTransfer() throws -> Promise<Transaction> {
+    return Promise.async { [core] in try await core.simulateIncomingTransfer().toNitro() }
+  }
+
   func setTimeZone(zoneId: String) throws {
     try core.setTimeZone(zoneId: zoneId)
   }
