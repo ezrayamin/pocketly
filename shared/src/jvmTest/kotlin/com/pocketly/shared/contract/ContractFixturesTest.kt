@@ -56,6 +56,7 @@ class ContractFixturesTest {
     private val stateMachine = fixture("state-machine.json")
     private val ingest = fixture("ingest.json")
     private val golden = fixture("golden.json")
+    private val timeZones = fixture("time-zones.json")
 
     private lateinit var core: PocketlyCore
 
@@ -167,6 +168,47 @@ class ContractFixturesTest {
 
         val second = core.ingestTransactions(ingest["input"].toString())
         assertEquals(0, second.accepted)
+    }
+
+    // ── time zones (ADR-0006) ──────────────────────────────────────────────
+
+    @Test
+    fun timeZoneEdges() = runTest {
+        for (case in timeZones["cases"]!!.jsonArray.map { it.jsonObject }) {
+            val name = case["name"]!!.jsonPrimitive.content
+            val c = PocketlyCore.create()
+            c.resetData(DatasetConfig(seed = 1, transactionCount = 1, nowMillis = case["nowMillis"]!!.jsonPrimitive.long))
+            c.setTimeZone(case["zone"]!!.jsonPrimitive.content)
+            val txs = case["transactions"]!!.jsonArray
+            assertEquals(txs.size, c.ingestTransactions(txs.toString()).accepted, name)
+
+            val expected = case["expected"]!!.jsonObject
+            assertEquals(expected["usedToday"]!!.jsonPrimitive.long, c.getWallet().usedToday.minor, "$name usedToday")
+            for ((month, want) in expected["months"]!!.jsonObject) {
+                val s = c.computeSpendingSummary(month)
+                val w = want.jsonObject
+                assertEquals(w["totalSpent"]!!.jsonPrimitive.long, s.totalSpent.minor, "$name $month totalSpent")
+                assertEquals(w["transactionCount"]!!.jsonPrimitive.int, s.transactionCount, "$name $month count")
+                val wantDays = w["byDay"]!!.jsonArray.map { d -> d.jsonArray.let { it[0].jsonPrimitive.content to it[1].jsonPrimitive.long } }
+                assertEquals(wantDays, s.byDay.map { it.date to it.spent.minor }, "$name $month byDay")
+            }
+        }
+    }
+
+    @Test
+    fun unknownTimeZonesAreRejected() {
+        for (zone in timeZones["invalidZones"]!!.jsonArray) {
+            val e = assertFailsWith<CoreException> { core.setTimeZone(zone.jsonPrimitive.content) }
+            assertEquals(ErrorCode.INVALID_ARGUMENT, e.code)
+        }
+    }
+
+    @Test
+    fun liveClockReportsCurrentTime() = runTest {
+        core.resetData(DatasetConfig(seed = 42, transactionCount = 10, nowMillis = null))
+        val before = System.currentTimeMillis()
+        val updatedAt = core.getWallet().updatedAt
+        kotlin.test.assertTrue(updatedAt in before..System.currentTimeMillis())
     }
 
     // ── prices ─────────────────────────────────────────────────────────────

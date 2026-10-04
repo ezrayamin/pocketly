@@ -108,9 +108,16 @@ data class MoneyParseResult(val minor: Money?, val error: MoneyParseError?) {
 
 data class PriceTick(val symbol: String, val price: Money, val changeBps: Int, val seq: Int)
 
-data class DatasetConfig(val seed: Int, val transactionCount: Int, val nowMillis: EpochMillis) {
+/**
+ * [nowMillis] set = the fake backend's clock is frozen there (tests, golden, benchmarks);
+ * null = it follows the device clock (the app). Mirrors core-contract's DatasetConfig.
+ */
+data class DatasetConfig(val seed: Int, val transactionCount: Int, val nowMillis: EpochMillis?) {
     companion object {
-        /** FR-FAKE-01. Same as DEFAULT_DATASET in core-contract. 2026-10-01T12:00:00Z. */
+        /** FR-FAKE-01, frozen at 2026-10-01T12:00:00Z. Same as DEFAULT_DATASET. */
         val DEFAULT = DatasetConfig(seed = 42, transactionCount = 200, nowMillis = 1_790_856_000_000L)
+
+        /** Same data on the device clock: what the app uses. Same as LIVE_DATASET. */
+        val LIVE = DatasetConfig(seed = 42, transactionCount = 200, nowMillis = null)
     }
 }

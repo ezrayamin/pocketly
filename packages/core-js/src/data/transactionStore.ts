@@ -1,6 +1,5 @@
 import { CoreError } from '@pocketly/core-contract';
 import type { Transaction, TransactionPage, TxFilter } from '@pocketly/core-contract';
-import { MILLIS_PER_DAY } from '../domain/calendar';
 import { countsTowardDailyLimit, ledgerEffect } from '../domain/ledger';
 
 /**
@@ -8,7 +7,7 @@ import { countsTowardDailyLimit, ledgerEffect } from '../domain/ledger';
  * storage work (BM-PAR-03, see ADR-0004). Mirrors shared/.../data/TransactionStore.kt.
  */
 export interface TransactionStore {
-  replaceAll(transactions: Transaction[], nowMillis: number): void;
+  replaceAll(transactions: Transaction[]): void;
   /** Inserts and re-sorts. Callers must have filtered out existing ids. */
   insertAll(transactions: Transaction[]): void;
   has(id: string): boolean;
@@ -17,7 +16,8 @@ export interface TransactionStore {
   all(): readonly Transaction[];
   page(cursor: string | undefined, limit: number, filter?: TxFilter): TransactionPage;
   balance(): number;
-  usedToday(): number;
+  /** Outgoing money counting toward the daily limit (FR-TRF-10) created at or after `from`. */
+  usedSince(from: number): number;
 }
 
 /** Newest first; ties broken by id descending so the order is total. */
@@ -51,15 +51,11 @@ export class InMemoryTransactionStore implements TransactionStore {
   private items: Transaction[] = [];
   private byId = new Map<string, Transaction>();
   private runningBalance = 0;
-  private runningUsedToday = 0;
-  private dayStart = 0;
 
-  replaceAll(transactions: Transaction[], nowMillis: number): void {
+  replaceAll(transactions: Transaction[]): void {
     this.items = [];
     this.byId.clear();
     this.runningBalance = 0;
-    this.runningUsedToday = 0;
-    this.dayStart = Math.floor(nowMillis / MILLIS_PER_DAY) * MILLIS_PER_DAY;
     this.insertAll(transactions);
   }
 
@@ -68,9 +64,6 @@ export class InMemoryTransactionStore implements TransactionStore {
       this.items.push(tx);
       this.byId.set(tx.id, tx);
       this.runningBalance += ledgerEffect(tx);
-      if (tx.createdAt >= this.dayStart && countsTowardDailyLimit(tx)) {
-        this.runningUsedToday += tx.amount;
-      }
     }
     this.items.sort(compareNewestFirst);
   }
@@ -91,8 +84,14 @@ export class InMemoryTransactionStore implements TransactionStore {
     return this.runningBalance;
   }
 
-  usedToday(): number {
-    return this.runningUsedToday;
+  usedSince(from: number): number {
+    // Newest first, so stop at the first older entry.
+    let used = 0;
+    for (const tx of this.items) {
+      if (tx.createdAt < from) break;
+      if (countsTowardDailyLimit(tx)) used += tx.amount;
+    }
+    return used;
   }
 
   page(cursor: string | undefined, limit: number, filter?: TxFilter): TransactionPage {

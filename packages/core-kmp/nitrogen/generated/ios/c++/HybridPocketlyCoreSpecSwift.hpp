@@ -59,6 +59,7 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 
 #include <NitroModules/Promise.hpp>
 #include "DatasetConfig.hpp"
+#include <optional>
 #include "Wallet.hpp"
 #include <string>
 #include "TransactionPage.hpp"
@@ -67,7 +68,6 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransactionType.hpp"
 #include "Category.hpp"
 #include "Counterparty.hpp"
-#include <optional>
 #include "CounterpartyKind.hpp"
 #include "TransactionStatus.hpp"
 #include "ErrorCode.hpp"
@@ -167,6 +167,12 @@ namespace margelo::nitro::pocketly {
       }
       auto __value = std::move(__result.value());
       return __value;
+    }
+    inline void setTimeZone(const std::string& zoneId) override {
+      auto __result = _swiftPart.setTimeZone(zoneId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
     }
     inline std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) override {
       auto __result = _swiftPart.computeSpendingSummary(month);

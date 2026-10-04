@@ -16,6 +16,7 @@ import type {
 import { FakeWalletApi } from './data/fakeWalletApi';
 import { ingestTransactions } from './data/transactionIngestor';
 import { InMemoryTransactionStore } from './data/transactionStore';
+import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { PriceFeed } from './sync/priceFeed';
@@ -25,16 +26,21 @@ const now: () => number =
     ? () => performance.now()
     : () => Date.now();
 
+export interface JsCoreOptions {
+  dataset?: DatasetConfig;
+}
+
 /** Composition root for the TypeScript core. Counterpart of shared/.../bridge/PocketlyCore.kt. */
 export class JsCore implements Core {
   readonly impl = 'js' as const;
 
   private readonly store = new InMemoryTransactionStore();
-  private readonly api = new FakeWalletApi(this.store);
+  private zone = new UserTimeZone('UTC');
+  private readonly api = new FakeWalletApi(this.store, () => this.zone);
   private computeMs = 0;
 
-  constructor(dataset: DatasetConfig = DEFAULT_DATASET) {
-    this.api.reset(dataset);
+  constructor(options: JsCoreOptions = {}) {
+    this.api.reset(options.dataset ?? DEFAULT_DATASET);
   }
 
   async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -54,11 +60,19 @@ export class JsCore implements Core {
   }
 
   async computeSpendingSummary(month: string): Promise<SpendingSummary> {
-    return this.timed(() => computeSpendingSummary(month, this.store.all(), this.store.balance()));
+    return this.timed(() =>
+      computeSpendingSummary(month, this.zone.month(month), this.store.all(), this.store.balance()),
+    );
   }
 
   async ingestTransactions(json: string): Promise<IngestResult> {
     return this.timed(() => ingestTransactions(json, this.store));
+  }
+
+  setTimeZone(zoneId: string): void {
+    if (zoneId !== this.zone.zoneId) {
+      this.zone = new UserTimeZone(zoneId);
+    }
   }
 
   formatMoney(minor: number): string {
@@ -97,6 +111,6 @@ export class JsCore implements Core {
   }
 }
 
-export function createJsCore(dataset?: DatasetConfig): Core {
-  return new JsCore(dataset);
+export function createJsCore(options?: JsCoreOptions): JsCore {
+  return new JsCore(options);
 }

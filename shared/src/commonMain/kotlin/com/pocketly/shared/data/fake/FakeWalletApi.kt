@@ -1,8 +1,10 @@
 package com.pocketly.shared.data.fake
 
 import com.pocketly.shared.data.FakeBackendControls
+import com.pocketly.shared.data.TimeZoneHolder
 import com.pocketly.shared.data.TransactionStore
 import com.pocketly.shared.data.WalletApi
+import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -10,30 +12,45 @@ import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
 import com.pocketly.shared.domain.Wallet
+import com.pocketly.shared.domain.ZonedCalendar
+import kotlin.concurrent.Volatile
 
 /**
  * In-process fake backend (requirements §4.2). Serves straight from the store.
- * Latency/failure simulation (FR-FAKE-04) arrives with the developer menu.
- * Mirrors packages/core-js/src/data/fakeWalletApi.ts.
+ * Its clock is frozen at `DatasetConfig.nowMillis` when given (tests, benchmarks) and is
+ * the device clock otherwise (the app). Latency/failure simulation (FR-FAKE-04) arrives
+ * with the developer menu. Mirrors packages/core-js/src/data/fakeWalletApi.ts.
  */
-internal class FakeWalletApi(private val store: TransactionStore) : WalletApi, FakeBackendControls {
-    private var nowMillis = 0L
+internal class FakeWalletApi(
+    private val store: TransactionStore,
+    private val timeZone: TimeZoneHolder,
+) : WalletApi, FakeBackendControls {
+    @Volatile
+    private var frozenNow: Long? = null
+
+    fun now(): Long = frozenNow ?: currentTimeMillis()
 
     override fun reset(config: DatasetConfig) {
         if (config.transactionCount < 1) {
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "transactionCount must be >= 1")
         }
-        store.replaceAll(SeedData.generate(config), config.nowMillis)
-        nowMillis = config.nowMillis
+        frozenNow = config.nowMillis
+        store.replaceAll(SeedData.generate(config, now()))
     }
 
-    override suspend fun getWallet() = Wallet(
-        id = SeedData.WALLET_ID,
-        balance = store.balance(),
-        dailyLimit = SeedData.DAILY_LIMIT,
-        usedToday = store.usedToday(),
-        updatedAt = nowMillis,
-    )
+    override suspend fun getWallet(): Wallet {
+        val now = now()
+        val zone = timeZone.current.offsetAt
+        // FR-TRF-10: the daily limit resets at local midnight in the user's zone (ADR-0006).
+        val todayStart = ZonedCalendar.localMidnight(ZonedCalendar.localEpochDay(now, zone), zone)
+        return Wallet(
+            id = SeedData.WALLET_ID,
+            balance = store.balance(),
+            dailyLimit = SeedData.DAILY_LIMIT,
+            usedToday = store.usedSince(todayStart),
+            updatedAt = now,
+        )
+    }
 
     override suspend fun getTransactions(cursor: String?, limit: Int, filter: TxFilter?): TransactionPage {
         if (limit !in 1..MAX_PAGE_SIZE) {

@@ -73,9 +73,9 @@ internal object SeedData {
         else -> TransactionStatus.REVERSED
     }
 
-    fun generate(config: DatasetConfig): List<Transaction> {
+    /** [now] is the backend clock at seeding time (config.nowMillis when frozen). */
+    fun generate(config: DatasetConfig, now: Long): List<Transaction> {
         val rng = SeededRandom(config.seed)
-        val now = config.nowMillis
         val out = ArrayList<Transaction>(config.transactionCount)
 
         val openingAt = now - (WINDOW_MINUTES + 24 * 60) * MINUTE

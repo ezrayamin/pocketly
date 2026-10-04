@@ -18,8 +18,14 @@ public extension DatasetConfig {
   /**
    * Create a new instance of `DatasetConfig`.
    */
-  init(seed: Double, transactionCount: Double, nowMillis: Double) {
-    self.init(seed, transactionCount, nowMillis)
+  init(seed: Double, transactionCount: Double, nowMillis: Double?) {
+    self.init(seed, transactionCount, { () -> bridge.std__optional_double_ in
+      if let __unwrappedValue = nowMillis {
+        return bridge.create_std__optional_double_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }())
   }
 
   @inline(__always)
@@ -33,7 +39,14 @@ public extension DatasetConfig {
   }
   
   @inline(__always)
-  var nowMillis: Double {
-    return self.__nowMillis
+  var nowMillis: Double? {
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__nowMillis) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__nowMillis)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
 }

@@ -1,0 +1,292 @@
+{
+  "$comment": "Hand-written (ADR-0006). Each case: resetData({ seed: 1, transactionCount: 1, nowMillis }), setTimeZone(zone), ingest `transactions` (all SUCCESS QR payments, so spent = sum), then check Wallet.usedToday and computeSpendingSummary per month. $local/$now are the human-readable sources of the epoch values. The opening balance entry is 61 days before now, outside every checked month.",
+  "invalidZones": [
+    "Mars/Olympus_Mons",
+    "Not a zone"
+  ],
+  "cases": [
+    {
+      "name": "Asia/Jakarta (UTC+7): local midnight vs UTC midnight, month end",
+      "zone": "Asia/Jakarta",
+      "$now": "2026-10-04T00:16:00+07:00",
+      "nowMillis": 1791047760000,
+      "transactions": [
+        {
+          "$local": "2026-10-03T23:59:00+07:00",
+          "id": "tz-001",
+          "idempotencyKey": "tz-key-1",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 1000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1791046740000,
+          "updatedAt": 1791046740000
+        },
+        {
+          "$local": "2026-10-04T00:01:00+07:00",
+          "id": "tz-002",
+          "idempotencyKey": "tz-key-2",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 2000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1791046860000,
+          "updatedAt": 1791046860000
+        },
+        {
+          "$local": "2026-09-30T23:59:00+07:00",
+          "id": "tz-003",
+          "idempotencyKey": "tz-key-3",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 4000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1790787540000,
+          "updatedAt": 1790787540000
+        },
+        {
+          "$local": "2026-10-01T00:01:00+07:00",
+          "id": "tz-004",
+          "idempotencyKey": "tz-key-4",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 8000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1790787660000,
+          "updatedAt": 1790787660000
+        }
+      ],
+      "expected": {
+        "usedToday": 2000,
+        "months": {
+          "2026-10": {
+            "totalSpent": 11000,
+            "transactionCount": 3,
+            "byDay": [
+              [
+                "2026-10-01",
+                8000
+              ],
+              [
+                "2026-10-03",
+                1000
+              ],
+              [
+                "2026-10-04",
+                2000
+              ]
+            ]
+          },
+          "2026-09": {
+            "totalSpent": 4000,
+            "transactionCount": 1,
+            "byDay": [
+              [
+                "2026-09-30",
+                4000
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "America/New_York: negative offset + DST ends 2026-11-01 02:00 (25-hour day)",
+      "zone": "America/New_York",
+      "$now": "2026-11-01T23:45:00-05:00",
+      "nowMillis": 1793594700000,
+      "transactions": [
+        {
+          "$local": "2026-10-31T23:59:00-04:00",
+          "id": "tz-005",
+          "idempotencyKey": "tz-key-5",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 100,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1793505540000,
+          "updatedAt": 1793505540000
+        },
+        {
+          "$local": "2026-11-01T00:01:00-04:00",
+          "id": "tz-006",
+          "idempotencyKey": "tz-key-6",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 200,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1793505660000,
+          "updatedAt": 1793505660000
+        },
+        {
+          "$local": "2026-11-01T23:30:00-05:00",
+          "id": "tz-007",
+          "idempotencyKey": "tz-key-7",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 400,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1793593800000,
+          "updatedAt": 1793593800000
+        }
+      ],
+      "expected": {
+        "usedToday": 600,
+        "months": {
+          "2026-11": {
+            "totalSpent": 600,
+            "transactionCount": 2,
+            "byDay": [
+              [
+                "2026-11-01",
+                600
+              ]
+            ]
+          },
+          "2026-10": {
+            "totalSpent": 100,
+            "transactionCount": 1,
+            "byDay": [
+              [
+                "2026-10-31",
+                100
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "UTC: same data as Jakarta, read in UTC (the old behaviour, still valid for UTC users)",
+      "zone": "UTC",
+      "$now": "2026-10-03T17:16:00Z",
+      "nowMillis": 1791047760000,
+      "transactions": [
+        {
+          "$local": "2026-10-03T16:59:00Z",
+          "id": "tz-008",
+          "idempotencyKey": "tz-key-8",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 1000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1791046740000,
+          "updatedAt": 1791046740000
+        },
+        {
+          "$local": "2026-10-03T17:01:00Z",
+          "id": "tz-009",
+          "idempotencyKey": "tz-key-9",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 2000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1791046860000,
+          "updatedAt": 1791046860000
+        },
+        {
+          "$local": "2026-09-30T16:59:00Z",
+          "id": "tz-010",
+          "idempotencyKey": "tz-key-10",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 4000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1790787540000,
+          "updatedAt": 1790787540000
+        },
+        {
+          "$local": "2026-09-30T17:01:00Z",
+          "id": "tz-011",
+          "idempotencyKey": "tz-key-11",
+          "type": "QR_PAYMENT",
+          "category": "FOOD",
+          "amount": 8000,
+          "counterparty": {
+            "kind": "MERCHANT",
+            "id": "m-01",
+            "name": "Corner Coffee"
+          },
+          "status": "SUCCESS",
+          "createdAt": 1790787660000,
+          "updatedAt": 1790787660000
+        }
+      ],
+      "expected": {
+        "usedToday": 3000,
+        "months": {
+          "2026-10": {
+            "totalSpent": 3000,
+            "transactionCount": 2,
+            "byDay": [
+              [
+                "2026-10-03",
+                3000
+              ]
+            ]
+          },
+          "2026-09": {
+            "totalSpent": 12000,
+            "transactionCount": 2,
+            "byDay": [
+              [
+                "2026-09-30",
+                12000
+              ]
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

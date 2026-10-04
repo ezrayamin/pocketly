@@ -11,9 +11,18 @@ export const DEFAULT_PRICE_INTERVAL_MS = 100;
 /** 2026-10-01T12:00:00Z */
 export const DEFAULT_NOW_MILLIS = 1_790_856_000_000;
 
-/** FR-FAKE-01: ~200 transactions over 60 days. */
+/** FR-FAKE-01: ~200 transactions over 60 days, frozen clock (tests, golden, benchmarks). */
 export const DEFAULT_DATASET: DatasetConfig = {
   seed: 42,
   transactionCount: 200,
   nowMillis: DEFAULT_NOW_MILLIS,
 };
+
+/** Same data, but on the device clock: what the app uses. */
+export const LIVE_DATASET: DatasetConfig = {
+  seed: 42,
+  transactionCount: 200,
+};
+
+/** Default zone for "today" and month boundaries until the app calls setTimeZone. */
+export const DEFAULT_TIME_ZONE = 'UTC';

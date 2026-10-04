@@ -35,6 +35,7 @@ flowchart TB
 | `packages/core-contract` | `Core` interface, all bridged types, error codes, the contract test suite and parity fixtures | nothing |
 | `packages/core-js` | The `jsCore` implementation, in TypeScript | `core-contract` |
 | `packages/core-kmp` | The `kmpCore` implementation: Nitro spec, a TS adapter, Kotlin and Swift adapters | `core-contract`, `react-native-nitro-modules` |
+| `packages/native-preferences` | UI preferences shared by both builds (ADR-0005), on SharedPreferences / NSUserDefaults | — |
 | `shared/` | The KMP module that holds all `kmpCore` business logic | — |
 | `apps/mobile` | The RN app. Screens import `src/core.ts` and `core-contract` types, never a specific core | `core-contract`, `@pocketly/core-impl` (virtual) |
 

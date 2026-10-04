@@ -25,7 +25,7 @@ import com.pocketly.shared.domain.Wallet as KWallet
 internal fun DatasetConfig.toDomain() = KDatasetConfig(
     seed = BridgeConversions.toIntExact(seed, "seed"),
     transactionCount = BridgeConversions.toIntExact(transactionCount, "transactionCount"),
-    nowMillis = BridgeConversions.toLongExact(nowMillis, "nowMillis"),
+    nowMillis = nowMillis?.let { BridgeConversions.toLongExact(it, "nowMillis") },
 )
 
 internal fun TxFilter.toDomain() = KTxFilter(

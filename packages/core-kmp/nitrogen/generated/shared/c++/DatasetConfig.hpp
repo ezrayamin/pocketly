@@ -30,7 +30,7 @@
 
 
 
-
+#include <optional>
 
 namespace margelo::nitro::pocketly {
 
@@ -41,11 +41,11 @@ namespace margelo::nitro::pocketly {
   public:
     double seed     SWIFT_PRIVATE;
     double transactionCount     SWIFT_PRIVATE;
-    double nowMillis     SWIFT_PRIVATE;
+    std::optional<double> nowMillis     SWIFT_PRIVATE;
 
   public:
     DatasetConfig() = default;
-    explicit DatasetConfig(double seed, double transactionCount, double nowMillis): seed(seed), transactionCount(transactionCount), nowMillis(nowMillis) {}
+    explicit DatasetConfig(double seed, double transactionCount, std::optional<double> nowMillis): seed(seed), transactionCount(transactionCount), nowMillis(nowMillis) {}
 
   public:
     friend bool operator==(const DatasetConfig& lhs, const DatasetConfig& rhs) = default;
@@ -63,14 +63,14 @@ namespace margelo::nitro {
       return margelo::nitro::pocketly::DatasetConfig(
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "transactionCount"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nowMillis")))
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nowMillis")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pocketly::DatasetConfig& arg) {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "seed"), JSIConverter<double>::toJSI(runtime, arg.seed));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "transactionCount"), JSIConverter<double>::toJSI(runtime, arg.transactionCount));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "nowMillis"), JSIConverter<double>::toJSI(runtime, arg.nowMillis));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "nowMillis"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.nowMillis));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -83,7 +83,7 @@ namespace margelo::nitro {
       }
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "transactionCount")))) return false;
-      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nowMillis")))) return false;
+      if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nowMillis")))) return false;
       return true;
     }
   };

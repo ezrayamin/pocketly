@@ -1,0 +1,12 @@
+{
+  "name": "@pocketly/native-preferences",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI preferences shared by both builds (ADR-0005), on SharedPreferences / NSUserDefaults.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "peerDependencies": {
+    "react-native": "*"
+  }
+}

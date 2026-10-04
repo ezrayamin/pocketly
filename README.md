@@ -31,7 +31,9 @@ Start with [docs/architecture.md](docs/architecture.md), then read the ADRs:
 [0001 two cores](docs/adr/0001-one-contract-two-cores.md) ·
 [0002 Nitro](docs/adr/0002-nitro-modules-bridge.md) ·
 [0003 linking](docs/adr/0003-linking-and-build-selection.md) ·
-[0004 parity](docs/adr/0004-parity-rules-in-practice.md).
+[0004 parity](docs/adr/0004-parity-rules-in-practice.md) ·
+[0005 where state lives](docs/adr/0005-where-state-lives.md) ·
+[0006 time zones & clocks](docs/adr/0006-time-zones-and-clocks.md).
 
 ## Prerequisites
 

@@ -16,7 +16,7 @@ import com.pocketly.shared.bridge.PocketlyCore
 @DoNotStrip
 @Keep
 class HybridPocketlyCore : HybridPocketlyCoreSpec() {
-    private val core: PocketlyCore = PocketlyCore.create()
+    private val core: PocketlyCore = PocketlyCore.create(com.pocketly.shared.domain.DatasetConfig.LIVE)
 
     override fun resetData(config: DatasetConfig): Promise<Unit> = Promise.async {
         core.resetData(config.toDomain())
@@ -31,6 +31,8 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun getTransaction(id: String): Promise<Transaction> =
         Promise.async { core.getTransaction(id).toNitro() }
+
+    override fun setTimeZone(zoneId: String) = core.setTimeZone(zoneId)
 
     override fun computeSpendingSummary(month: String): Promise<SpendingSummary> =
         Promise.async { core.computeSpendingSummary(month).toNitro() }

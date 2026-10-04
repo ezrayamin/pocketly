@@ -20,7 +20,7 @@ const sets: [string, number, number][] = [
 ];
 
 for (const [file, seed, transactionCount] of sets) {
-  let txs = generateTransactions({ ...DEFAULT_DATASET, seed, transactionCount });
+  let txs = generateTransactions({ ...DEFAULT_DATASET, seed, transactionCount }, DEFAULT_DATASET.nowMillis!);
   if (file.startsWith('ingest')) {
     txs = txs.map((t) => ({ ...t, id: t.id.replace('tx-', 'in-') }));
   }

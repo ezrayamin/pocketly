@@ -18,7 +18,7 @@ const PRICE_SYMBOLS = ['BTC', 'ETH', 'XAU', 'DOGE'];
 const PRICE_SEED = 7;
 
 async function main() {
-  const core = new JsCore(DEFAULT_DATASET);
+  const core = new JsCore({ dataset: DEFAULT_DATASET });
 
   const defaultDataset = {
     config: DEFAULT_DATASET,

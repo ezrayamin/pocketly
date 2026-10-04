@@ -1,18 +1,20 @@
 import { CoreError } from '@pocketly/core-contract';
 import type { Category, CategoryTotal, DayTotal, SpendingSummary, Transaction } from '@pocketly/core-contract';
-import { epochDay, isoDate, monthRange } from './calendar';
+import { MILLIS_PER_DAY, isoDate } from './calendar';
 import { isOutgoing, ledgerEffect } from './ledger';
+import { segmentOffset, type ZonedMonth } from './zonedCalendar';
 
 /**
- * BM-03: group by category and day, totals, balance check.
+ * BM-03: group by category and day, totals, balance check. `range` is the month in the
+ * user's time zone (zonedCalendar.ts); days are local days.
  * Mirrors shared/.../domain/SpendingCalculator.kt — same single pass, same maps, same sorts.
  */
 export function computeSpendingSummary(
   month: string,
+  range: ZonedMonth | undefined,
   transactions: readonly Transaction[],
   walletBalance: number,
 ): SpendingSummary {
-  const range = monthRange(month);
   if (range === undefined) {
     throw new CoreError('INVALID_ARGUMENT', `month must be YYYY-MM, got "${month}"`);
   }
@@ -35,7 +37,7 @@ export function computeSpendingSummary(
       continue;
     }
 
-    const dayKey = epochDay(tx.createdAt);
+    const dayKey = Math.floor((tx.createdAt + segmentOffset(range.segments, tx.createdAt)) / MILLIS_PER_DAY);
     let day = byDay.get(dayKey);
     if (day === undefined) {
       day = { spent: 0, income: 0 };

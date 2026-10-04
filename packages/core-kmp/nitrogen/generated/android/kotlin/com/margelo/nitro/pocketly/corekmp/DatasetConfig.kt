@@ -26,7 +26,7 @@ data class DatasetConfig(
   val transactionCount: Double,
   @DoNotStrip
   @Keep
-  val nowMillis: Double
+  val nowMillis: Double?
 ) {
   /* primary constructor */
 
@@ -54,7 +54,7 @@ data class DatasetConfig(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(seed: Double, transactionCount: Double, nowMillis: Double): DatasetConfig {
+    private fun fromCpp(seed: Double, transactionCount: Double, nowMillis: Double?): DatasetConfig {
       return DatasetConfig(seed, transactionCount, nowMillis)
     }
   }

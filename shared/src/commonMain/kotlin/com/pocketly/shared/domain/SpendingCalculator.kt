@@ -1,16 +1,16 @@
 package com.pocketly.shared.domain
 
 /**
- * BM-03: group by category and day, totals, balance check.
+ * BM-03: group by category and day, totals, balance check. [range] is the month in the
+ * user's time zone (ZonedCalendar); days are local days.
  * Mirrors packages/core-js/src/domain/spendingSummary.ts — same single pass, same maps, same sorts.
  */
 internal object SpendingCalculator {
     private class CategoryAcc(var total: Long = 0, var count: Int = 0)
     private class DayAcc(var spent: Long = 0, var income: Long = 0)
 
-    fun compute(month: String, transactions: List<Transaction>, walletBalance: Money): SpendingSummary {
-        val range = UtcCalendar.monthRange(month)
-            ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "month must be YYYY-MM, got \"$month\"")
+    fun compute(month: String, range: ZonedMonth?, transactions: List<Transaction>, walletBalance: Money): SpendingSummary {
+        range ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "month must be YYYY-MM, got \"$month\"")
 
         var totalSpent = 0L
         var totalIncome = 0L
@@ -22,11 +22,13 @@ internal object SpendingCalculator {
         for (tx in transactions) {
             ledgerBalance += Ledger.effect(tx).minor
 
-            if (tx.createdAt < range.first || tx.createdAt > range.last) continue
+            if (tx.createdAt < range.start || tx.createdAt >= range.end) continue
             transactionCount++
             if (tx.status != TransactionStatus.SUCCESS) continue
 
-            val day = byDay.getOrPut(UtcCalendar.epochDay(tx.createdAt)) { DayAcc() }
+            val localDay = (tx.createdAt + ZonedCalendar.segmentOffset(range.segments, tx.createdAt))
+                .floorDiv(UtcCalendar.MILLIS_PER_DAY)
+            val day = byDay.getOrPut(localDay) { DayAcc() }
             val amount = tx.amount.minor
             if (Ledger.isOutgoing(tx.type)) {
                 totalSpent += amount

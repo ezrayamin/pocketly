@@ -16,6 +16,7 @@ import type { PriceTick, Transaction } from '../types';
 import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
+import timeZones from '../../fixtures/time-zones.json';
 
 type CoreFactory = () => Core | Promise<Core>;
 
@@ -74,6 +75,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
     beforeEach(async () => {
       core = await createCore();
+      core.setTimeZone('UTC');
       await core.resetData(DEFAULT_DATASET);
     });
 
@@ -175,6 +177,37 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       it('rejects payloads that are not a JSON array', async () => {
         await expectCoreError(core.ingestTransactions('{not json'), 'INVALID_ARGUMENT');
         await expectCoreError(core.ingestTransactions('{"a":1}'), 'INVALID_ARGUMENT');
+      });
+    });
+
+    describe('time zones (ADR-0006)', () => {
+      it.each(timeZones.cases)('$name', async ({ zone, nowMillis, transactions, expected }) => {
+        await core.resetData({ seed: 1, transactionCount: 1, nowMillis });
+        core.setTimeZone(zone);
+        const ingested = await core.ingestTransactions(JSON.stringify(transactions));
+        expect(ingested.accepted).toBe(transactions.length);
+
+        expect((await core.getWallet()).usedToday).toBe(expected.usedToday);
+        for (const [month, want] of Object.entries(expected.months)) {
+          const summary = await core.computeSpendingSummary(month);
+          expect({
+            totalSpent: summary.totalSpent,
+            transactionCount: summary.transactionCount,
+            byDay: summary.byDay.map((d) => [d.date, d.spent]),
+          }).toEqual(want);
+        }
+      });
+
+      it.each(timeZones.invalidZones)('rejects unknown zone %p', (zone) => {
+        expectCoreErrorSync(() => core.setTimeZone(zone), 'INVALID_ARGUMENT');
+      });
+
+      it('a live (unfrozen) clock reports the current time', async () => {
+        await core.resetData({ seed: 42, transactionCount: 10 });
+        const before = Date.now();
+        const wallet = await core.getWallet();
+        expect(wallet.updatedAt).toBeGreaterThanOrEqual(before);
+        expect(wallet.updatedAt).toBeLessThanOrEqual(Date.now());
       });
     });
 

@@ -1,5 +1,5 @@
 declare module '@pocketly/core-impl' {
   import type { Core } from '@pocketly/core-contract';
 
-  export const core: Core;
+  export function createCore(): Core;
 }

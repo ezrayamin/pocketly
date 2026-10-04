@@ -170,6 +170,10 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 > contains `<FullyDrawnMarker />` (rendered once Home has data). Calling `reportFullyDrawn()`
 > from a JS effect is too early: it runs before Fabric mounts the native views, so Android
 > stamps an earlier, sometimes empty, frame.
+>
+> **Live feeds stay out of other scenarios.** Home has no price feed (Invest/F10 is hidden
+> until it ships). When a live feed returns, it must not run during BM-01/BM-02: start it only
+> after "fully drawn" and give it a launch flag that disables it. BM-05 measures it alone.
 
 ### 5.1 Example Flashlight run
 

@@ -58,6 +58,7 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<Wallet>> getWallet() override;
     std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) override;
     std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) override;
+    void setTimeZone(const std::string& zoneId) override;
     std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) override;
     std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override;
     std::string formatMoney(double minor) override;

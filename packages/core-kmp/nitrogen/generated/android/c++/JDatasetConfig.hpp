@@ -10,7 +10,7 @@
 #include <fbjni/fbjni.h>
 #include "DatasetConfig.hpp"
 
-
+#include <optional>
 
 namespace margelo::nitro::pocketly {
 
@@ -35,12 +35,12 @@ namespace margelo::nitro::pocketly {
       double seed = this->getFieldValue(fieldSeed);
       static const auto fieldTransactionCount = clazz->getField<double>("transactionCount");
       double transactionCount = this->getFieldValue(fieldTransactionCount);
-      static const auto fieldNowMillis = clazz->getField<double>("nowMillis");
-      double nowMillis = this->getFieldValue(fieldNowMillis);
+      static const auto fieldNowMillis = clazz->getField<jni::JDouble>("nowMillis");
+      jni::local_ref<jni::JDouble> nowMillis = this->getFieldValue(fieldNowMillis);
       return DatasetConfig(
         seed,
         transactionCount,
-        nowMillis
+        nowMillis != nullptr ? std::make_optional(nowMillis->value()) : std::nullopt
       );
     }
 
@@ -50,14 +50,14 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JDatasetConfig::javaobject> fromCpp(const DatasetConfig& value) {
-      using JSignature = JDatasetConfig(double, double, double);
+      using JSignature = JDatasetConfig(double, double, jni::alias_ref<jni::JDouble>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
         value.seed,
         value.transactionCount,
-        value.nowMillis
+        value.nowMillis.has_value() ? jni::JDouble::valueOf(value.nowMillis.value()) : nullptr
       );
     }
   };

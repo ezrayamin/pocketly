@@ -2,7 +2,9 @@ package com.pocketly.shared.bridge
 
 import com.pocketly.shared.bridge.di.coreModule
 import com.pocketly.shared.data.FakeBackendControls
+import com.pocketly.shared.data.TimeZoneHolder
 import com.pocketly.shared.data.TransactionIngestor
+import com.pocketly.shared.data.UserTimeZone
 import com.pocketly.shared.data.TransactionStore
 import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.domain.CoreException
@@ -44,13 +46,15 @@ class PocketlyCore internal constructor(
     private val backend: FakeBackendControls,
     private val store: TransactionStore,
     private val ingestor: TransactionIngestor,
+    private val timeZone: TimeZoneHolder,
+    initialDataset: DatasetConfig,
 ) {
     private val streamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile
     private var computeMs = 0.0
 
     init {
-        backend.reset(DatasetConfig.DEFAULT)
+        backend.reset(initialDataset)
     }
 
     // ── Data / fake backend ────────────────────────────────────────────────
@@ -68,12 +72,20 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getTransaction(id: String): Transaction = api.getTransaction(id)
 
+    // ── Time (ADR-0006) ───────────────────────────────────────────────────
+
+    /** IANA zone for the daily-limit day and month/day boundaries. Default "UTC". */
+    @Throws(CoreException::class)
+    fun setTimeZone(zoneId: String) {
+        if (zoneId != timeZone.current.zoneId) timeZone.current = UserTimeZone(zoneId)
+    }
+
     // ── CPU-heavy work (BM-03, BM-04) ─────────────────────────────────────
     // Off the caller's thread on both platforms (Swift calls suspend funs on the main thread).
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun computeSpendingSummary(month: String): SpendingSummary = withContext(Dispatchers.Default) {
-        timed { SpendingCalculator.compute(month, store.all(), store.balance()) }
+        timed { SpendingCalculator.compute(month, timeZone.current.month(month), store.all(), store.balance()) }
     }
 
     @Throws(CoreException::class, CancellationException::class)
@@ -121,8 +133,12 @@ class PocketlyCore internal constructor(
     }
 
     companion object {
-        /** Builds a fully wired core. Each call gets its own isolated Koin graph. */
-        fun create(): PocketlyCore = koinApplication { modules(coreModule()) }.koin.get()
+        /**
+         * Builds a fully wired core. Each call gets its own isolated Koin graph.
+         * The native adapters pass [DatasetConfig.LIVE]; tests use the frozen default.
+         */
+        fun create(dataset: DatasetConfig = DatasetConfig.DEFAULT): PocketlyCore =
+            koinApplication { modules(coreModule(dataset)) }.koin.get()
     }
 }
 

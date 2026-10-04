@@ -203,6 +203,10 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
+  void JHybridPocketlyCoreSpec::setTimeZone(const std::string& zoneId) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* zoneId */)>("setTimeZone");
+    method(_javaPart, jni::make_jstring(zoneId));
+  }
   std::shared_ptr<Promise<SpendingSummary>> JHybridPocketlyCoreSpec::computeSpendingSummary(const std::string& month) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* month */)>("computeSpendingSummary");
     auto __result = method(_javaPart, jni::make_jstring(month));

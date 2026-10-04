@@ -10,7 +10,7 @@ class UtcCalendarTest {
         assertEquals("1970-01-01", UtcCalendar.isoDate(0))
         assertEquals("2024-02-29", UtcCalendar.isoDate(UtcCalendar.daysFromCivil(2024, 2, 29)))
         assertEquals("2100-02-28", UtcCalendar.isoDate(UtcCalendar.daysFromCivil(2100, 3, 1) - 1))
-        assertEquals("2026-10-01", UtcCalendar.isoDate(UtcCalendar.epochDay(DatasetConfig.DEFAULT.nowMillis)))
+        assertEquals("2026-10-01", UtcCalendar.isoDate(UtcCalendar.epochDay(DatasetConfig.DEFAULT.nowMillis!!)))
     }
 
     @Test

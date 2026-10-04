@@ -17,6 +17,7 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func getWallet() throws -> Promise<Wallet>
   func getTransactions(cursor: String?, limit: Double, filter: TxFilter?) throws -> Promise<TransactionPage>
   func getTransaction(id: String) throws -> Promise<Transaction>
+  func setTimeZone(zoneId: String) throws -> Void
   func computeSpendingSummary(month: String) throws -> Promise<SpendingSummary>
   func ingestTransactions(json: String) throws -> Promise<IngestResult>
   func formatMoney(minor: Double) throws -> String

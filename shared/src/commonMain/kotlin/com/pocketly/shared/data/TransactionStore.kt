@@ -8,7 +8,6 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
-import com.pocketly.shared.domain.UtcCalendar
 
 /**
  * Local transaction cache (FR-HIST-04). In-memory for now; the SQLDelight-backed
@@ -16,7 +15,7 @@ import com.pocketly.shared.domain.UtcCalendar
  * Mirrors packages/core-js/src/data/transactionStore.ts.
  */
 internal interface TransactionStore {
-    fun replaceAll(transactions: List<Transaction>, nowMillis: EpochMillis)
+    fun replaceAll(transactions: List<Transaction>)
 
     /** Inserts and re-sorts. Callers must have filtered out existing ids. */
     fun insertAll(transactions: List<Transaction>)
@@ -27,22 +26,20 @@ internal interface TransactionStore {
     fun all(): List<Transaction>
     fun page(cursor: String?, limit: Int, filter: TxFilter?): TransactionPage
     fun balance(): Money
-    fun usedToday(): Money
+
+    /** Outgoing money counting toward the daily limit (FR-TRF-10) created at or after [from]. */
+    fun usedSince(from: EpochMillis): Money
 }
 
 internal class InMemoryTransactionStore : TransactionStore {
     private val items = ArrayList<Transaction>()
     private val byId = HashMap<String, Transaction>()
     private var runningBalance = 0L
-    private var runningUsedToday = 0L
-    private var dayStart = 0L
 
-    override fun replaceAll(transactions: List<Transaction>, nowMillis: EpochMillis) {
+    override fun replaceAll(transactions: List<Transaction>) {
         items.clear()
         byId.clear()
         runningBalance = 0
-        runningUsedToday = 0
-        dayStart = UtcCalendar.epochDay(nowMillis) * UtcCalendar.MILLIS_PER_DAY
         insertAll(transactions)
     }
 
@@ -51,9 +48,6 @@ internal class InMemoryTransactionStore : TransactionStore {
             items.add(tx)
             byId[tx.id] = tx
             runningBalance += Ledger.effect(tx).minor
-            if (tx.createdAt >= dayStart && Ledger.countsTowardDailyLimit(tx)) {
-                runningUsedToday += tx.amount.minor
-            }
         }
         items.sortWith(NEWEST_FIRST)
     }
@@ -66,7 +60,15 @@ internal class InMemoryTransactionStore : TransactionStore {
 
     override fun balance() = Money(runningBalance)
 
-    override fun usedToday() = Money(runningUsedToday)
+    override fun usedSince(from: EpochMillis): Money {
+        // Newest first, so stop at the first older entry.
+        var used = 0L
+        for (tx in items) {
+            if (tx.createdAt < from) break
+            if (Ledger.countsTowardDailyLimit(tx)) used += tx.amount.minor
+        }
+        return Money(used)
+    }
 
     override fun page(cursor: String?, limit: Int, filter: TxFilter?): TransactionPage {
         var index = 0

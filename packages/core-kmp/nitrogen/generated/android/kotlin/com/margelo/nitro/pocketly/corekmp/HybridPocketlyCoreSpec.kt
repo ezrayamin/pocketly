@@ -48,6 +48,10 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun setTimeZone(zoneId: String): Unit
+  
+  @DoNotStrip
+  @Keep
   abstract fun computeSpendingSummary(month: String): Promise<SpendingSummary>
   
   @DoNotStrip

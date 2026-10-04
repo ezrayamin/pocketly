@@ -33,6 +33,8 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   getTransactions(cursor: string | undefined, limit: number, filter: TxFilter | undefined): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
 
+  setTimeZone(zoneId: string): void;
+
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
   ingestTransactions(json: string): Promise<IngestResult>;
 

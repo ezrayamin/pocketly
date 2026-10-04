@@ -81,9 +81,9 @@ function pickStatus(roll: number): TransactionStatus {
   return 'REVERSED';
 }
 
-export function generateTransactions(config: DatasetConfig): Transaction[] {
+/** `now` is the backend clock at seeding time (config.nowMillis when frozen). */
+export function generateTransactions(config: DatasetConfig, now: number): Transaction[] {
   const rng = new SeededRandom(config.seed);
-  const now = config.nowMillis;
   const out: Transaction[] = [];
 
   const openingAt = now - (WINDOW_MINUTES + 24 * 60) * MINUTE;

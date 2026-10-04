@@ -48,6 +48,14 @@ export class KmpCore implements Core {
     return this.native.getTransaction(id).catch(rethrow);
   }
 
+  setTimeZone(zoneId: string): void {
+    try {
+      this.native.setTimeZone(zoneId);
+    } catch (e) {
+      throw toCoreError(e);
+    }
+  }
+
   computeSpendingSummary(month: string): Promise<SpendingSummary> {
     return this.native.computeSpendingSummary(month).catch(rethrow);
   }
@@ -103,5 +111,7 @@ export function createKmpCore(): Core {
   return new KmpCore(NitroModules.createHybridObject<PocketlyCore>('PocketlyCore'));
 }
 
-/** App-wide singleton, picked by `apps/mobile/src/core.ts` when CORE_IMPL=kmp. */
-export const core: Core = createKmpCore();
+/** Entry point used by `apps/mobile/src/core.ts` when CORE_IMPL=kmp. */
+export function createCore(): Core {
+  return createKmpCore();
+}

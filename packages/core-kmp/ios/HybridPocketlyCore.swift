@@ -14,14 +14,18 @@ import NitroModules
 import PocketlyShared
 
 final class HybridPocketlyCore: HybridPocketlyCoreSpec {
-  private let core = PocketlyShared.PocketlyCore.companion.create()
+  private let core = PocketlyShared.PocketlyCore.companion.create(dataset: PocketlyShared.DatasetConfig.companion.LIVE)
   private let convert = PocketlyShared.BridgeConversions.shared
 
   func resetData(config: DatasetConfig) throws -> Promise<Void> {
+    var nowMillis: KotlinLong? = nil
+    if let now = config.nowMillis {
+      nowMillis = KotlinLong(value: try convert.toLongExact(value: now, field: "nowMillis"))
+    }
     let kConfig = PocketlyShared.DatasetConfig(
       seed: try convert.toIntExact(value: config.seed, field: "seed"),
       transactionCount: try convert.toIntExact(value: config.transactionCount, field: "transactionCount"),
-      nowMillis: try convert.toLongExact(value: config.nowMillis, field: "nowMillis")
+      nowMillis: nowMillis
     )
     return Promise.async { [core] in try await core.resetData(config: kConfig) }
   }
@@ -45,6 +49,10 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
 
   func getTransaction(id: String) throws -> Promise<Transaction> {
     return Promise.async { [core] in try await core.getTransaction(id: id).toNitro() }
+  }
+
+  func setTimeZone(zoneId: String) throws {
+    try core.setTimeZone(zoneId: zoneId)
   }
 
   func computeSpendingSummary(month: String) throws -> Promise<SpendingSummary> {

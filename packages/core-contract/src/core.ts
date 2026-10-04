@@ -34,7 +34,16 @@ export interface Core {
   getTransactions(cursor?: string, limit?: number, filter?: TxFilter): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
 
+  // ── Time (ADR-0006) ───────────────────────────────────────────────────
+  /**
+   * IANA zone (e.g. "Asia/Jakarta") for everything calendar-based: the daily-limit day
+   * (Wallet.usedToday), and month/day boundaries in computeSpendingSummary.
+   * Defaults to "UTC". Throws INVALID_ARGUMENT for an unknown zone.
+   */
+  setTimeZone(zoneId: string): void;
+
   // ── CPU-heavy work (BM-03, BM-04) ─────────────────────────────────────
+  /** `month` is `YYYY-MM` in the core's time zone; byDay uses local dates. */
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
   /** Parse a JSON array of transactions, validate each one and add the valid ones to the ledger. */
   ingestTransactions(json: string): Promise<IngestResult>;
@@ -59,3 +68,4 @@ export interface Core {
    */
   lastComputeMs(): number;
 }
+

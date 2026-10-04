@@ -201,6 +201,10 @@ export interface DatasetConfig {
   seed: number;
   /** Total ledger entries, including the opening top-up. Must be >= 1. */
   transactionCount: number;
-  /** The fake backend's "now". Fixed so datasets are reproducible (BM-PAR-04). */
-  nowMillis: EpochMillis;
+  /**
+   * When set, the fake backend's clock is FROZEN at this instant, so datasets and results
+   * are reproducible (tests, golden fixtures, benchmarks: BM-PAR-04). When absent, the
+   * backend follows the device clock and data is seeded relative to "now" (the app).
+   */
+  nowMillis?: EpochMillis;
 }
