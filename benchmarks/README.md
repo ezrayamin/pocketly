@@ -35,11 +35,25 @@ The plan is [docs/benchmarking.md](../docs/benchmarking.md). This folder holds t
 |---|---|---|---|
 | BM-01 / BM-09 | cold start → `getWallet()` + `getTransactions()` from the replica, then a delta sync | `LIVE_DATASET` (200) | release · seeded on the first (warm-up) launch |
 | BM-02 | `getTransactions()` paging, 20 per page | `{ seed: 42, transactionCount: 1000 }` | perf · launch arguments from `bm-02-scroll.sh prepare` |
-| BM-03 | `computeSpendingSummary('2026-09')`: storage = replica read | `{ seed: 7, transactionCount: 10000 }` | perf · launch arguments + harness (to do) |
-| BM-04 | `ingestTransactions(<ingest-5k.json>)`: compute = parse + validate, storage = write | `DEFAULT_DATASET` + 5,000 entries | perf · harness (to do) |
+| BM-03 | `computeSpendingSummary('2026-09')`: storage = replica read | `{ seed: 7, transactionCount: 10000 }` | perf · `bm-harness.sh … BM-03` |
+| BM-04 | `ingestTransactions(<ingest-5k.json>)`: compute = parse + validate, storage = write | `DEFAULT_DATASET` + 5,000 entries | perf · `bm-harness.sh … BM-04` |
 | BM-05 | `subscribePrices(20 symbols, …, { intervalMs: 100 })` | — |
 | BM-06 | 10,000 × `formatMoney()` vs 1 × `formatMoneyBatch(10,000)` | — |
 | BM-07 | transfer flow with `setNetworkSimulation({ mode: 'NORMAL', failureRatePercent: 0, normalLatencyMs: 300 })` | `LIVE_DATASET` |
+
+## Running BM-03, BM-04, BM-06 (in-app harness)
+
+Needs the perf APKs installed. Each round cold-starts each build once with
+`pocketly.bench=<scenario>`; the app runs the iterations in-process and logs the result.
+
+```bash
+benchmarks/scripts/bm-harness.sh benchmarks/results/2026-10-xx_mid-01 BM-03   # 5 rounds × 10 runs, warm-up 5
+benchmarks/scripts/bm-harness.sh benchmarks/results/2026-10-xx_mid-01 BM-04
+npx tsx benchmarks/scripts/collect.ts benchmarks/results/2026-10-xx_mid-01
+```
+
+To try one by hand: `adb shell am start -n com.pocketly.kmp/com.pocketly.MainActivity -e pocketly.bench BM-03 --ei pocketly.benchRuns 3`
+shows the medians on screen.
 
 ## Running BM-02
 

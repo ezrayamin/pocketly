@@ -1,5 +1,6 @@
 import { CoreError, LIVE_DATASET } from '@pocketly/core-contract';
 import type { DatasetConfig } from '@pocketly/core-contract';
+import { BENCH_SCENARIOS, type BenchScenario } from './bench/harness';
 import type { TabKey } from './components/TabBar';
 import { core } from './core';
 import { applyNetworkParams } from './features/devmenu/devLinks';
@@ -14,12 +15,15 @@ import { applyNetworkParams } from './features/devmenu/devLinks';
  *                                                            (unset fields: LIVE_DATASET's)
  *   network.mode, network.failureRatePercent, network.normalLatencyMs,
  *   network.readTimeoutMs, network.seed                      fake backend, as the dev link
+ *   bench                  BM-03 | BM-04 | BM-06              run the in-app harness instead
+ *   benchRuns, benchWarmup integers (default 10, 5)           of the app (bench/harness.ts)
  *
  * Everything is applied before the first screen loads, so a cold start measures the
  * requested setup. Unknown keys are rejected: a typo must not silently benchmark defaults.
  */
 export interface LaunchArgs {
   tab?: TabKey;
+  bench?: { scenario: BenchScenario; runs: number; warmup: number };
   dataset?: DatasetConfig;
   network?: Record<string, string>;
 }
@@ -41,8 +45,19 @@ export function parseLaunchArgs(raw: Readonly<Record<string, string>> | undefine
   const args: LaunchArgs = {};
   if (!raw) return args;
   const dataset: Partial<DatasetConfig> = {};
+  let benchRuns = 10;
+  let benchWarmup = 5;
   for (const [key, value] of Object.entries(raw)) {
-    if (key === 'tab') {
+    if (key === 'bench') {
+      if (!(BENCH_SCENARIOS as readonly string[]).includes(value)) {
+        throw new CoreError('INVALID_ARGUMENT', `launch argument bench="${value}" must be one of ${BENCH_SCENARIOS.join(', ')}`);
+      }
+      args.bench = { scenario: value as BenchScenario, runs: 0, warmup: 0 };
+    } else if (key === 'benchRuns') {
+      benchRuns = integer(key, value);
+    } else if (key === 'benchWarmup') {
+      benchWarmup = integer(key, value);
+    } else if (key === 'tab') {
       if (!(TABS as readonly string[]).includes(value)) {
         throw new CoreError('INVALID_ARGUMENT', `launch argument tab="${value}" must be one of ${TABS.join(', ')}`);
       }
@@ -54,6 +69,12 @@ export function parseLaunchArgs(raw: Readonly<Record<string, string>> | undefine
     } else {
       throw new CoreError('INVALID_ARGUMENT', `unknown launch argument "${key}"`);
     }
+  }
+  if (args.bench) {
+    if (benchRuns < 1 || benchWarmup < 0) {
+      throw new CoreError('INVALID_ARGUMENT', 'launch arguments benchRuns must be ≥ 1 and benchWarmup ≥ 0');
+    }
+    args.bench = { ...args.bench, runs: benchRuns, warmup: benchWarmup };
   }
   if (Object.keys(dataset).length > 0) {
     args.dataset = {

@@ -210,6 +210,48 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
 }
 
 /**
+ * In-app harness (BM-03, BM-04, BM-06): <scenario>/<round>-<build>.json, each holding the
+ * measured runs of one cold start. Adds the bridge overhead per run: end-to-end − compute −
+ * storage (BM-03/04), batch end-to-end − batch compute (BM-06). Checks that both builds
+ * saw the same input and produced the same output (checksums).
+ */
+type HarnessResult = {
+  build: string;
+  runs: Record<string, number>[];
+  input: { checksum: string };
+  output: { checksum: string };
+};
+
+function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const raw = join(dir, scenario.toLowerCase());
+  if (!existsSync(join(raw, 'meta.json'))) return;
+  const values: Record<string, Record<Build, number[]>> = {};
+  const sums: Record<Build, Set<string>> = { jsCore: new Set(), kmpCore: new Set() };
+  for (const file of readdirSync(raw).filter((f) => /^\d+-(jsCore|kmpCore)\.json$/.test(f)).sort()) {
+    const build = file.split('-')[1].replace('.json', '') as Build;
+    const result = JSON.parse(readFileSync(join(raw, file), 'utf8')) as HarnessResult;
+    sums[build].add(`${result.input.checksum} → ${result.output.checksum}`);
+    for (const run of result.runs) {
+      const derived: Record<string, number> = { ...run };
+      if ('endToEndMs' in run) derived.overheadMs = run.endToEndMs - run.computeMs - run.storageMs;
+      if ('batchEndToEndMs' in run) derived.batchOverheadMs = run.batchEndToEndMs - run.batchComputeMs;
+      for (const [metric, v] of Object.entries(derived)) {
+        values[metric] ??= { jsCore: [], kmpCore: [] };
+        values[metric][build].push(v);
+      }
+    }
+  }
+  for (const [metric, byBuild] of Object.entries(values)) {
+    if (byBuild.jsCore.length > 1 && byBuild.kmpCore.length > 1) compare(scenario, metric, 'ms', byBuild, rows, verdicts);
+  }
+  const same = sums.jsCore.size === 1 && sums.kmpCore.size === 1 && [...sums.jsCore][0] === [...sums.kmpCore][0];
+  verdicts.push(
+    `${scenario} inputs and outputs ${same ? 'identical in both builds' : 'DIFFER between builds'}: ` +
+      `jsCore ${[...sums.jsCore].join(', ')} · kmpCore ${[...sums.kmpCore].join(', ')}`,
+  );
+}
+
+/**
  * `dumpsys gfxinfo` per iteration (<scenario>/gfxinfo/<block>-<build>/<n>.txt), reset right
  * before the measured part: frame-level numbers that don't drop when the list is at rest.
  */
@@ -351,6 +393,7 @@ function main() {
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
+  for (const scenario of ['BM-03', 'BM-04', 'BM-06']) collectHarness(dir, scenario, rows, verdicts);
   collectSize(dir, rows, verdicts, extra);
   collectDownload(dir, verdicts, extra);
 

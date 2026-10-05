@@ -232,6 +232,22 @@ which is kept out of compute in both cores:
 
 For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
 
+**Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
+build started with `pocketly.bench=BM-03|BM-04|BM-06` (plus `benchRuns`, `benchWarmup`) renders
+only the harness screen, runs the scenario in-process and logs the result to logcat, where the
+runner collects it. Inputs are built through the `Core` API rather than bundled files, so both
+builds get byte-identical inputs (each result carries input and output checksums, compared by
+`collect.ts`) and neither bundle grows (BM-08):
+
+| Scenario | Setup (not timed) | Timed per run |
+|---|---|---|
+| BM-03 | `resetData({ seed: 7, transactionCount: 10000 })` (syncs the replica) | `computeSpendingSummary('2026-09')` |
+| BM-04 | payload: the seed-2026 × 5,000 dataset paged out of the core, ids `in-…`, canonical JSON; before every run `resetData(DEFAULT_DATASET)` | `ingestTransactions(payload)` |
+| BM-06 | 10,000 deterministic amounts | 10,000 × `formatMoney`, then 1 × `formatMoneyBatch` |
+
+Each cold start runs the warm-up and measured iterations; rounds alternate builds and wait for
+the battery to cool (`temperatures.csv`), as BM-02 does.
+
 ```json
 {
   "scenario": "BM-03",

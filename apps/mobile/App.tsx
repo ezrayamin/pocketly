@@ -3,6 +3,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { BenchScreen } from './src/bench/BenchScreen';
 import { TabBar, type TabKey } from './src/components/TabBar';
 import { DEV_TOOLS_ENABLED } from './src/devtools';
 import { DevMenu } from './src/features/devmenu/DevMenu';
@@ -154,6 +155,13 @@ function App({ launchArgs }: { launchArgs?: Record<string, string> }) {
     );
   }
   if (!ready) return <View style={styles.root} testID="launch-setup" />;
+  if (launch.args.bench) {
+    return (
+      <SafeAreaProvider>
+        <BenchScreen {...launch.args.bench} />
+      </SafeAreaProvider>
+    );
+  }
   return <MainApp initialTab={launch.args.tab ?? 'home'} />;
 }
 
