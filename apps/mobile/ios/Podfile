@@ -8,6 +8,14 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+# Build React Native's core from source instead of the prebuilt React.xcframework (the 0.87
+# default). The prebuilt framework is a dylib that keeps React's C++ type info private
+# (`typeinfo/vtable for facebook::react::Props`), and react-native-svg's Fabric props inherit
+# from those classes, so the app fails to link (23 undefined symbols from libRNSVG.a).
+# The third-party dependencies stay prebuilt (RCT_USE_RN_DEP). Revisit when react-native-svg
+# or the prebuilt core changes.
+ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green

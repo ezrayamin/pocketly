@@ -11,9 +11,8 @@ The same app ships as two builds that differ only in where the core runs:
 | `kmpCore` | Kotlin (KMP), called through a [Nitro](https://nitro.margelo.com) HybridObject | `com.pocketly.kmp` |
 
 > **Status: M2 in progress.** Home and History (list, filters, detail, offline) run on both
-> cores, with data persisted in SQLite (ADR-0009). Verified on Android; the iOS app currently
-> fails to link (see [Known issues](#known-issues)). Startup and size have interim results;
-> the other benchmarks are next.
+> cores, with data persisted in SQLite (ADR-0009), on Android and iOS. Startup and size have
+> interim results; the other benchmarks are next.
 
 ## Repository layout
 
@@ -42,10 +41,13 @@ Start with [docs/architecture.md](docs/architecture.md), then read the ADRs:
 
 ## Prerequisites
 
-Node ≥ 22.13, Yarn 1.22, JDK 17, Android SDK (API 36/37, NDK 27.1), Xcode 16.4+ and CocoaPods for iOS.
+Node ≥ 22.13, Yarn 1.22, JDK 17, Android SDK (API 36/37, NDK 27.1), Xcode 16.4+ and Ruby for iOS.
 
 ```bash
 yarn install
+```
+```bash
+cd apps/mobile && bundle install   # iOS: CocoaPods 1.15.2, pinned by Gemfile/Gemfile.lock
 ```
 
 ### First-time setup
@@ -95,7 +97,8 @@ storage, or use **Reset data** in the developer menu, to start over.
 
 ### iOS
 
-iOS has no flavors. The core is chosen at `pod install` time:
+iOS has no flavors. The core is chosen at `pod install` time, and both builds share the
+bundle id `com.pocketly`, so only one is installed at a time:
 
 ```bash
 yarn ios:framework                                         # builds shared/ → PocketlyShared.xcframework
@@ -104,6 +107,20 @@ cd apps/mobile/ios && bundle exec pod install                # jsCore
 yarn workspace @pocketly/mobile start:kmp                    # Metro :8082 for kmpCore
 yarn workspace @pocketly/mobile ios --port 8082
 ```
+
+React Native's core is built from source on iOS (`RCT_USE_PREBUILT_RNCORE=0` in the
+Podfile): the prebuilt `React.xcframework` hides the C++ type info that react-native-svg's
+Fabric props need, and the app fails to link against it. The first build is slower; the
+other dependencies stay prebuilt.
+
+If a Debug build fails to link with undefined `facebook::hermes::cdp::…` symbols, Pods hold
+the Release Hermes engine from an earlier Release build without a record of it. Run
+`echo -n Release > apps/mobile/ios/Pods/hermes-engine/.last_build_configuration` and rebuild:
+the build's Hermes step then swaps in the Debug engine (both are cached in Pods).
+
+A build made without the RN CLI loads JS from Metro's default port 8081. To point it at the
+kmpCore Metro instead:
+`xcrun simctl spawn booted defaults write com.pocketly RCT_jsLocation localhost:8082`.
 
 ### Developer menu (F11)
 
@@ -125,12 +142,9 @@ late responses are discarded (ADR-0007). Scriptable: `pocketly://dev/network?nor
   with the offline banner, and History scrolls through 1,000 entries to the end.
 - `jsCore`'s APK and JS bundle contain no KMP core code; `kmpCore`'s contain no op-sqlite.
   The exception is the Nitro runtime; see [ADR-0003](docs/adr/0003-linking-and-build-selection.md).
-- iOS: the M1 `kmpCore` release build rendered the same balance on a simulator. Since slice 4
-  the Swift and Kotlin code compiles, but the app doesn't link (below).
+- iOS (simulator, Debug): both cores show the same seeded balance on Home, and History and
+  the transaction detail work on `kmpCore`.
 
 ## Known issues
 
-- **iOS link failure.** `libRNSVG.a` (react-native-svg 15.15.5) references React's
-  `Props`/`BaseViewProps` vtables, which RN 0.87's prebuilt React core doesn't export
-  (23 undefined symbols). It predates slice 4; to fix.
 - **iOS has no benchmark launch arguments yet** (Android perf builds only).
