@@ -38,6 +38,7 @@ Start with [docs/architecture.md](docs/architecture.md), then read the ADRs:
 [0007 timeouts](docs/adr/0007-timeouts-and-late-responses.md) ·
 [0008 dev tools in release](docs/adr/0008-developer-tools-in-release-builds.md) ·
 [0009 storage](docs/adr/0009-storage-two-databases-two-engines.md).
+Temporary workarounds, and when to remove each one, are listed in [docs/workarounds.md](docs/workarounds.md).
 
 ## Prerequisites
 
@@ -110,13 +111,16 @@ yarn workspace @pocketly/mobile ios --port 8082
 
 React Native's core is built from source on iOS (`RCT_USE_PREBUILT_RNCORE=0` in the
 Podfile): the prebuilt `React.xcframework` hides the C++ type info that react-native-svg's
-Fabric props need, and the app fails to link against it. The first build is slower; the
-other dependencies stay prebuilt.
+Fabric props need, and the app fails to link against it ([workaround 2](docs/workarounds.md)).
+**This makes clean iOS builds much slower:** a clean Debug build takes about 5 minutes instead
+of about 1 minute on an Apple-silicon Mac. Incremental builds are unaffected, and the other
+dependencies stay prebuilt.
 
-If a Debug build fails to link with undefined `facebook::hermes::cdp::…` symbols, Pods hold
-the Release Hermes engine from an earlier Release build without a record of it. Run
-`echo -n Release > apps/mobile/ios/Pods/hermes-engine/.last_build_configuration` and rebuild:
-the build's Hermes step then swaps in the Debug engine (both are cached in Pods).
+A fresh clone needs no manual iOS steps: a clean `pod install` sets up the Debug Hermes engine,
+and the build switches engines when you change configuration. Only if a Debug build fails to
+link with undefined `facebook::hermes::cdp::…` symbols (Pods kept the Release engine after a
+Release build followed by `pod install`) run
+`echo -n Release > apps/mobile/ios/Pods/hermes-engine/.last_build_configuration` and rebuild.
 
 A build made without the RN CLI loads JS from Metro's default port 8081. To point it at the
 kmpCore Metro instead:
