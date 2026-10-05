@@ -1,6 +1,6 @@
 # Pocketly — Benchmarking Plan
 
-**Status:** Draft v0.1 · **Related:** `product.md`, `requirements.md` · **Last updated:** 2026-10-03
+**Status:** Draft v0.2 · **Related:** `product.md`, `requirements.md`, ADR-0009 · **Last updated:** 2026-10-04
 **Primary platform:** Android (most target users). iOS results are optional and reported separately.
 
 ---
@@ -107,6 +107,12 @@ export const core: Core =
 | BM-PAR-04 | Same fixtures, same random seed, same fake API latency |
 | BM-PAR-05 | Same React Native version, Hermes on, minification on, release signing |
 
+> **BM-PAR-03 in practice (ADR-0009):** both cores store data in SQLite, but through different
+> libraries: `jsCore` uses op-sqlite (its own bundled SQLite, over JSI), `kmpCore` uses
+> SQLDelight on the platform's SQLite. Same schema (generated from the same `.sq` files),
+> different engine builds. So every scenario that touches storage reports it separately:
+> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2).
+
 ## 4. Environment & Test Rules
 
 ### 4.1 Devices
@@ -121,7 +127,7 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 
 ### 4.2 Pre-run checklist
 
-- [ ] **Release** builds of both flavors (never debug), freshly installed
+- [ ] **Release-optimized** builds of both flavors, freshly installed: `release`, or `perf` when the scenario needs launch arguments (§5.3). Never debug
 - [ ] Device restarted at the start of the session
 - [ ] Airplane mode on (the fake API is local), Wi-Fi/Bluetooth off
 - [ ] Battery > 50%, same charging state for every run
@@ -204,6 +210,17 @@ It records **two timings** for every `kmpCore` operation:
 
 **Bridge overhead = end-to-end − compute only.** For `jsCore`, end-to-end and compute are the same thing.
 
+Operations that also touch SQLite record a third timing, **storage** (`core.lastStorageMs()`),
+which is kept out of compute in both cores:
+
+| Operation | `lastComputeMs()` | `lastStorageMs()` |
+|---|---|---|
+| `computeSpendingSummary` (BM-03) | the calculation | reading the month's ledger from the replica |
+| `ingestTransactions` (BM-04) | parse + validate | writing the accepted rows to the replica |
+| `formatMoneyBatch` (BM-06) | formatting | 0 |
+
+For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
+
 ```json
 {
   "scenario": "BM-03",
@@ -215,6 +232,34 @@ It records **two timings** for every `kmpCore` operation:
   "computeMs": [9.8, 9.6, ...]
 }
 ```
+
+### 5.3 The `perf` build and launch arguments
+
+Benchmarks install the **`perf`** build type (`assembleJsCorePerf`, `assembleKmpCorePerf`).
+It is `release` in every respect (R8, bundled JS, Hermes, profileable, release signing, the
+same package ids, so it installs over a release build) with one addition: it reads
+**launch arguments**. A `release` build ignores them.
+
+Launch arguments are `pocketly.*` intent extras. They are applied **before the first screen
+loads**, so a cold start measures exactly the requested setup. (Dev links can't do that:
+they arrive after the first load has started.) Unknown keys and bad values stop the app with a
+visible error (`launch-args-error`) rather than letting it run on defaults.
+
+| Extra | Values | Effect |
+|---|---|---|
+| `pocketly.tab` | `home`, `history`, `profile` | Start tab |
+| `pocketly.seed`, `pocketly.transactionCount`, `pocketly.nowMillis` | integers | `resetData()` with this dataset before anything loads (unset fields: `LIVE_DATASET`'s) |
+| `pocketly.network.mode`, `pocketly.network.normalLatencyMs`, `pocketly.network.failureRatePercent`, `pocketly.network.readTimeoutMs`, `pocketly.network.seed` | as `setNetworkSimulation` | Fake backend, same rules as the dev link |
+
+```bash
+adb shell am start -W -n com.pocketly.kmp/com.pocketly.MainActivity \
+  -e pocketly.tab history --ei pocketly.transactionCount 1000
+```
+
+Maestro's `launchApp: arguments:` sends the same extras (see `bm-02-scroll.yaml`). Arguments
+are read at cold start only. A dataset argument resets the databases on **every** launch, so
+leave it out of startup scenarios (BM-01/BM-09) unless the reset is part of what is measured.
+iOS has no equivalent yet.
 
 ## 6. Scenarios
 
@@ -233,7 +278,9 @@ It records **two timings** for every `kmpCore` operation:
 ### Scenario notes
 
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
-- **BM-04 must follow BM-PAR-03.** If the storage libraries differ, report "parse + validate" and "write to DB" as separate numbers.
+- **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
+- **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
+- **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 

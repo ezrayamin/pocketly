@@ -20,7 +20,10 @@ class MainActivity : ReactActivity() {
    * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
-      DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+      object : DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled) {
+        // perf builds: benchmark launch arguments → initial props (LaunchArgs.kt)
+        override fun getLaunchOptions(): Bundle? = LaunchArgs.initialProps(this@MainActivity)
+      }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // react-native-screens: restores its fragments safely after an Activity restart.

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -11,6 +11,7 @@ import { HistoryScreen } from './src/features/history/HistoryScreen';
 import { TransactionDetailScreen } from './src/features/history/TransactionDetailScreen';
 import { HomeScreen } from './src/features/home/HomeScreen';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
+import { applyLaunchArgs, needsSetup, parseLaunchArgs, type LaunchArgs } from './src/launchArgs';
 import type { RootStackParamList } from './src/navigation';
 import { colors } from './src/theme/tokens';
 
@@ -28,10 +29,10 @@ const NAV_THEME: Theme = {
   },
 };
 
-function App() {
-  const [tab, setTab] = useState<TabKey>('home');
+function MainApp({ initialTab }: { initialTab: TabKey }) {
+  const [tab, setTab] = useState<TabKey>(initialTab);
   // History mounts on first visit, then stays mounted (keeps its list and scroll) like Home.
-  const [historyVisited, setHistoryVisited] = useState(false);
+  const [historyVisited, setHistoryVisited] = useState(initialTab === 'history');
   const [historyScrollToTop, setHistoryScrollToTop] = useState(0);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
   // Bumped when the developer menu closes or a dev link changes the backend, so Home and
@@ -113,6 +114,47 @@ const styles = StyleSheet.create({
   screen: StyleSheet.absoluteFill,
   // display:none keeps Home mounted but out of layout, touch and the accessibility tree.
   hidden: { display: 'none' },
+  launchError: { justifyContent: 'center', padding: 24 },
+  launchErrorText: { color: colors.danger, fontSize: 15 },
 });
+
+type Launch = { args: LaunchArgs; error?: undefined } | { args?: undefined; error: string };
+
+/**
+ * Root. Perf builds may pass benchmark launch arguments (src/launchArgs.ts); they are
+ * applied before MainApp mounts, so its first load already sees the requested dataset and
+ * network. Bad arguments stop the app with a visible error rather than run with defaults.
+ */
+function App({ launchArgs }: { launchArgs?: Record<string, string> }) {
+  const [launch, setLaunch] = useState<Launch>(() => {
+    try {
+      return { args: parseLaunchArgs(launchArgs) };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  });
+  const [ready, setReady] = useState(() => launch.args !== undefined && !needsSetup(launch.args));
+
+  useEffect(() => {
+    if (ready || !launch.args) return;
+    console.info(`[Pocketly] launch arguments: ${JSON.stringify(launch.args)}`);
+    applyLaunchArgs(launch.args).then(
+      () => setReady(true),
+      (e: unknown) => setLaunch({ error: String(e) }),
+    );
+  }, [ready, launch]);
+
+  if (launch.error !== undefined) {
+    return (
+      <View style={[styles.root, styles.launchError]}>
+        <Text style={styles.launchErrorText} testID="launch-args-error">
+          Launch arguments rejected: {launch.error}
+        </Text>
+      </View>
+    );
+  }
+  if (!ready) return <View style={styles.root} testID="launch-setup" />;
+  return <MainApp initialTab={launch.args.tab ?? 'home'} />;
+}
 
 export default App;

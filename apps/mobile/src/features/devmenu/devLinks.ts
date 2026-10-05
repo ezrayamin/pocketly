@@ -27,6 +27,20 @@ function parseQuery(query: string | undefined): Record<string, string> {
   return params;
 }
 
+/**
+ * Applies network params (`mode` plus NUMBER_PARAMS, as strings) on top of the current
+ * simulation. Shared with launch arguments. Throws CoreError(INVALID_ARGUMENT) on bad values.
+ */
+export function applyNetworkParams(params: Readonly<Record<string, string>>): NetworkSimulation {
+  const next: NetworkSimulation = { ...core.getNetworkSimulation() };
+  if (params.mode) next.mode = params.mode as NetworkSimulation['mode'];
+  for (const key of NUMBER_PARAMS) {
+    if (params[key] !== undefined) next[key] = Number(params[key]);
+  }
+  core.setNetworkSimulation(next); // validates
+  return core.getNetworkSimulation();
+}
+
 /** Applies a dev link. Returns null if `url` isn't one; throws CoreError on bad values. */
 export async function applyDevLink(url: string): Promise<DevLinkResult | null> {
   const match = LINK.exec(url);
@@ -34,14 +48,7 @@ export async function applyDevLink(url: string): Promise<DevLinkResult | null> {
   const [, action, query] = match;
   switch (action) {
     case 'network': {
-      const params = parseQuery(query);
-      const next: NetworkSimulation = { ...core.getNetworkSimulation() };
-      if (params.mode) next.mode = params.mode as NetworkSimulation['mode'];
-      for (const key of NUMBER_PARAMS) {
-        if (params[key] !== undefined) next[key] = Number(params[key]);
-      }
-      core.setNetworkSimulation(next); // validates; throws INVALID_ARGUMENT
-      return { action, detail: JSON.stringify(core.getNetworkSimulation()) };
+      return { action, detail: JSON.stringify(applyNetworkParams(parseQuery(query))) };
     }
     case 'reset':
       await core.resetData(LIVE_DATASET);

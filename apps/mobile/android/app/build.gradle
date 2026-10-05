@@ -89,6 +89,8 @@ android {
         // ADR-0008: developer tools (menu + pocketly://dev links) in every build we produce
         // (debug, demo, benchmarks). A store build passes -PproductionBuild to remove them.
         resValue "bool", "pocketly_dev_tools", project.hasProperty("productionBuild") ? "false" : "true"
+        // Benchmark launch arguments (LaunchArgs.kt): read by perf builds only.
+        resValue "bool", "pocketly_launch_args", "false"
     }
 
     // BM-08: one APK per ABI (≈ what a device downloads). Opt-in: -PsplitApksByAbi
@@ -136,6 +138,16 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+        // Benchmarks (docs/benchmarking.md §5.3): release in every respect (R8, bundled JS,
+        // Hermes, profileable, same package ids) plus launch arguments, so a run picks its
+        // dataset, network and start tab at cold start. Release itself ignores them.
+        perf {
+            initWith release
+            matchingFallbacks = ["release"]
+            // The RN Gradle plugin sets this for debug/release only; release's value.
+            manifestPlaceholders = [usesCleartextTraffic: "false"]
+            resValue "bool", "pocketly_launch_args", "true"
         }
     }
 }
