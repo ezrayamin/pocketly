@@ -32,7 +32,7 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun resetData(config: DatasetConfig): Promise<Unit>
+  abstract fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -94,6 +94,10 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun lastComputeMs(): Double
+  
+  @DoNotStrip
+  @Keep
+  abstract fun lastStorageMs(): Double
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

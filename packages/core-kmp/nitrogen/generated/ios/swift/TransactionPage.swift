@@ -18,7 +18,7 @@ public extension TransactionPage {
   /**
    * Create a new instance of `TransactionPage`.
    */
-  init(items: [Transaction], nextCursor: String?) {
+  init(items: [Transaction], nextCursor: String?, stale: StaleInfo?) {
     self.init({ () -> bridge.std__vector_Transaction_ in
       var __vector = bridge.create_std__vector_Transaction_(items.count)
       for __item in items {
@@ -28,6 +28,12 @@ public extension TransactionPage {
     }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = nextCursor {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_StaleInfo_ in
+      if let __unwrappedValue = stale {
+        return bridge.create_std__optional_StaleInfo_(__unwrappedValue)
       } else {
         return .init()
       }
@@ -49,5 +55,10 @@ public extension TransactionPage {
         return nil
       }
     }()
+  }
+  
+  @inline(__always)
+  var stale: StaleInfo? {
+    return self.__stale.value
   }
 }

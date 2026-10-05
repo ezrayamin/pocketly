@@ -30,11 +30,14 @@
 
 // Forward declaration of `Transaction` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Transaction; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
 
 #include "Transaction.hpp"
 #include <vector>
 #include <string>
 #include <optional>
+#include "StaleInfo.hpp"
 
 namespace margelo::nitro::pocketly {
 
@@ -45,10 +48,11 @@ namespace margelo::nitro::pocketly {
   public:
     std::vector<Transaction> items     SWIFT_PRIVATE;
     std::optional<std::string> nextCursor     SWIFT_PRIVATE;
+    std::optional<StaleInfo> stale     SWIFT_PRIVATE;
 
   public:
     TransactionPage() = default;
-    explicit TransactionPage(std::vector<Transaction> items, std::optional<std::string> nextCursor): items(items), nextCursor(nextCursor) {}
+    explicit TransactionPage(std::vector<Transaction> items, std::optional<std::string> nextCursor, std::optional<StaleInfo> stale): items(items), nextCursor(nextCursor), stale(stale) {}
 
   public:
     friend bool operator==(const TransactionPage& lhs, const TransactionPage& rhs) = default;
@@ -65,13 +69,15 @@ namespace margelo::nitro {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::pocketly::TransactionPage(
         JSIConverter<std::vector<margelo::nitro::pocketly::Transaction>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "items"))),
-        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nextCursor")))
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nextCursor"))),
+        JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "stale")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pocketly::TransactionPage& arg) {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "items"), JSIConverter<std::vector<margelo::nitro::pocketly::Transaction>>::toJSI(runtime, arg.items));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "nextCursor"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.nextCursor));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "stale"), JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::toJSI(runtime, arg.stale));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -84,6 +90,7 @@ namespace margelo::nitro {
       }
       if (!JSIConverter<std::vector<margelo::nitro::pocketly::Transaction>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "items")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "nextCursor")))) return false;
+      if (!JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "stale")))) return false;
       return true;
     }
   };

@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.sqldelight)
 }
 
 // Coordinates the RN app resolves through composite-build substitution
@@ -34,6 +35,16 @@ kotlin {
             api(libs.kotlinx.coroutines.core) // Flow is part of the public API
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.koin.core)
+            implementation(libs.sqldelight.runtime)
+        }
+        androidMain.dependencies {
+            implementation(libs.sqldelight.android.driver) // system SQLite (ADR-0009)
+        }
+        iosMain.dependencies {
+            implementation(libs.sqldelight.native.driver) // system SQLite (ADR-0009)
+        }
+        jvmMain.dependencies {
+            implementation(libs.sqldelight.sqlite.driver) // tests only
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -43,6 +54,20 @@ kotlin {
 
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+}
+
+// ADR-0009: two databases, two files. Server = the fake backend's truth; Cache = the app's replica.
+sqldelight {
+    databases {
+        create("ServerDatabase") {
+            packageName.set("com.pocketly.shared.db.server")
+            srcDirs.setFrom("src/commonMain/sqldelight/server")
+        }
+        create("CacheDatabase") {
+            packageName.set("com.pocketly.shared.db.cache")
+            srcDirs.setFrom("src/commonMain/sqldelight/cache")
+        }
     }
 }
 

@@ -20,12 +20,16 @@ data class Counterparty(
 
 data class Contact(val userId: String, val name: String, val phone: String)
 
+/** Data from the local replica because the server was unreachable (ADR-0009). */
+data class StaleInfo(val reason: ErrorCode, val cachedAt: EpochMillis)
+
 data class Wallet(
     val id: String,
     val balance: Money,
     val dailyLimit: Money,
     val usedToday: Money,
     val updatedAt: EpochMillis,
+    val stale: StaleInfo? = null,
 )
 
 data class Transaction(
@@ -42,7 +46,7 @@ data class Transaction(
     val updatedAt: EpochMillis,
 )
 
-data class TransactionPage(val items: List<Transaction>, val nextCursor: String?)
+data class TransactionPage(val items: List<Transaction>, val nextCursor: String?, val stale: StaleInfo? = null)
 
 data class TxFilter(
     val types: List<TransactionType>? = null,
@@ -112,7 +116,13 @@ data class PriceTick(val symbol: String, val price: Money, val changeBps: Int, v
  * [nowMillis] set = the fake backend's clock is frozen there (tests, golden, benchmarks);
  * null = it follows the device clock (the app). Mirrors core-contract's DatasetConfig.
  */
-data class DatasetConfig(val seed: Int, val transactionCount: Int, val nowMillis: EpochMillis?) {
+data class DatasetConfig(
+    val seed: Int,
+    val transactionCount: Int,
+    val nowMillis: EpochMillis?,
+    /** Extra server seed rows (tests, demos); validated like ingest input. */
+    val extraTransactions: List<Transaction> = emptyList(),
+) {
     companion object {
         /** FR-FAKE-01, frozen at 2026-10-01T12:00:00Z. Same as DEFAULT_DATASET. */
         val DEFAULT = DatasetConfig(seed = 42, transactionCount = 200, nowMillis = 1_790_856_000_000L)

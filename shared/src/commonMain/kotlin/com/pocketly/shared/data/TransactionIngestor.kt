@@ -10,13 +10,16 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
-/**
- * BM-04: JSON → validate → write. Mirrors packages/core-js/src/data/transactionIngestor.ts.
- * Both sides parse into a generic tree first, then validate field by field.
- */
-internal class TransactionIngestor(private val store: TransactionStore) {
+/** BM-04 compute step output. Valid entries in input order (duplicates included). */
+internal class ParsedIngest(val valid: List<Transaction>, val rejected: Int, val errors: List<IngestError>)
 
-    fun ingest(json: String): IngestResult {
+/**
+ * BM-04 compute step: JSON → generic tree → field-by-field validation. The write step is
+ * CacheStore.insertIfAbsentMany (storage, timed separately: ADR-0009).
+ * Mirrors packages/core-js/src/data/transactionIngestor.ts.
+ */
+internal object TransactionIngestor {
+    fun parseAndValidate(json: String): ParsedIngest {
         val parsed: JsonElement = try {
             Json.parseToJsonElement(json)
         } catch (e: SerializationException) {
@@ -25,31 +28,18 @@ internal class TransactionIngestor(private val store: TransactionStore) {
         val entries = parsed as? JsonArray
             ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "Payload must be a JSON array")
 
-        val accepted = ArrayList<Transaction>(entries.size)
-        val seen = HashSet<String>()
+        val valid = ArrayList<Transaction>(entries.size)
         val errors = ArrayList<IngestError>()
         var rejected = 0
-        var duplicates = 0
-
         entries.forEachIndexed { index, element ->
             when (val result = TransactionDtoValidator.validate(element)) {
+                is TransactionDtoValidator.Result.Valid -> valid += result.value
                 is TransactionDtoValidator.Result.Invalid -> {
                     rejected++
                     if (errors.size < IngestResult.MAX_ERRORS) errors += IngestError(index, result.reason)
                 }
-                is TransactionDtoValidator.Result.Valid -> {
-                    val id = result.value.id
-                    if (id in seen || store.has(id)) {
-                        duplicates++
-                    } else {
-                        seen += id
-                        accepted += result.value
-                    }
-                }
             }
         }
-
-        store.insertAll(accepted)
-        return IngestResult(accepted.size, rejected, duplicates, errors)
+        return ParsedIngest(valid, rejected, errors)
     }
 }

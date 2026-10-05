@@ -2,7 +2,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // NFR-ARCH-05: struct/enum types are NOT redeclared here. Nitrogen resolves them from
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
-  DatasetConfig,
+  DatasetSeed,
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
@@ -29,7 +29,11 @@ export interface PriceSubscription extends HybridObject<Platforms> {
  * `src/index.ts` adapts this to the `Core` contract.
  */
 export interface PocketlyCore extends HybridObject<Platforms> {
-  resetData(config: DatasetConfig): Promise<void>;
+  /**
+   * `DatasetConfig` arrives split: an optional array of structs inside a struct breaks Swift's
+   * `std::vector<Transaction>` conformance (Swift 6.1 C++ interop), which a plain array avoids.
+   */
+  resetData(config: DatasetSeed, extraTransactions: Transaction[]): Promise<void>;
   getWallet(): Promise<Wallet>;
   getTransactions(cursor: string | undefined, limit: number, filter: TxFilter | undefined): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
@@ -55,4 +59,5 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   ): PriceSubscription;
 
   lastComputeMs(): number;
+  lastStorageMs(): number;
 }

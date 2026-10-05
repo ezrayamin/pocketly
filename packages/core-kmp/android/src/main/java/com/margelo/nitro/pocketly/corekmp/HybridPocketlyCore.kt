@@ -2,10 +2,12 @@ package com.margelo.nitro.pocketly.corekmp
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.Cancellable
 import com.pocketly.shared.bridge.PocketlyCore
+import com.pocketly.shared.data.db.AndroidDatabaseDrivers
 
 /**
  * Nitro adapter over the KMP facade. No business logic lives here: it only converts
@@ -16,11 +18,13 @@ import com.pocketly.shared.bridge.PocketlyCore
 @DoNotStrip
 @Keep
 class HybridPocketlyCore : HybridPocketlyCoreSpec() {
-    private val core: PocketlyCore = PocketlyCore.create(com.pocketly.shared.domain.DatasetConfig.LIVE)
+    private val core: PocketlyCore = PocketlyCore.create(
+        AndroidDatabaseDrivers(NitroModules.applicationContext!!),
+        com.pocketly.shared.domain.DatasetConfig.LIVE,
+    )
 
-    override fun resetData(config: DatasetConfig): Promise<Unit> = Promise.async {
-        core.resetData(config.toDomain())
-    }
+    override fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit> =
+        Promise.async { core.resetData(config.toDomain(extraTransactions)) }
 
     override fun getWallet(): Promise<Wallet> = Promise.async { core.getWallet().toNitro() }
 
@@ -69,6 +73,8 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     }
 
     override fun lastComputeMs(): Double = core.lastComputeMs()
+
+    override fun lastStorageMs(): Double = core.lastStorageMs()
 }
 
 @DoNotStrip

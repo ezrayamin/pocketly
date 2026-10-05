@@ -1,6 +1,9 @@
 package com.pocketly.shared.data
 
 import com.pocketly.shared.bridge.PocketlyCore
+import com.pocketly.shared.data.db.JvmDatabaseDrivers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -20,12 +23,17 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Platform-independent behaviour checks. Exact-value parity is in jvmTest/ContractFixturesTest. */
+/** Behaviour checks on in-memory SQLite. Exact-value parity is in contract/ContractFixturesTest. */
 class PocketlyCoreTest {
-    private val core = PocketlyCore.create()
+    private val core = PocketlyCore.create(JvmDatabaseDrivers())
+
+    /** On the test scheduler, so latencies and timeouts run on virtual time. */
+    private fun TestScope.virtualTimeCore() = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, StandardTestDispatcher(testScheduler))
 
     @Test
     fun walletBalanceMatchesLedger() = runTest {
+        core.getWallet() // cached
+        core.getTransactions(null, 20, null) // replica synced
         val summary = core.computeSpendingSummary("2026-09")
         assertTrue(summary.balanceCheck.consistent)
         assertEquals(core.getWallet().balance, summary.balanceCheck.walletBalance)
@@ -80,7 +88,9 @@ class PocketlyCoreTest {
 
     @Test
     fun slowModeAnswersAfterTwoToFiveSeconds() = runTest {
+        val core = virtualTimeCore()
         core.setNetworkSimulation(NetworkSimulation(NetworkMode.SLOW, failureRatePercent = 0))
+        core.getTransactions(null, 1, null) // let the databases open first
         val start = testScheduler.currentTime
         core.getWallet()
         assertTrue(testScheduler.currentTime - start in 2_000L..5_000L)
@@ -88,6 +98,7 @@ class PocketlyCoreTest {
 
     @Test
     fun timeoutModeFailsWithNetworkTimeoutAfterTenSeconds() = runTest {
+        val core = virtualTimeCore() // nothing cached yet, so the timeout is an error
         core.setNetworkSimulation(NetworkSimulation(NetworkMode.TIMEOUT, failureRatePercent = 0))
         val start = testScheduler.currentTime
         assertEquals(ErrorCode.NETWORK_TIMEOUT, assertFailsWith<CoreException> { core.getWallet() }.code)
@@ -96,6 +107,7 @@ class PocketlyCoreTest {
 
     @Test
     fun normalLatencyIsExact() = runTest {
+        val core = virtualTimeCore()
         core.setNetworkSimulation(NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0, normalLatencyMs = 300))
         val start = testScheduler.currentTime
         core.getWallet()

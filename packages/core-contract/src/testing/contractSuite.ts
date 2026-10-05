@@ -12,7 +12,7 @@
 import { DEFAULT_DATASET, NETWORK_NORMAL } from '../constants';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
-import type { NetworkSimulation, PriceTick, Transaction } from '../types';
+import type { NetworkSimulation, PriceTick, Transaction, Wallet } from '../types';
 import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
@@ -180,12 +180,13 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
     });
 
     describe('ingestTransactions (BM-04)', () => {
-      it('validates, de-duplicates and applies entries', async () => {
+      it('validates, de-duplicates and writes entries to the replica (not the server)', async () => {
         const before = await core.getWallet();
         expect(await core.ingestTransactions(JSON.stringify(ingest.input))).toEqual(ingest.expected);
         const after = await core.getWallet();
         expect(after.balance - before.balance).toBe(ingest.expectedBalanceDelta);
         expect((await core.getTransaction('ing-0001')).note).toBe('Iced latte');
+        expect(core.lastStorageMs()).toBeGreaterThanOrEqual(0);
       });
 
       it('is idempotent: re-ingesting the same payload only yields duplicates', async () => {
@@ -210,12 +211,34 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expectCoreErrorSync(() => core.setNetworkSimulation(sim as NetworkSimulation), 'INVALID_ARGUMENT');
       });
 
-      it.each(network.modeErrors)('$mode → $error on every backend call', async ({ mode, failureRatePercent, error }) => {
+      it.each(network.modeErrors)('$mode → $error: reads fall back to the replica, marked stale (FR-HIST-04)', async ({ mode, failureRatePercent, error }) => {
+        const fresh = await core.getWallet();
         core.setNetworkSimulation({ mode: mode as NetworkSimulation['mode'], failureRatePercent });
-        await expectCoreError(core.getWallet(), error as CoreError['code']);
-        await expectCoreError(core.getTransactions(), error as CoreError['code']);
-        // Local work isn't a backend call.
+        const wallet = await core.getWallet();
+        expect(wallet.stale?.reason).toBe(error);
+        expect({ ...wallet, stale: undefined }).toEqual({ ...fresh, stale: undefined });
+        const page = await core.getTransactions();
+        expect(page.stale?.reason).toBe(error);
+        expect({ items: page.items, nextCursor: page.nextCursor }).toEqual(golden.defaultDataset.firstPage);
+        // Later pages and local work never touch the server.
+        await expect(core.getTransactions(page.nextCursor)).resolves.toBeDefined();
         await expect(core.computeSpendingSummary('2026-09')).resolves.toBeDefined();
+      });
+
+      it('with nothing cached yet, an unreachable server is an error', async () => {
+        core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+        await core.resetData(DEFAULT_DATASET); // server re-seeded, replica cleared, sync fails
+        await expectCoreError(core.getWallet(), 'NETWORK_UNAVAILABLE');
+        await expectCoreError(core.getTransactions(), 'NETWORK_UNAVAILABLE');
+      });
+
+      it('the replica is separate from the server: offline shows what was synced, not live data', async () => {
+        await core.getTransactions(); // synced
+        await core.simulateIncomingTransfer(); // server-side change
+        core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+        expect((await core.getTransactions()).items.map((t) => t.id)).not.toContain('sim-000001');
+        core.setNetworkSimulation(NETWORK_NORMAL);
+        expect((await core.getTransactions()).items[0].id).toBe('sim-000001'); // the next refresh brings it
       });
 
       it('failure rate follows the seeded golden sequence', async () => {
@@ -223,7 +246,8 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         core.setNetworkSimulation(simulation as NetworkSimulation);
         const actual: string[] = [];
         for (let i = 0; i < outcomes.length; i++) {
-          actual.push(await core.getWallet().then(() => 'OK', (e: CoreError) => e.code));
+          const wallet = await core.getWallet();
+          actual.push(wallet.stale ? wallet.stale.reason : 'OK');
         }
         expect(actual).toEqual(outcomes);
       });
@@ -238,14 +262,14 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
         const settlements: string[] = [];
         await core.getWallet().then(
-          () => settlements.push('resolved'),
+          (w: Wallet) => settlements.push(w.stale ? `stale:${w.stale.reason}` : 'fresh'),
           (e: CoreError) => settlements.push(e.code),
         );
-        expect(settlements).toEqual(['NETWORK_TIMEOUT']);
+        expect(settlements).toEqual(['stale:NETWORK_TIMEOUT']); // answered from the replica
 
         // The backend answers during this wait. Nothing may settle again or change.
         await new Promise((r) => setTimeout(r, waitAfterTimeoutMs));
-        expect(settlements).toEqual(['NETWORK_TIMEOUT']);
+        expect(settlements).toEqual(['stale:NETWORK_TIMEOUT']);
         core.setNetworkSimulation(NETWORK_NORMAL);
         expect(await core.getWallet()).toEqual(before);
       });
@@ -276,10 +300,8 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
     describe('time zones (ADR-0006)', () => {
       it.each(timeZones.cases)('$name', async ({ zone, nowMillis, transactions, expected }) => {
-        await core.resetData({ seed: 1, transactionCount: 1, nowMillis });
         core.setTimeZone(zone);
-        const ingested = await core.ingestTransactions(JSON.stringify(transactions));
-        expect(ingested.accepted).toBe(transactions.length);
+        await core.resetData({ seed: 1, transactionCount: 1, nowMillis, extraTransactions: transactions as Transaction[] });
 
         expect((await core.getWallet()).usedToday).toBe(expected.usedToday);
         for (const [month, want] of Object.entries(expected.months)) {

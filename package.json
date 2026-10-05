@@ -14,7 +14,9 @@
     "nitrogen": "yarn workspace @pocketly/core-kmp nitrogen",
     "android:js": "yarn workspace @pocketly/mobile android:js",
     "android:kmp": "yarn workspace @pocketly/mobile android:kmp",
-    "ios:framework": "yarn workspace @pocketly/core-kmp build:ios-framework"
+    "ios:framework": "yarn workspace @pocketly/core-kmp build:ios-framework",
+    "sql:generate": "yarn workspace @pocketly/core-js sql:generate",
+    "sql:check": "yarn workspace @pocketly/core-js sql:generate --check"
   },
   "engines": {
     "node": ">= 22.13.0"

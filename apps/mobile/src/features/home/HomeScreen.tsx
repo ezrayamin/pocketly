@@ -9,6 +9,7 @@ import { HomeHeader } from './components/HomeHeader';
 import { IncomingBanner } from './components/IncomingBanner';
 import { QuickActions } from './components/QuickActions';
 import { RecentActivity } from './components/RecentActivity';
+import { staleNotice } from '../errors';
 import { useHomeData } from './useHomeData';
 
 /**
@@ -26,6 +27,8 @@ export function HomeScreen({ refreshToken = 0 }: { refreshToken?: number }) {
     if (refreshToken !== firstToken.current) refresh();
   }, [refreshToken, refresh]);
   const latestIncoming = data?.recent.find((tx) => tx.type === 'TRANSFER_IN' && tx.status === 'SUCCESS');
+  // A failed refresh, or a load the core answered from its replica (product §6.3).
+  const notice = error ?? (data?.stale ? staleNotice(data.stale) : null);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -46,13 +49,13 @@ export function HomeScreen({ refreshToken = 0 }: { refreshToken?: number }) {
         <HomeHeader />
         {latestIncoming && <IncomingBanner transaction={latestIncoming} />}
 
-        {error && (
-          <View style={[styles.error, error.offline && styles.offline]} accessibilityRole="alert" testID="home-error">
+        {notice && (
+          <View style={[styles.error, notice.offline && styles.offline]} accessibilityRole="alert" testID="home-error">
             <View style={styles.errorBody}>
-              <Text style={[styles.errorText, error.offline && styles.offlineText]}>{error.message}</Text>
+              <Text style={[styles.errorText, notice.offline && styles.offlineText]}>{notice.message}</Text>
               {data && (
-                <Text style={styles.staleText}>
-                  Showing data from {new Date(data.loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <Text style={styles.staleText} testID="home-last-updated">
+                  Last updated {new Date(data.syncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               )}
             </View>

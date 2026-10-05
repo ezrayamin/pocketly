@@ -1,14 +1,20 @@
 import { LIVE_DATASET } from '@pocketly/core-contract';
 import type { Core } from '@pocketly/core-contract';
+import { opSqliteDriver } from './data/db/opSqliteDriver';
 import { createJsCore } from './jsCore';
 
 export { JsCore, createJsCore } from './jsCore';
 export type { JsCoreOptions } from './jsCore';
+export type { SqlDriver } from './data/db/sqlDriver';
 export { generateTransactions } from './data/seedData';
 export { PriceFeed } from './sync/priceFeed';
 export { nextTransferState, transition, InvalidTransitionError } from './domain/transferStateMachine';
 
-/** Entry point used by `apps/mobile/src/core.ts` when CORE_IMPL=js. */
+/** Entry point used by `apps/mobile/src/core.ts` when CORE_IMPL=js. Two files (ADR-0009). */
 export function createCore(): Core {
-  return createJsCore({ dataset: LIVE_DATASET });
+  return createJsCore({
+    server: opSqliteDriver('pocketly-server.db'),
+    cache: opSqliteDriver('pocketly-cache.db'),
+    dataset: LIVE_DATASET,
+  });
 }

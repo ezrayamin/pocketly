@@ -62,6 +62,18 @@ internal object TransactionDtoValidator {
 
     private val INVALID = Any()
 
+    /** Same rules for an already-typed transaction (server seed rows: DatasetConfig.extraTransactions). */
+    fun validate(tx: Transaction): IngestRejectReason? = when {
+        !isId(tx.id) || !isId(tx.idempotencyKey) -> IngestRejectReason.INVALID_ID
+        tx.amount.minor <= 0 || tx.amount.minor > Money.MAX_AMOUNT_MINOR -> IngestRejectReason.INVALID_AMOUNT
+        (tx.status == TransactionStatus.FAILED) != (tx.failureReason != null) -> IngestRejectReason.INVALID_FAILURE_REASON
+        tx.createdAt < 0 || tx.updatedAt < tx.createdAt -> IngestRejectReason.INVALID_TIMESTAMP
+        tx.counterparty != null && (tx.counterparty.id.isEmpty() || tx.counterparty.name.isEmpty()) ->
+            IngestRejectReason.INVALID_COUNTERPARTY
+        tx.note != null && tx.note.length > MAX_NOTE_LENGTH -> IngestRejectReason.INVALID_NOTE
+        else -> null
+    }
+
     fun validate(raw: JsonElement?): Result {
         val obj = raw as? JsonObject ?: return Result.Invalid(IngestRejectReason.INVALID_SHAPE)
 

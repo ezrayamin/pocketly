@@ -1,0 +1,94 @@
+-- The app's local replica (pocketly-cache.db): what the client last received from the
+-- server (FR-HIST-04, ADR-0009). Never written by the fake backend. Shared with core-js:
+-- this file is the single source for both cores. Repeated values use named `:params`;
+-- the JS generator maps them to positional `?` plus a name order.
+
+CREATE TABLE cache_transaction (
+  id TEXT NOT NULL PRIMARY KEY,
+  idempotency_key TEXT NOT NULL,
+  type TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  counterparty_kind TEXT,
+  counterparty_id TEXT,
+  counterparty_name TEXT,
+  counterparty_phone TEXT,
+  note TEXT,
+  status TEXT NOT NULL,
+  failure_reason TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX cache_transaction_newest ON cache_transaction(created_at DESC, id DESC);
+
+CREATE TABLE cache_wallet (
+  id TEXT NOT NULL PRIMARY KEY,
+  balance INTEGER NOT NULL,
+  daily_limit INTEGER NOT NULL,
+  used_today INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  cached_at INTEGER NOT NULL
+);
+
+CREATE TABLE cache_meta (
+  key TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+upsertTransaction:
+INSERT OR REPLACE INTO cache_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- BM-04: a row whose id is already cached is a duplicate and isn't inserted.
+insertTransactionIfAbsent:
+INSERT OR IGNORE INTO cache_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getTransaction:
+SELECT * FROM cache_transaction WHERE id = ?;
+
+-- History, newest first (FR-HIST-01). Filters are comma-wrapped lists (",A,B,") or '' for all.
+pageFirst:
+SELECT * FROM cache_transaction
+WHERE (:types = '' OR instr(:types, ',' || type || ',') > 0)
+  AND (:statuses = '' OR instr(:statuses, ',' || status || ',') > 0)
+ORDER BY created_at DESC, id DESC
+LIMIT :limit;
+
+pageAfter:
+SELECT * FROM cache_transaction
+WHERE (created_at < :afterCreatedAt OR (created_at = :afterCreatedAt AND id < :afterId))
+  AND (:types = '' OR instr(:types, ',' || type || ',') > 0)
+  AND (:statuses = '' OR instr(:statuses, ',' || status || ',') > 0)
+ORDER BY created_at DESC, id DESC
+LIMIT :limit;
+
+-- BM-03 loads the whole ledger, then computes in memory (same algorithm in both cores).
+allTransactions:
+SELECT * FROM cache_transaction ORDER BY created_at DESC, id DESC;
+
+countTransactions:
+SELECT COUNT(*) AS n FROM cache_transaction;
+
+deleteAllTransactions:
+DELETE FROM cache_transaction;
+
+upsertWallet:
+INSERT OR REPLACE INTO cache_wallet(id, balance, daily_limit, used_today, updated_at, cached_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+getWallet:
+SELECT * FROM cache_wallet LIMIT 1;
+
+deleteWallet:
+DELETE FROM cache_wallet;
+
+getMeta:
+SELECT value FROM cache_meta WHERE key = ?;
+
+setMeta:
+INSERT OR REPLACE INTO cache_meta(key, value) VALUES (?, ?);
+
+deleteAllMeta:
+DELETE FROM cache_meta;

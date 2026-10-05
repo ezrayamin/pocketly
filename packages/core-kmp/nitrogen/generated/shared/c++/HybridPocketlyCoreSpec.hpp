@@ -13,16 +13,16 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-// Forward declaration of `DatasetConfig` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct DatasetConfig; }
+// Forward declaration of `DatasetSeed` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct DatasetSeed; }
+// Forward declaration of `Transaction` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `Wallet` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Wallet; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
-// Forward declaration of `Transaction` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
@@ -37,17 +37,17 @@ namespace margelo::nitro::pocketly { class HybridPriceSubscriptionSpec; }
 namespace margelo::nitro::pocketly { struct PriceTick; }
 
 #include <NitroModules/Promise.hpp>
-#include "DatasetConfig.hpp"
+#include "DatasetSeed.hpp"
+#include "Transaction.hpp"
+#include <vector>
 #include "Wallet.hpp"
 #include "TransactionPage.hpp"
 #include <string>
 #include <optional>
 #include "TxFilter.hpp"
-#include "Transaction.hpp"
 #include "NetworkSimulation.hpp"
 #include "SpendingSummary.hpp"
 #include "IngestResult.hpp"
-#include <vector>
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -85,7 +85,7 @@ namespace margelo::nitro::pocketly {
 
     public:
       // Methods
-      virtual std::shared_ptr<Promise<void>> resetData(const DatasetConfig& config) = 0;
+      virtual std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) = 0;
       virtual std::shared_ptr<Promise<Wallet>> getWallet() = 0;
       virtual std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) = 0;
       virtual std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) = 0;
@@ -100,6 +100,7 @@ namespace margelo::nitro::pocketly {
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;
       virtual double lastComputeMs() = 0;
+      virtual double lastStorageMs() = 0;
 
     protected:
       // Hybrid Setup

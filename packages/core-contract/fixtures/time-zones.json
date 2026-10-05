@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-written (ADR-0006). Each case: resetData({ seed: 1, transactionCount: 1, nowMillis }), setTimeZone(zone), ingest `transactions` (all SUCCESS QR payments, so spent = sum), then check Wallet.usedToday and computeSpendingSummary per month. $local/$now are the human-readable sources of the epoch values. The opening balance entry is 61 days before now, outside every checked month.",
+  "$comment": "Hand-written (ADR-0006). Each case: resetData({ seed: 1, transactionCount: 1, nowMillis, extraTransactions: transactions }) so the server (usedToday) and, after the sync, the replica (summaries) both hold them; setTimeZone(zone) first. All entries are SUCCESS QR payments, so spent = sum. $local/$now are the human-readable sources of the epoch values. The opening balance entry is 61 days before now, outside every checked month.",
   "invalidZones": [
     "Mars/Olympus_Mons",
     "Not a zone"

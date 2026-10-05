@@ -1,13 +1,20 @@
 import { CoreError, MAX_INGEST_ERRORS } from '@pocketly/core-contract';
-import type { IngestError, IngestResult, Transaction } from '@pocketly/core-contract';
+import type { IngestError, Transaction } from '@pocketly/core-contract';
 import { validateTransaction } from './transactionDtoValidator';
-import type { TransactionStore } from './transactionStore';
+
+export interface ParsedIngest {
+  /** Valid entries in input order (duplicates included: the write step drops them). */
+  valid: Transaction[];
+  rejected: number;
+  errors: IngestError[];
+}
 
 /**
- * BM-04: JSON → validate → write. Mirrors shared/.../data/TransactionIngestor.kt.
- * Both sides parse into a generic tree first, then validate field by field.
+ * BM-04 compute step: JSON → generic tree → field-by-field validation. The write step is
+ * CacheStore.insertIfAbsentMany (storage, timed separately: ADR-0009).
+ * Mirrors shared/.../data/TransactionIngestor.kt.
  */
-export function ingestTransactions(json: string, store: TransactionStore): IngestResult {
+export function parseAndValidate(json: string): ParsedIngest {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -18,30 +25,17 @@ export function ingestTransactions(json: string, store: TransactionStore): Inges
     throw new CoreError('INVALID_ARGUMENT', 'Payload must be a JSON array');
   }
 
-  const accepted: Transaction[] = [];
-  const seen = new Set<string>();
+  const valid: Transaction[] = [];
   const errors: IngestError[] = [];
   let rejected = 0;
-  let duplicates = 0;
-
   for (let index = 0; index < parsed.length; index++) {
     const result = validateTransaction(parsed[index]);
-    if (!result.ok) {
+    if (result.ok) {
+      valid.push(result.value);
+    } else {
       rejected++;
-      if (errors.length < MAX_INGEST_ERRORS) {
-        errors.push({ index, reason: result.reason });
-      }
-      continue;
+      if (errors.length < MAX_INGEST_ERRORS) errors.push({ index, reason: result.reason });
     }
-    const id = result.value.id;
-    if (seen.has(id) || store.has(id)) {
-      duplicates++;
-      continue;
-    }
-    seen.add(id);
-    accepted.push(result.value);
   }
-
-  store.insertAll(accepted);
-  return { accepted: accepted.length, rejected, duplicates, errors };
+  return { valid, rejected, errors };
 }

@@ -162,3 +162,12 @@ gradle.taskGraph.whenReady { graph ->
         .findAll { it.project == project && it.name ==~ /createBundleKmpCore.*JsAndAssets/ }
         .each { it.extraPackagerArgs.addAll(["--config", file("../../metro.kmp.config.js").absolutePath]) }
 }
+
+// ADR-0009: op-sqlite (bundled SQLite) serves core-js only. Its Turbo Module glue must stay
+// autolinked in both flavors, but kmpCore never loads it, so its native library is stripped
+// from kmpCore APKs: BM-08 then charges the bundled SQLite to jsCore alone.
+androidComponents {
+    onVariants(selector().withFlavor(new kotlin.Pair("core", "kmpCore"))) { variant ->
+        variant.packaging.jniLibs.excludes.add("**/libop-sqlite.so")
+    }
+}

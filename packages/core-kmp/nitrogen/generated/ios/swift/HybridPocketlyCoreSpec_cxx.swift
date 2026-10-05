@@ -125,9 +125,9 @@ open class HybridPocketlyCoreSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func resetData(config: DatasetConfig) -> bridge.Result_std__shared_ptr_Promise_void___ {
+  public final func resetData(config: DatasetSeed, extraTransactions: bridge.std__vector_Transaction_) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      let __result = try self.__implementation.resetData(config: config)
+      let __result = try self.__implementation.resetData(config: config, extraTransactions: extraTransactions.map({ __item in __item }))
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
         let __promise = bridge.create_std__shared_ptr_Promise_void__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
@@ -370,6 +370,18 @@ open class HybridPocketlyCoreSpec_cxx {
   public final func lastComputeMs() -> bridge.Result_double_ {
     do {
       let __result = try self.__implementation.lastComputeMs()
+      let __resultCpp = __result
+      return bridge.create_Result_double_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_double_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func lastStorageMs() -> bridge.Result_double_ {
+    do {
+      let __result = try self.__implementation.lastStorageMs()
       let __resultCpp = __result
       return bridge.create_Result_double_(__resultCpp)
     } catch (let __error) {

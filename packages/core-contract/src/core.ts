@@ -27,12 +27,22 @@ export type CoreImpl = 'js' | 'kmp';
 export interface Core {
   readonly impl: CoreImpl;
 
-  // ── Data / fake backend ────────────────────────────────────────────────
-  /** Re-seed the fake backend (FR-DEV-05). Defaults to {@link DEFAULT_DATASET}. */
+  // ── Data (ADR-0009: fake server DB + the app's local replica) ──────────
+  /**
+   * FR-DEV-05: re-seed the fake server, clear the local replica, then sync it once (a sync
+   * that can't reach the server leaves the replica empty). Defaults to {@link DEFAULT_DATASET}.
+   */
   resetData(config?: DatasetConfig): Promise<void>;
+  /** From the server (and cached); if unreachable, the cached wallet with `stale`. */
   getWallet(): Promise<Wallet>;
-  /** Newest first. FR-HIST-01: default limit 20, no duplicates across pages. */
+  /**
+   * History from the local replica, newest first (FR-HIST-01: default limit 20, no duplicates
+   * across pages). The first page (no cursor) refreshes first: it delta-syncs server changes
+   * into the replica; if the server is unreachable it returns the replica with `stale`.
+   * Rejects only when there is nothing cached to show.
+   */
   getTransactions(cursor?: string, limit?: number, filter?: TxFilter): Promise<TransactionPage>;
+  /** From the replica, else the server. */
   getTransaction(id: string): Promise<Transaction>;
 
   // ── Developer menu / fake backend controls (F11) ──────────────────────
@@ -56,9 +66,15 @@ export interface Core {
   setTimeZone(zoneId: string): void;
 
   // ── CPU-heavy work (BM-03, BM-04) ─────────────────────────────────────
-  /** `month` is `YYYY-MM` in the core's time zone; byDay uses local dates. */
+  /**
+   * Over the local replica. `month` is `YYYY-MM` in the core's time zone; byDay uses local
+   * dates; balanceCheck compares the replica's ledger with the server balance last received.
+   */
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
-  /** Parse a JSON array of transactions, validate each one and add the valid ones to the ledger. */
+  /**
+   * BM-04: parse a JSON array of transactions, validate each one and write the valid ones to
+   * the local replica (not the server: balances are unaffected). Existing ids are duplicates.
+   */
   ingestTransactions(json: string): Promise<IngestResult>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
@@ -80,5 +96,10 @@ export interface Core {
    * For kmpCore, this is measured in Kotlin, so end-to-end minus this = bridge overhead.
    */
   lastComputeMs(): number;
+  /**
+   * Database time of that same call (reading the replica for a summary, writing it for an
+   * ingest). Reported separately because the two builds use different SQLite engines (ADR-0009).
+   */
+  lastStorageMs(): number;
 }
 

@@ -28,9 +28,12 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
 
 #include <string>
+#include "StaleInfo.hpp"
+#include <optional>
 
 namespace margelo::nitro::pocketly {
 
@@ -44,10 +47,11 @@ namespace margelo::nitro::pocketly {
     double dailyLimit     SWIFT_PRIVATE;
     double usedToday     SWIFT_PRIVATE;
     double updatedAt     SWIFT_PRIVATE;
+    std::optional<StaleInfo> stale     SWIFT_PRIVATE;
 
   public:
     Wallet() = default;
-    explicit Wallet(std::string id, double balance, double dailyLimit, double usedToday, double updatedAt): id(id), balance(balance), dailyLimit(dailyLimit), usedToday(usedToday), updatedAt(updatedAt) {}
+    explicit Wallet(std::string id, double balance, double dailyLimit, double usedToday, double updatedAt, std::optional<StaleInfo> stale): id(id), balance(balance), dailyLimit(dailyLimit), usedToday(usedToday), updatedAt(updatedAt), stale(stale) {}
 
   public:
     friend bool operator==(const Wallet& lhs, const Wallet& rhs) = default;
@@ -67,7 +71,8 @@ namespace margelo::nitro {
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "balance"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "dailyLimit"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "usedToday"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "updatedAt")))
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "updatedAt"))),
+        JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "stale")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pocketly::Wallet& arg) {
@@ -77,6 +82,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "dailyLimit"), JSIConverter<double>::toJSI(runtime, arg.dailyLimit));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "usedToday"), JSIConverter<double>::toJSI(runtime, arg.usedToday));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "updatedAt"), JSIConverter<double>::toJSI(runtime, arg.updatedAt));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "stale"), JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::toJSI(runtime, arg.stale));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -92,6 +98,7 @@ namespace margelo::nitro {
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "dailyLimit")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "usedToday")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "updatedAt")))) return false;
+      if (!JSIConverter<std::optional<margelo::nitro::pocketly::StaleInfo>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "stale")))) return false;
       return true;
     }
   };

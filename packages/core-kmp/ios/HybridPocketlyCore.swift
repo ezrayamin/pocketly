@@ -14,10 +14,13 @@ import NitroModules
 import PocketlyShared
 
 final class HybridPocketlyCore: HybridPocketlyCoreSpec {
-  private let core = PocketlyShared.PocketlyCore.companion.create(dataset: PocketlyShared.DatasetConfig.companion.LIVE)
+  private let core = PocketlyShared.PocketlyCore.companion.create(
+    drivers: PocketlyShared.IosDatabaseDrivers(),
+    dataset: PocketlyShared.DatasetConfig.companion.LIVE
+  )
   private let convert = PocketlyShared.BridgeConversions.shared
 
-  func resetData(config: DatasetConfig) throws -> Promise<Void> {
+  func resetData(config: DatasetSeed, extraTransactions: [Transaction]) throws -> Promise<Void> {
     var nowMillis: KotlinLong? = nil
     if let now = config.nowMillis {
       nowMillis = KotlinLong(value: try convert.toLongExact(value: now, field: "nowMillis"))
@@ -25,7 +28,8 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     let kConfig = PocketlyShared.DatasetConfig(
       seed: try convert.toIntExact(value: config.seed, field: "seed"),
       transactionCount: try convert.toIntExact(value: config.transactionCount, field: "transactionCount"),
-      nowMillis: nowMillis
+      nowMillis: nowMillis,
+      extraTransactions: try extraTransactions.map { try $0.toDomain(convert) }
     )
     return Promise.async { [core] in try await core.resetData(config: kConfig) }
   }
@@ -128,6 +132,10 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   func lastComputeMs() throws -> Double {
     return core.lastComputeMs()
   }
+
+  func lastStorageMs() throws -> Double {
+    return core.lastStorageMs()
+  }
 }
 
 final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
@@ -142,7 +150,41 @@ final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
   }
 }
 
+// MARK: - Nitro structs → Kotlin domain
+
+private extension Transaction {
+  /// Shape only: the fake server validates the values like ingest input (INVALID_ARGUMENT).
+  func toDomain(_ convert: PocketlyShared.BridgeConversions) throws -> PocketlyShared.Transaction {
+    PocketlyShared.Transaction(
+      id: id,
+      idempotencyKey: idempotencyKey,
+      type: PocketlyShared.TransactionType.entries.first { $0.name == type.stringValue }!,
+      category: PocketlyShared.Category.entries.first { $0.name == category.stringValue }!,
+      amount: try convert.toLongExact(value: amount, field: "amount"),
+      counterparty: counterparty.map { c in
+        PocketlyShared.Counterparty(
+          kind: PocketlyShared.CounterpartyKind.entries.first { $0.name == c.kind.stringValue }!,
+          id: c.id,
+          name: c.name,
+          phone: c.phone
+        )
+      },
+      note: note,
+      status: PocketlyShared.TransactionStatus.entries.first { $0.name == status.stringValue }!,
+      failureReason: failureReason.map { r in PocketlyShared.ErrorCode.entries.first { $0.name == r.stringValue }! },
+      createdAt: try convert.toLongExact(value: createdAt, field: "createdAt"),
+      updatedAt: try convert.toLongExact(value: updatedAt, field: "updatedAt")
+    )
+  }
+}
+
 // MARK: - Kotlin domain → Nitro structs
+
+private extension PocketlyShared.StaleInfo {
+  func toNitro() -> StaleInfo {
+    StaleInfo(reason: ErrorCode(fromString: reason.name)!, cachedAt: Double(cachedAt))
+  }
+}
 
 private extension PocketlyShared.Wallet {
   func toNitro() -> Wallet {
@@ -151,7 +193,8 @@ private extension PocketlyShared.Wallet {
       balance: Double(balance),
       dailyLimit: Double(dailyLimit),
       usedToday: Double(usedToday),
-      updatedAt: Double(updatedAt)
+      updatedAt: Double(updatedAt),
+      stale: stale?.toNitro()
     )
   }
 }
@@ -178,7 +221,7 @@ private extension PocketlyShared.Transaction {
 
 private extension PocketlyShared.TransactionPage {
   func toNitro() -> TransactionPage {
-    TransactionPage(items: items.map { $0.toNitro() }, nextCursor: nextCursor)
+    TransactionPage(items: items.map { $0.toNitro() }, nextCursor: nextCursor, stale: stale?.toNitro())
   }
 }
 

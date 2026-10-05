@@ -40,7 +40,7 @@ describe('Home (jsCore)', () => {
     // Exactly 5 rows, newest first (the order the core returns).
     const { items } = await core.getTransactions(undefined, 5);
     expect(ids).toEqual(items.map((t) => `tx-${t.id}`));
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 
   it('hides the balance and persists the choice (FR-HOME-02)', async () => {
@@ -50,12 +50,12 @@ describe('Home (jsCore)', () => {
     });
     expect(text(tree.root.findByProps({ testID: 'balance' }))).toBe('••••••');
     expect(await uiPreferences.getBalanceHidden()).toBe(true);
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
 
     // A fresh mount (≈ app restart) starts hidden.
     const again = await renderApp();
     expect(text(again.root.findByProps({ testID: 'balance' }))).toBe('••••••');
-    again.unmount();
+    ReactTestRenderer.act(() => again.unmount());
   });
 
   it('pull to refresh reloads from the core (FR-HOME-05)', async () => {
@@ -67,7 +67,7 @@ describe('Home (jsCore)', () => {
     });
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 });
 
@@ -91,10 +91,10 @@ describe('Developer menu (F11)', () => {
     expect(tree.root.findAllByProps({ testID: 'devmenu-close' })).toHaveLength(0);
     await openDevMenu(tree);
     expect(tree.root.findAllByProps({ testID: 'devmenu-close' }).length).toBeGreaterThan(0);
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 
-  it('offline mode shows the offline message on Home and keeps the cached balance (FR-DEV-02)', async () => {
+  it('offline mode shows the offline message on Home with the cached balance and its sync time (FR-DEV-02, FR-HIST-04)', async () => {
     const tree = await renderApp();
     await openDevMenu(tree);
     await ReactTestRenderer.act(async () => {
@@ -106,8 +106,10 @@ describe('Developer menu (F11)', () => {
     });
     const error = tree.root.findByProps({ testID: 'home-error' });
     expect(JSON.stringify(error.findAllByType('Text' as never).map((t) => t.props.children))).toContain("You're offline");
+    // The replica answered (ADR-0009): the banner dates it from the last sync.
+    expect(text(tree.root.findByProps({ testID: 'home-last-updated' }))).toMatch(/^Last updated \S/);
     expect(text(tree.root.findByProps({ testID: 'balance' }))).toBe('$14,590.85');
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 
   it('a simulated incoming transfer appears on Home after closing (FR-DEV-04)', async () => {
@@ -121,7 +123,7 @@ describe('Developer menu (F11)', () => {
       tree.root.findByProps({ testID: 'devmenu-close' }).props.onPress();
     });
     expect(tree.root.findAllByProps({ testID: 'tx-sim-000001' }).length).toBeGreaterThan(0);
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 });
 
@@ -157,7 +159,7 @@ describe('Late results (ADR-0007)', () => {
     });
     expect(tree.root.findAllByProps({ testID: 'home-error' })).toHaveLength(0);
     expect(scroll().props.refreshControl.props.refreshing).toBe(false);
-    tree.unmount();
+    ReactTestRenderer.act(() => tree.unmount());
   });
 });
 

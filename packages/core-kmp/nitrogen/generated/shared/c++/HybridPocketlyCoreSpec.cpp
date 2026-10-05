@@ -29,6 +29,7 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);
       prototype.registerHybridMethod("subscribePrices", &HybridPocketlyCoreSpec::subscribePrices);
       prototype.registerHybridMethod("lastComputeMs", &HybridPocketlyCoreSpec::lastComputeMs);
+      prototype.registerHybridMethod("lastStorageMs", &HybridPocketlyCoreSpec::lastStorageMs);
     });
   }
 

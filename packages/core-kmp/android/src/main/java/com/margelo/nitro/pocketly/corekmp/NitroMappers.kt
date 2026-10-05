@@ -2,16 +2,21 @@ package com.margelo.nitro.pocketly.corekmp
 
 import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.domain.BalanceCheck as KBalanceCheck
+import com.pocketly.shared.domain.Category as KCategory
 import com.pocketly.shared.domain.CategoryTotal as KCategoryTotal
 import com.pocketly.shared.domain.Counterparty as KCounterparty
+import com.pocketly.shared.domain.CounterpartyKind as KCounterpartyKind
 import com.pocketly.shared.domain.DatasetConfig as KDatasetConfig
 import com.pocketly.shared.domain.DayTotal as KDayTotal
+import com.pocketly.shared.domain.ErrorCode as KErrorCode
 import com.pocketly.shared.domain.IngestResult as KIngestResult
+import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyParseResult as KMoneyParseResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
 import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
 import com.pocketly.shared.domain.SpendingSummary as KSpendingSummary
+import com.pocketly.shared.domain.StaleInfo as KStaleInfo
 import com.pocketly.shared.domain.Transaction as KTransaction
 import com.pocketly.shared.domain.TransactionPage as KTransactionPage
 import com.pocketly.shared.domain.TransactionStatus as KTransactionStatus
@@ -24,10 +29,26 @@ import com.pocketly.shared.domain.Wallet as KWallet
 
 // ── JS → Kotlin ─────────────────────────────────────────────────────────────
 
-internal fun DatasetConfig.toDomain() = KDatasetConfig(
+internal fun DatasetSeed.toDomain(extraTransactions: Array<Transaction>) = KDatasetConfig(
     seed = BridgeConversions.toIntExact(seed, "seed"),
     transactionCount = BridgeConversions.toIntExact(transactionCount, "transactionCount"),
     nowMillis = nowMillis?.let { BridgeConversions.toLongExact(it, "nowMillis") },
+    extraTransactions = extraTransactions.map { it.toDomain() },
+)
+
+// Shape only: the fake server validates the values like ingest input (INVALID_ARGUMENT).
+private fun Transaction.toDomain() = KTransaction(
+    id = id,
+    idempotencyKey = idempotencyKey,
+    type = KTransactionType.valueOf(type.name),
+    category = KCategory.valueOf(category.name),
+    amount = Money(BridgeConversions.toLongExact(amount, "amount")),
+    counterparty = counterparty?.let { KCounterparty(KCounterpartyKind.valueOf(it.kind.name), it.id, it.name, it.phone) },
+    note = note,
+    status = KTransactionStatus.valueOf(status.name),
+    failureReason = failureReason?.let { KErrorCode.valueOf(it.name) },
+    createdAt = BridgeConversions.toLongExact(createdAt, "createdAt"),
+    updatedAt = BridgeConversions.toLongExact(updatedAt, "updatedAt"),
 )
 
 internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
@@ -53,12 +74,15 @@ internal fun TxFilter.toDomain() = KTxFilter(
 
 // ── Kotlin → JS ─────────────────────────────────────────────────────────────
 
+private fun KStaleInfo.toNitro() = StaleInfo(ErrorCode.valueOf(reason.name), cachedAt.toDouble())
+
 internal fun KWallet.toNitro() = Wallet(
     id = id,
     balance = balance.minor.toDouble(),
     dailyLimit = dailyLimit.minor.toDouble(),
     usedToday = usedToday.minor.toDouble(),
     updatedAt = updatedAt.toDouble(),
+    stale = stale?.toNitro(),
 )
 
 internal fun KCounterparty.toNitro() = Counterparty(
@@ -85,6 +109,7 @@ internal fun KTransaction.toNitro() = Transaction(
 internal fun KTransactionPage.toNitro() = TransactionPage(
     items = Array(items.size) { items[it].toNitro() },
     nextCursor = nextCursor,
+    stale = stale?.toNitro(),
 )
 
 private fun KCategoryTotal.toNitro() =

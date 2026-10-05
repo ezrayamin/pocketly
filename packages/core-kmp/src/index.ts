@@ -34,7 +34,8 @@ export class KmpCore implements Core {
   constructor(private readonly native: PocketlyCore) {}
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
-    return this.native.resetData(config).catch(rethrow);
+    const { extraTransactions = [], ...seed } = config;
+    return this.native.resetData(seed, extraTransactions).catch(rethrow);
   }
 
   getWallet(): Promise<Wallet> {
@@ -117,6 +118,10 @@ export class KmpCore implements Core {
 
   lastComputeMs(): number {
     return this.native.lastComputeMs();
+  }
+
+  lastStorageMs(): number {
+    return this.native.lastStorageMs();
   }
 }
 

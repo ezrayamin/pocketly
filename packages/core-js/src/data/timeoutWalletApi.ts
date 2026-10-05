@@ -1,6 +1,6 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
-import type { WalletApi } from './walletApi';
+import type { Transaction, Wallet } from '@pocketly/core-contract';
+import type { ChangesPage, WalletApi } from './walletApi';
 
 /**
  * NFR-REL-01: every backend call has a timeout. Wraps any WalletApi (fake or real).
@@ -21,8 +21,8 @@ export class TimeoutWalletApi implements WalletApi {
     return this.withTimeout(() => this.inner.getWallet());
   }
 
-  getTransactions(cursor: string | undefined, limit: number, filter?: TxFilter): Promise<TransactionPage> {
-    return this.withTimeout(() => this.inner.getTransactions(cursor, limit, filter));
+  getChanges(afterToken: string | undefined, limit: number): Promise<ChangesPage> {
+    return this.withTimeout(() => this.inner.getChanges(afterToken, limit));
   }
 
   getTransaction(id: string): Promise<Transaction> {

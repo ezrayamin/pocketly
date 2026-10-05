@@ -8,3 +8,7 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# ADR-0009: kmpCore excludes this autolinked package by class name (CorePackages.excludedPackageClasses),
+# so R8 must not rename it.
+-keepnames class com.op.sqlite.OPSQLitePackage

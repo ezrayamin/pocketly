@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@op-engineering/op-sqlite": "18.2.5",
     "@pocketly/core-contract": "0.1.0",
     "@pocketly/core-js": "0.1.0",
     "@pocketly/core-kmp": "0.1.0",

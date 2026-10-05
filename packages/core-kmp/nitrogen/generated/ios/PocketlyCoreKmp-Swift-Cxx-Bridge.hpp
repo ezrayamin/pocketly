@@ -42,6 +42,8 @@ namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 namespace margelo::nitro::pocketly { struct PriceTick; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -79,6 +81,7 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "NetworkSimulation.hpp"
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
+#include "StaleInfo.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"
@@ -193,40 +196,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return optional.value();
   }
   
-  // pragma MARK: std::shared_ptr<Promise<Wallet>>
-  /**
-   * Specialized version of `std::shared_ptr<Promise<Wallet>>`.
-   */
-  using std__shared_ptr_Promise_Wallet__ = std::shared_ptr<Promise<Wallet>>;
-  inline std::shared_ptr<Promise<Wallet>> create_std__shared_ptr_Promise_Wallet__() noexcept {
-    return Promise<Wallet>::create();
-  }
-  inline PromiseHolder<Wallet> wrap_std__shared_ptr_Promise_Wallet__(std::shared_ptr<Promise<Wallet>> promise) noexcept {
-    return PromiseHolder<Wallet>(std::move(promise));
-  }
-  
-  // pragma MARK: std::function<void(const Wallet& /* result */)>
-  /**
-   * Specialized version of `std::function<void(const Wallet&)>`.
-   */
-  using Func_void_Wallet = std::function<void(const Wallet& /* result */)>;
-  /**
-   * Wrapper class for a `std::function<void(const Wallet& / * result * /)>`, this can be used from Swift.
-   */
-  class Func_void_Wallet_Wrapper final {
-  public:
-    explicit Func_void_Wallet_Wrapper(std::function<void(const Wallet& /* result */)>&& func): _function(std::make_unique<std::function<void(const Wallet& /* result */)>>(std::move(func))) {}
-    inline void call(Wallet result) const noexcept {
-      _function->operator()(result);
-    }
-  private:
-    std::unique_ptr<std::function<void(const Wallet& /* result */)>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void_Wallet create_Func_void_Wallet(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_Wallet_Wrapper wrap_Func_void_Wallet(Func_void_Wallet value) noexcept {
-    return Func_void_Wallet_Wrapper(std::move(value));
-  }
-  
   // pragma MARK: std::optional<std::string>
   /**
    * Specialized version of `std::optional<std::string>`.
@@ -281,6 +250,55 @@ namespace margelo::nitro::pocketly::bridge::swift {
     std::vector<Transaction> vector;
     vector.reserve(size);
     return vector;
+  }
+  
+  // pragma MARK: std::optional<StaleInfo>
+  /**
+   * Specialized version of `std::optional<StaleInfo>`.
+   */
+  using std__optional_StaleInfo_ = std::optional<StaleInfo>;
+  inline std::optional<StaleInfo> create_std__optional_StaleInfo_(const StaleInfo& value) noexcept {
+    return std::optional<StaleInfo>(value);
+  }
+  inline bool has_value_std__optional_StaleInfo_(const std::optional<StaleInfo>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline StaleInfo get_std__optional_StaleInfo_(const std::optional<StaleInfo>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<Wallet>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<Wallet>>`.
+   */
+  using std__shared_ptr_Promise_Wallet__ = std::shared_ptr<Promise<Wallet>>;
+  inline std::shared_ptr<Promise<Wallet>> create_std__shared_ptr_Promise_Wallet__() noexcept {
+    return Promise<Wallet>::create();
+  }
+  inline PromiseHolder<Wallet> wrap_std__shared_ptr_Promise_Wallet__(std::shared_ptr<Promise<Wallet>> promise) noexcept {
+    return PromiseHolder<Wallet>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const Wallet& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const Wallet&)>`.
+   */
+  using Func_void_Wallet = std::function<void(const Wallet& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const Wallet& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_Wallet_Wrapper final {
+  public:
+    explicit Func_void_Wallet_Wrapper(std::function<void(const Wallet& /* result */)>&& func): _function(std::make_unique<std::function<void(const Wallet& /* result */)>>(std::move(func))) {}
+    inline void call(Wallet result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const Wallet& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_Wallet create_Func_void_Wallet(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wallet_Wrapper wrap_Func_void_Wallet(Func_void_Wallet value) noexcept {
+    return Func_void_Wallet_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<Promise<TransactionPage>>

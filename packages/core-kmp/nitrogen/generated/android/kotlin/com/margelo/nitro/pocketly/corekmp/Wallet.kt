@@ -32,7 +32,10 @@ data class Wallet(
   val usedToday: Double,
   @DoNotStrip
   @Keep
-  val updatedAt: Double
+  val updatedAt: Double,
+  @DoNotStrip
+  @Keep
+  val stale: StaleInfo?
 ) {
   /* primary constructor */
 
@@ -44,6 +47,7 @@ data class Wallet(
       && Objects.deepEquals(this.dailyLimit, other.dailyLimit)
       && Objects.deepEquals(this.usedToday, other.usedToday)
       && Objects.deepEquals(this.updatedAt, other.updatedAt)
+      && Objects.deepEquals(this.stale, other.stale)
   }
 
   override fun hashCode(): Int {
@@ -52,7 +56,8 @@ data class Wallet(
       balance,
       dailyLimit,
       usedToday,
-      updatedAt
+      updatedAt,
+      stale
     ).contentDeepHashCode()
   }
 
@@ -64,8 +69,8 @@ data class Wallet(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(id: String, balance: Double, dailyLimit: Double, usedToday: Double, updatedAt: Double): Wallet {
-      return Wallet(id, balance, dailyLimit, usedToday, updatedAt)
+    private fun fromCpp(id: String, balance: Double, dailyLimit: Double, usedToday: Double, updatedAt: Double, stale: StaleInfo?): Wallet {
+      return Wallet(id, balance, dailyLimit, usedToday, updatedAt, stale)
     }
   }
 }
