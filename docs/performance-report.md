@@ -5,9 +5,8 @@
 > `benchmarks/scripts/collect.ts`; none are typed by hand except where a table quotes them.
 > Template: [benchmarking.md](benchmarking.md) §8.
 >
-> **BM-01 rerun pending (slice 4, storage).** BM-08 has been rerun on the slice-4 code
-> (`2026-10-05_mid-02`). The BM-01 numbers below still predate SQLite (ADR-0009): Home now reads
-> a local replica, so don't quote them for the current app until they're rerun.
+> **Current code:** BM-01 and BM-08 were rerun on the slice-4 code (`2026-10-05_mid-02`: SQLite
+> storage, local replica, History). Earlier sessions stay below as history.
 
 ## TL;DR (so far)
 - **kmpCore is now 423 KB (4.7%) smaller to download on arm64, but only because jsCore bundles
@@ -17,9 +16,10 @@
   library. KMP doesn't make apps smaller; choosing the platform's SQLite does.
 - **The architecture's cost is roughly fixed:** +822 KB → +835 KB → +918 KB APK across three
   sessions while the app grew by 7 MB.
-- **Startup is the same in both builds.** On the real Home screen, KMP's time to fully drawn is
-  +3 ms (95% CI −7 to +14 ms). Startup is dominated by React Native rendering; Kotlin's own
-  threads use ~2 ms of CPU.
+- **Startup is the same in both builds** (within the 5% rule). With slice 4's storage, kmpCore
+  now reaches "fully drawn" 17 ms *sooner* (95% CI −26 to −8 ms, −3.1%): Home's first load
+  syncs and reads SQLite, which kmpCore does in Kotlin off the JS thread. Small, but the first
+  measurable KMP advantage on real work.
 - **Scrolling is the same in both builds (BM-02, the control).** Flinging through 1,000 History
   entries: frame rate +0.1%, app CPU −3.7%, JS-thread CPU −2.7%, peak RAM +0.5%, none of
   them meaningful. The setup is fair, so differences found in other scenarios can be trusted.
@@ -35,7 +35,7 @@
   | `2026-10-03_mid-01` | skeleton (`2079d7b`) | placeholder (balance only) |
   | `2026-10-04_mid-01` | `m1-home` (`ba54bfc`) | real Home |
   | `2026-10-05_mid-01` | tag `bench/2026-10-05_mid-01` (slice 4: SQLite, History) | History, 1,000 entries, `perf` build |
-  | `2026-10-05_mid-02` | branch `slice-4-storage-history` (slice 4); tagged once BM-01 completes | BM-08 rerun; BM-01 pending |
+  | `2026-10-05_mid-02` | tag `bench/2026-10-05_mid-02` (slice 4) | Home (BM-01) and app size (BM-08), release builds |
 - Method: [benchmarking.md](benchmarking.md), with the BM-01 and BM-02 tool changes noted in §5.
 
 ## Hypotheses vs results
@@ -46,7 +46,7 @@
 | H3 | Many tiny calls are slower in `kmpCore` | not measured yet (BM-06) | — |
 | H4 | Scrolling and animation are the same (control) | BM-02 scrolling: frame rate +0.1% (p=0.68), app CPU −3.7% (p=0.35), all metrics within ±6%, none meaningful. BM-07 not measured yet | **Confirmed for scrolling (interim)** |
 | H5 | `kmpCore` is slightly larger | Architecture alone: about +250 KB download, +918 KB APK (arm64). With storage included, kmpCore is 423 KB *smaller* to download, because jsCore bundles SQLite (ADR-0009) | **Confirmed for the architecture (interim)** |
-| H6 | Cold start differs by < 10% | TTFD +3 ms (95% CI −7 to +14 ms), i.e. < 3% | **Confirmed (interim)** |
+| H6 | Cold start differs by < 10% | Slice 4: TTID +4 ms (CI −3 to +11), TTFD −17 ms (CI −26 to −8 ms, −3.1%, kmpCore faster). Home slice: TTFD +3 ms | **Confirmed (interim)** |
 | H7 | A Baseline Profile helps `kmpCore` more | not measured yet (BM-09) | — |
 
 **Note under H6.** One Perfetto trace per build shows where startup time goes: after the first
@@ -58,19 +58,29 @@ cases where KMP could win are BM-03, BM-04 and BM-05.
 ## Results by scenario
 
 ### BM-01: cold start → Home rendered
-Session `2026-10-04_mid-01`, 2 warm-up + 20 measured per build, alternating, all launches cold.
+Session `2026-10-05_mid-02` (slice 4), release builds, 2 warm-up + 20 measured per build,
+alternating, all launches cold. Battery 32.2–33.0 °C.
 
 | Metric | jsCore median | kmpCore median | Shift (kmp − js) | 95% CI | p |
 |---|---:|---:|---:|---|---:|
-| Time to initial display | 252.0 ms | 251.5 ms | +1.0 ms | −6.0 to +9.0 ms | 0.80 |
-| Time to fully drawn (Home with data) | 473.5 ms | 481.0 ms | +3.0 ms | −7.0 to +14.0 ms | 0.69 |
+| Time to initial display | 256.5 ms | 260.5 ms | +4.0 ms | −3.0 to +11.0 ms | 0.19 |
+| Time to fully drawn (Home with data) | 527.5 ms | 511.0 ms | **−17.0 ms** | −26.0 to −8.0 ms | 0.001 |
 
 Shift is the Hodges–Lehmann estimate; the CI is distribution-free and states the largest
-difference this setup can rule out. CV ≤ 4.9% in every row.
+difference this setup can rule out. CV ≤ 4.3% in every row.
 
-**Across sessions** (not a build comparison): time to fully drawn rose from ~294 ms (placeholder)
-to ~474–481 ms (real Home) in **both** builds. That's the cost of a real screen. Compare builds
-within a session only.
+**Time to fully drawn.** The shift is real (p = 0.001, IQRs don't overlap) but below the 5%
+threshold, so by the §4.3 rule it is not a meaningful difference. Its direction fits slice 4:
+before Home can draw, it now syncs the server's changes into the replica and reads wallet, recent
+transactions and the monthly summary from SQLite. kmpCore does that in Kotlin on its own
+threads; jsCore does it in JS on the JS thread (plus op-sqlite's native calls).
+
+Earlier session (`2026-10-04_mid-01`, Home slice, in-memory storage): TTID +1.0 ms (CI −6 to
++9), TTFD +3.0 ms (CI −7 to +14).
+
+**Across sessions** (not a build comparison): time to fully drawn went from ~294 ms
+(placeholder) to ~474–481 ms (real Home) to ~511–528 ms (slice 4: replica sync and SQLite reads,
+navigation) in **both** builds. Compare builds within a session only.
 
 ### BM-02: scroll History, 1,000 entries (control)
 Session `2026-10-05_mid-01`, `perf` builds, 1 warm-up + 10 measured iterations per build in 5

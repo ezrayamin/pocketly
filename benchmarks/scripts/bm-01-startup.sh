@@ -35,11 +35,22 @@ adb get-state >/dev/null
 
 pkg_of() { [ "$1" = jsCore ] && echo com.pocketly.js || echo com.pocketly.kmp; }
 
-# A flaky USB link can drop a single adb call; retry installs rather than lose the session.
+# On the vivo V2538, adbd sometimes stops answering while USB stays attached; `adb reconnect`
+# recovers it. Check before each launch, and retry installs, rather than lose the session.
+# (Uses coreutils `timeout`.)
+adb_alive() {
+  timeout 15 adb shell true >/dev/null 2>&1 && return 0
+  echo "  adb not answering, reconnecting" >&2
+  adb reconnect >/dev/null 2>&1
+  sleep 5
+  timeout 15 adb shell true >/dev/null 2>&1 || { echo "✗ adb lost the device" >&2; exit 1; }
+}
+
 install_apk() { # <apk>
   local attempt
   for attempt in 1 2 3; do
-    adb install "$1" >/dev/null 2>&1 && return 0
+    adb_alive
+    timeout 120 adb install "$1" >/dev/null 2>&1 && return 0
     echo "  install attempt $attempt failed, retrying" >&2
     sleep 5
   done
@@ -67,6 +78,7 @@ to_ms() { sed -E 's/^\+//; s/^([0-9]+)s([0-9]+)ms$/\1*1000+\2/; s/ms$//' <<<"$1"
 run_one() { # <round> <build>
   local round=$1 build=$2 pkg
   pkg=$(pkg_of "$build")
+  adb_alive
   local temp level
   temp=$(adb shell dumpsys battery | awk -F': ' '/^ *temperature:/ {print $2}' | tr -d '\r')
   level=$(adb shell dumpsys battery | awk -F': ' '/^ *level:/ {print $2}' | tr -d '\r')
