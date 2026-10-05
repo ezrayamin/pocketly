@@ -5,17 +5,18 @@
 > `benchmarks/scripts/collect.ts`; none are typed by hand except where a table quotes them.
 > Template: [benchmarking.md](benchmarking.md) §8.
 >
-> **Rerun pending (slice 4, storage).** The BM-01 and BM-08 sessions predate SQLite (ADR-0009). Since
-> then `jsCore` ships op-sqlite with its own SQLite build (`libop-sqlite.so`, 1.6 MB
-> uncompressed on arm64) while `kmpCore` uses the platform's SQLite, and Home reads a local
-> replica. Expect H5 (size) to move toward `jsCore` being larger, and rerun BM-01/BM-08
-> before quoting either result again.
+> **BM-01 rerun pending (slice 4, storage).** BM-08 has been rerun on the slice-4 code
+> (`2026-10-05_mid-02`). The BM-01 numbers below still predate SQLite (ADR-0009): Home now reads
+> a local replica, so don't quote them for the current app until they're rerun.
 
 ## TL;DR (so far)
-- **Users download +264 KB (+3.9%) more with KMP** on arm64 (Play download size). The APK
-  difference is larger (+835 KB) only because APKs store native libraries uncompressed.
-- **The size cost looks fixed, not proportional:** +822 KB → +835 KB APK while the app grew by
-  ~1.7 MB. Almost all of it is the Nitro-generated bridge library, not the Kotlin core.
+- **kmpCore is now 423 KB (4.7%) smaller to download on arm64, but only because jsCore bundles
+  SQLite.** Storage differs by design (ADR-0009): op-sqlite ships its own SQLite build in
+  jsCore (1,564 KB in the APK), while kmpCore uses the phone's. **The KMP architecture itself
+  still costs about +250 KB of download (+918 KB APK)**, mostly the Nitro-generated bridge
+  library. KMP doesn't make apps smaller; choosing the platform's SQLite does.
+- **The architecture's cost is roughly fixed:** +822 KB → +835 KB → +918 KB APK across three
+  sessions while the app grew by 7 MB.
 - **Startup is the same in both builds.** On the real Home screen, KMP's time to fully drawn is
   +3 ms (95% CI −7 to +14 ms). Startup is dominated by React Native rendering; Kotlin's own
   threads use ~2 ms of CPU.
@@ -34,6 +35,7 @@
   | `2026-10-03_mid-01` | skeleton (`2079d7b`) | placeholder (balance only) |
   | `2026-10-04_mid-01` | `m1-home` (`ba54bfc`) | real Home |
   | `2026-10-05_mid-01` | tag `bench/2026-10-05_mid-01` (slice 4: SQLite, History) | History, 1,000 entries, `perf` build |
+  | `2026-10-05_mid-02` | branch `slice-4-storage-history` (slice 4); tagged once BM-01 completes | BM-08 rerun; BM-01 pending |
 - Method: [benchmarking.md](benchmarking.md), with the BM-01 and BM-02 tool changes noted in §5.
 
 ## Hypotheses vs results
@@ -43,7 +45,7 @@
 | H2 | JS-thread CPU is lower during streams in `kmpCore` | not measured yet (BM-05) | — |
 | H3 | Many tiny calls are slower in `kmpCore` | not measured yet (BM-06) | — |
 | H4 | Scrolling and animation are the same (control) | BM-02 scrolling: frame rate +0.1% (p=0.68), app CPU −3.7% (p=0.35), all metrics within ±6%, none meaningful. BM-07 not measured yet | **Confirmed for scrolling (interim)** |
-| H5 | `kmpCore` is slightly larger | +264 KB download (+3.9%), +835 KB APK (+4.7%), arm64 | **Confirmed (interim)** |
+| H5 | `kmpCore` is slightly larger | Architecture alone: about +250 KB download, +918 KB APK (arm64). With storage included, kmpCore is 423 KB *smaller* to download, because jsCore bundles SQLite (ADR-0009) | **Confirmed for the architecture (interim)** |
 | H6 | Cold start differs by < 10% | TTFD +3 ms (95% CI −7 to +14 ms), i.e. < 3% | **Confirmed (interim)** |
 | H7 | A Baseline Profile helps `kmpCore` more | not measured yet (BM-09) | — |
 
@@ -103,33 +105,45 @@ them; the work is FlashList layout and native drawing, which is the same code in
 The core is only called once per page.
 
 ### BM-08: app size (arm64-v8a)
+Session `2026-10-05_mid-02` (slice 4: SQLite storage, History). Release builds, split per ABI.
 
 | | jsCore | kmpCore | Δ |
 |---|---:|---:|---:|
-| **Download size** (bundletool `get-size total`, max) | 6,820 KB | 7,084 KB | **+264 KB (+3.9%)** |
-| APK file (split per ABI) | 17,774 KB | 18,609 KB | +835 KB (+4.7%) |
+| **Download size** (bundletool `get-size total`, max) | 8,914 KB | 8,491 KB | **−423 KB (−4.7%)** |
+| APK file (split per ABI) | 23,319 KB | 22,673 KB | −645 KB (−2.8%) |
 
-Every ABI shows a +3.6–3.9% download delta. **Why the two differ:** native libraries are stored
-uncompressed in the APK (so they can be mapped directly), and Play compresses the download.
-The APK delta is mostly native code, so it shrinks most in the download.
+Every ABI's APK is smaller in kmpCore (−405 to −805 KB). **That total mixes two effects**, which
+the per-library breakdown separates:
 
-**What adds the bytes** (APK, arm64):
+| Effect (kmpCore − jsCore) | APK, measured | Download, estimated¹ |
+|---|---:|---:|
+| **Storage choice:** `libop-sqlite.so`, op-sqlite's bundled SQLite, in jsCore only | −1,564 KB | ≈ −719 KB |
+| **KMP architecture:** everything else | **+918 KB** | **≈ +250 KB** |
+| · `libPocketlyCoreKmp.so` (Nitro-generated C++ bridge) | +864 KB | ≈ +208 KB |
+| · Dex (Kotlin core, SQLDelight, coroutines, serialization, Koin, after R8) | +118 KB | +118 KB |
+| · JS bundle (no `core-js` in kmpCore) | −74 KB | −74 KB |
+| Total | −645 KB | −423 KB measured |
 
-| Part | Δ kmpCore − jsCore |
-|---|---:|
-| Native libs (`libPocketlyCoreKmp.so`: Nitro-generated C++ bridge) | +763 KB |
-| Dex (Kotlin core + coroutines, serialization, Koin, after R8) | +85 KB |
-| JS bundle (no `core-js` in kmpCore) | −13 KB |
+¹ bundletool reports download size per build, not per file. Each native library's share is
+estimated by compressing it (`gzip -9`); dex and the JS bundle are already compressed in the
+APK. The estimates add up to −467 KB against −423 KB measured, so read them as ±50 KB.
 
-**Is the cost fixed or growing?** Track it every session:
+**What this means.** The comparison is realistic: most React Native apps that need SQLite ship a
+bundled one, as op-sqlite does. But the size win comes from that storage choice, not from KMP.
+An app that already bundles SQLite would see roughly the architecture's cost, about +250 KB of
+download; one that could use the platform's SQLite from JavaScript too would lose the win.
 
-| Session | jsCore APK | Δ APK | Δ download |
-|---|---:|---:|---:|
-| skeleton (`2026-10-03`) | 16,025 KB | +822 KB | not measured |
-| Home (`2026-10-04`) | 17,774 KB (+1,749 KB) | +835 KB | +264 KB |
+**Is the architecture's cost fixed or growing?** Tracked every session (APK, arm64):
 
-Flat so far, while the app grew by 1.7 MB. If the delta grows with each contract method
-(the bridge library is generated per method and struct), that's a finding too.
+| Session | jsCore APK | Δ APK, architecture | Δ APK, total | Δ download, total |
+|---|---:|---:|---:|---:|
+| skeleton (`2026-10-03`) | 16,025 KB | +822 KB | +822 KB | not measured |
+| Home (`2026-10-04`) | 17,774 KB | +835 KB | +835 KB | +264 KB |
+| slice 4 (`2026-10-05_mid-02`) | 23,319 KB | +918 KB | −645 KB | −423 KB |
+
+Roughly fixed while the app grew by 7 MB (navigation, FlashList, op-sqlite). The bridge library
+grew by 101 KB with slice 4's new bridged types and methods (StaleInfo, DatasetSeed,
+`lastStorageMs`), consistent with it being generated per method and struct.
 
 ## Bridge overhead
 _Not measured yet (BM-03, BM-04, BM-06): compute = `core.lastComputeMs()`, storage = `core.lastStorageMs()`, overhead = end-to-end − compute − storage ([benchmarking.md](benchmarking.md) §5.2)._
