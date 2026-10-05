@@ -156,6 +156,13 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // RN 0.87 keeps the native view registry in a MutableIntObjectMap, which androidx.collection
+    // 1.4.0–1.4.2 can corrupt: views go missing ("Unable to find viewState for tag N") and fast
+    // list recycling ends in "Unable to find parentView" crashes (seen in BM-02). Fixed in 1.4.3;
+    // RN 0.88 bumps it. reactwg/react-native-releases#1426, issuetracker.google.com/352560465.
+    // Remove once React Native is ≥ 0.88.
+    implementation("androidx.collection:collection:1.4.4")
+
     // jsCore ships with no Kotlin core code (H5 / BM-08).
     kmpCoreImplementation project(":pocketly_core-kmp")
 
