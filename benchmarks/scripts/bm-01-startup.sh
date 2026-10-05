@@ -35,11 +35,23 @@ adb get-state >/dev/null
 
 pkg_of() { [ "$1" = jsCore ] && echo com.pocketly.js || echo com.pocketly.kmp; }
 
+# A flaky USB link can drop a single adb call; retry installs rather than lose the session.
+install_apk() { # <apk>
+  local attempt
+  for attempt in 1 2 3; do
+    adb install "$1" >/dev/null 2>&1 && return 0
+    echo "  install attempt $attempt failed, retrying" >&2
+    sleep 5
+  done
+  echo "✗ couldn't install $1" >&2
+  exit 1
+}
+
 echo "▸ fresh install + compilation=$COMPILATION"
 for build in jsCore kmpCore; do
   pkg=$(pkg_of $build)
   adb uninstall "$pkg" >/dev/null 2>&1 || true
-  adb install "$APK_DIR/$build/release/app-$build-arm64-v8a-release.apk" >/dev/null
+  install_apk "$APK_DIR/$build/release/app-$build-arm64-v8a-release.apk"
   case "$COMPILATION" in
     none) adb shell cmd package compile -f -m verify "$pkg" >/dev/null ;;
     baselineProfile)
@@ -67,6 +79,15 @@ run_one() { # <round> <build>
   local am launch_state am_total
   am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
   launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
+  if [ -z "$launch_state" ]; then
+    # No output at all is an adb hiccup, not a slow launch: stop the app and launch it again.
+    echo "  round $round $build: am start returned nothing, relaunching" >&2
+    adb shell am force-stop "$pkg"
+    sleep "$SETTLE_SECONDS"
+    adb logcat -c
+    am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
+    launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
+  fi
   am_total=$(awk -F': ' '/TotalTime/ {print $2}' <<<"$am")
   if [ "$launch_state" != "COLD" ]; then
     echo "✗ round $round $build: launch was '$launch_state', not COLD" >&2

@@ -11,7 +11,9 @@
 #   is at most COOL_C °C (default 40), so heat builds up evenly across the two builds.
 #   A first run without the gate drifted from 39 to 45 °C and skewed the kmpCore block.
 # - One unrecorded warm-up iteration per build first.
-# - Raw Flashlight JSON: <results-dir>/bm-02/<block>-<build>.json. Never edited by hand.
+# - Raw Flashlight JSON: <results-dir>/bm-02/<block>-<build>.json; `dumpsys gfxinfo` per
+#   iteration: bm-02/gfxinfo/<block>-<build>/<n>.txt; battery temperature at the start of each
+#   block: bm-02/temperatures.csv. Never edited by hand.
 set -euo pipefail
 
 OUT_DIR="${1:?usage: bm-02-run.sh <results-dir> [blocks] [iterations-per-block]}"
@@ -24,13 +26,14 @@ SCROLL="$HERE/bm-02-scroll.sh"
 RAW="$OUT_DIR/bm-02"
 
 mkdir -p "$RAW"
+[ -f "$RAW/temperatures.csv" ] || echo "block,build,startC,at" > "$RAW/temperatures.csv"
 adb get-state >/dev/null
 [ -f "$OUT_DIR/device.json" ] || "$HERE/device-info.sh" "$OUT_DIR"
 
 pkg_of() { [ "$1" = jsCore ] && echo com.pocketly.js || echo com.pocketly.kmp; }
 battery_c() { adb shell dumpsys battery | awk -F': ' '/^ *temperature:/ {printf "%.1f", $2 / 10}'; }
 
-cool_down() {
+cool_down() { # <block> <build>: wait until ≤ COOL_C, then record the start temperature
   local t
   t=$(battery_c)
   while awk -v t="$t" -v c="$COOL_C" 'BEGIN {exit !(t > c)}'; do
@@ -40,6 +43,7 @@ cool_down() {
     t=$(battery_c)
   done
   echo "  battery $t °C"
+  echo "$1,$2,$t,$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$RAW/temperatures.csv"
 }
 
 echo "▸ warm-up (not recorded)"
@@ -51,8 +55,8 @@ for block in $(seq 1 "$BLOCKS"); do
   for build in jsCore kmpCore; do
     pkg=$(pkg_of $build)
     echo "▸ block $block/$BLOCKS $build × $PER_BLOCK"
-    cool_down
-    "$FLASHLIGHT" test \
+    cool_down "$block" "$build"
+    GFX_DIR="$RAW/gfxinfo/$(printf '%02d' "$block")-$build" "$FLASHLIGHT" test \
       --bundleId "$pkg" \
       --skipRestart \
       --beforeEachCommand "$SCROLL $pkg prepare" \

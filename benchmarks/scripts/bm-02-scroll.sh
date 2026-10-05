@@ -11,6 +11,11 @@
 #                                        (Flashlight --afterEachCommand, not measured)
 #   bm-02-scroll.sh <package> [all]     all three, for a manual check
 #
+# With GFX_DIR set, `scroll` also resets `dumpsys gfxinfo` before the first fling and saves its
+# frame stats (total frames, janky %, frame-time percentiles) right after the last one; `verify`
+# keeps that file only if the end was reached. Frame-level numbers complement Flashlight's
+# average FPS, which drops whenever the list is at rest.
+#
 # Why not Maestro (benchmarks/maestro/bm-02-scroll.yaml): on the vivo V2538 its driver's
 # view-hierarchy call hangs for minutes or fails, while `uiautomator dump` takes ~3 s.
 # Same pattern as BM-01 moving off Macrobenchmark (docs/benchmarking.md §5 note).
@@ -57,6 +62,7 @@ prepare() {
 }
 
 scroll() {
+  [ -n "${GFX_DIR:-}" ] && adb shell dumpsys gfxinfo "$PKG" reset >/dev/null
   for pass in $(seq 1 "$PASSES"); do
     for _ in $(seq 1 "$SWIPES"); do
       adb shell input swipe "$X" "$FROM_Y" "$X" "$TO_Y" 120
@@ -67,10 +73,26 @@ scroll() {
       sleep 1
     fi
   done
+  if [ -n "${GFX_DIR:-}" ]; then
+    mkdir -p "$GFX_DIR"
+    {
+      # The rate the display runs at with the app in front; the ROM may override the setting.
+      echo "renderFrameRateHz: $(adb shell dumpsys display | grep -oE 'renderFrameRate [0-9.]+' | head -1 | awk '{printf "%.0f", $2}')"
+      adb shell dumpsys gfxinfo "$PKG"
+    } | tr -d '\r' > "$GFX_DIR/.pending.txt"
+  fi
 }
 
 verify() {
-  has_id history-end || { echo "✗ $PKG: the last pass didn't reach the end after $SWIPES swipes" >&2; exit 1; }
+  has_id history-end || {
+    [ -n "${GFX_DIR:-}" ] && rm -f "$GFX_DIR/.pending.txt"
+    echo "✗ $PKG: the last pass didn't reach the end after $SWIPES swipes" >&2
+    exit 1
+  }
+  if [ -n "${GFX_DIR:-}" ] && [ -f "$GFX_DIR/.pending.txt" ]; then
+    n=$(find "$GFX_DIR" -name '[0-9]*.txt' | wc -l | tr -d ' ')
+    mv "$GFX_DIR/.pending.txt" "$GFX_DIR/$(printf '%02d' $((n + 1))).txt"
+  fi
   echo "✓ $PKG: $PASSES passes × $SWIPES swipes, end reached"
 }
 

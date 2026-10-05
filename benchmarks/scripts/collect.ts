@@ -205,6 +205,55 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
     if (values[metric]) compare(scenario, metric, unit, values[metric], rows, verdicts);
   }
   if (failed) verdicts.push(`${scenario}: ${failed} iteration(s) not SUCCESS, excluded`);
+  collectGfxinfo(raw, scenario, rows, verdicts);
+  collectTemperatures(raw, scenario, verdicts);
+}
+
+/**
+ * `dumpsys gfxinfo` per iteration (<scenario>/gfxinfo/<block>-<build>/<n>.txt), reset right
+ * before the measured part: frame-level numbers that don't drop when the list is at rest.
+ */
+const GFX_METRICS: { metric: string; unit: string; rx: RegExp }[] = [
+  { metric: 'jankyFrames', unit: '%', rx: /^Janky frames: \d+ \(([\d.]+)%\)/m },
+  { metric: 'frameTimeP90', unit: 'ms', rx: /^90th percentile: (\d+)ms/m },
+  { metric: 'frameTimeP99', unit: 'ms', rx: /^99th percentile: (\d+)ms/m },
+  { metric: 'framesRendered', unit: 'frames', rx: /^Total frames rendered: (\d+)/m },
+];
+
+function collectGfxinfo(raw: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const dir = join(raw, 'gfxinfo');
+  if (!existsSync(dir)) return;
+  const values: Record<string, Record<Build, number[]>> = {};
+  for (const block of readdirSync(dir).filter((d) => /^\d+-(jsCore|kmpCore)$/.test(d)).sort()) {
+    const build = block.split('-')[1] as Build;
+    for (const file of readdirSync(join(dir, block)).filter((f) => /^\d+\.txt$/.test(f)).sort()) {
+      const text = readFileSync(join(dir, block, file), 'utf8');
+      for (const { metric, rx } of GFX_METRICS) {
+        const m = rx.exec(text);
+        if (!m) continue;
+        values[metric] ??= { jsCore: [], kmpCore: [] };
+        values[metric][build].push(Number(m[1]));
+      }
+    }
+  }
+  for (const { metric, unit } of GFX_METRICS) {
+    const v = values[metric];
+    if (v && v.jsCore.length > 1 && v.kmpCore.length > 1) compare(scenario, metric, unit, v, rows, verdicts);
+  }
+}
+
+/** <scenario>/temperatures.csv: battery temperature at the start of each block. */
+function collectTemperatures(raw: string, scenario: string, verdicts: string[]) {
+  const file = join(raw, 'temperatures.csv');
+  if (!existsSync(file)) return;
+  const byBuild: Record<Build, number[]> = { jsCore: [], kmpCore: [] };
+  for (const line of readFileSync(file, 'utf8').trim().split('\n').slice(1)) {
+    const [, build, startC] = line.split(',');
+    byBuild[build as Build].push(Number(startC));
+  }
+  const fmt = (v: number[]) =>
+    `${mean(v).toFixed(1)} °C (${Math.min(...v).toFixed(1)}–${Math.max(...v).toFixed(1)}, ${v.length} blocks)`;
+  verdicts.push(`${scenario} battery at block start: jsCore ${fmt(byBuild.jsCore)}, kmpCore ${fmt(byBuild.kmpCore)}`);
 }
 
 function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string[]) {
@@ -238,6 +287,24 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   );
   for (const lib of libs.filter((l) => /nitro|pocketly/i.test(l) || (js.nativeLibs[l] ?? 0) !== (kmp.nativeLibs[l] ?? 0))) {
     extra.push(`| ${lib} | ${js.nativeLibs[lib] ? kb(js.nativeLibs[lib]) : '—'} | ${kmp.nativeLibs[lib] ? kb(kmp.nativeLibs[lib]) : '—'} |`);
+  }
+  // Two effects mix in the total (ADR-0009): the KMP architecture itself, and the storage
+  // choice (op-sqlite bundles its own SQLite into jsCore; kmpCore uses the platform's).
+  const STORAGE_LIBS = ['libop-sqlite.so'];
+  const storage = STORAGE_LIBS.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
+  const total = kmp.fileBytes - js.fileBytes;
+  if (storage !== 0) {
+    extra.push(
+      '',
+      '### BM-08 split, arm64-v8a APK (kmpCore − jsCore)',
+      '',
+      '| Effect | Δ |',
+      '|---|---:|',
+      `| Storage choice (${STORAGE_LIBS.join(', ')}, bundled in jsCore only) | ${delta(storage)} |`,
+      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | ${delta(total - storage)} |`,
+      `| Total | ${delta(total)} |`,
+    );
+    verdicts.push(`BM-08 arm64-v8a APK split: architecture ${delta(total - storage)}, storage choice ${delta(storage)} → total ${delta(total)}`);
   }
   const kept = data.keptClassesByOrigin;
   if (kept?.kmpCore) {

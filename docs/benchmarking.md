@@ -132,9 +132,10 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 - [ ] Airplane mode on (the fake API is local), Wi-Fi/Bluetooth off
 - [ ] Battery > 50%, same charging state for every run
 - [ ] Fixed screen brightness, screen timeout disabled
+- [ ] Refresh rate **pinned** in display settings (not adaptive), and recorded: run `device-info.sh` with `EXPECTED_HZ=<rate>`, which fails if the setting differs. The ROM can still run the app at a lower rate (the vivo V2538 runs Pocketly at 60 Hz with the setting at 120); BM-02 records the in-app rate per iteration
 - [ ] Developer-option animation scales at **1x**
 - [ ] No other apps open, and battery-saver / performance modes off
-- [ ] Device temperature checked (`adb shell dumpsys battery` → temperature); 2 min cooldown between scenario batches
+- [ ] Device temperature checked (`adb shell dumpsys battery` → temperature); 2 min cooldown between scenario batches. Record the temperature at the start of every block or run (BM-01: per launch; BM-02: `temperatures.csv`). Temperatures depend on the scenario (BM-01 sessions ran at ~35 °C; BM-02's continuous flinging needs a 40 °C gate), so compare builds within a scenario, never temperatures across scenarios
 - [ ] Builds run **alternately** (js, kmp, js, kmp…) rather than all-js then all-kmp, so device drift affects both equally
 
 ### 4.3 Iterations & statistics
