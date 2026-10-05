@@ -1,11 +1,14 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Avatar } from '../../../components/Avatar';
-import { Bell, Wallet } from '../../../components/icons';
-import { colors, radius, type } from '../../../theme/tokens';
+import { colors, radius, type } from '../theme/tokens';
+import { Avatar } from './Avatar';
+import { Bell, Wallet } from './icons';
 
-/** Notifications (F9) and Profile are not built yet: bell and avatar are static placeholders. */
-export function HomeHeader() {
+/**
+ * Top bar of the tab screens: brand, the screen's name, notifications, avatar.
+ * Notifications (F9) and Profile are not built yet: bell and avatar are static placeholders.
+ */
+export function AppHeader({ subtitle }: { subtitle: string }) {
   return (
     <View style={styles.row}>
       <View style={styles.brand}>
@@ -16,7 +19,7 @@ export function HomeHeader() {
           <Text style={styles.title} accessibilityRole="header">
             Pocketly
           </Text>
-          <Text style={styles.subtitle}>Wallet</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </View>
       <View style={styles.actions}>

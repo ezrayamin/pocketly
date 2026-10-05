@@ -6,11 +6,11 @@ import { History, House, ScanLine, User, type LucideIcon } from './icons';
 
 /**
  * Bottom tab bar (product.md §7.1): the MVP's 4 tabs, Pay as the raised center button.
- * Invest becomes a 5th tab once F10 ships. Home and Profile work; History and Pay are
- * placeholders until their features exist. React Navigation replaces this with History.
+ * Invest becomes a 5th tab once F10 ships. Pay is a placeholder until F7 exists.
+ * Selecting the active tab is reported too (scroll to top, §7.3 rule 5).
  */
 export type TabKey = 'home' | 'history' | 'pay' | 'profile';
-const ENABLED: readonly TabKey[] = ['home', 'profile'];
+const ENABLED: readonly TabKey[] = ['home', 'history', 'profile'];
 const TABS: { key: TabKey; label: string; Icon: LucideIcon }[] = [
   { key: 'home', label: 'Home', Icon: House },
   { key: 'history', label: 'History', Icon: History },

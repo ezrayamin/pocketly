@@ -1,5 +1,7 @@
 /* eslint-env jest */
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+// FlashList measures its parent and cells natively; this gives them a fixed size under Jest.
+require('@shopify/flash-list/jestSetup');
 // Tests run the jsCore build: no native `PocketlyCore` HybridObject is registered.
 jest.mock('react-native-nitro-modules', () => ({ NitroModules: { hasHybridObject: () => false } }));
 // In-memory stand-in for the native SharedPreferences/NSUserDefaults module.

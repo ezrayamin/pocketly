@@ -27,7 +27,7 @@ const CATEGORY_ICON: Partial<Record<Category, LucideIcon>> = {
   ENTERTAINMENT: Clapperboard,
 };
 
-const TYPE_ICON: Record<TransactionType, LucideIcon> = {
+export const TYPE_ICON: Record<TransactionType, LucideIcon> = {
   TRANSFER_IN: ArrowDownLeft,
   TRANSFER_OUT: ArrowUpRight,
   QR_PAYMENT: ScanLine,
@@ -48,7 +48,8 @@ const TONE_BG: Record<Tone, string> = {
   danger: colors.dangerDim,
 };
 
-function Leading({ tx }: { tx: Transaction }) {
+/** The counterparty's avatar, or an icon for merchants and payment methods. */
+export function TransactionLeading({ tx }: { tx: Transaction }) {
   const cp = tx.counterparty;
   if (cp?.kind === 'USER') return <Avatar id={cp.id} name={cp.name} />;
   const Icon = tx.type === 'TOP_UP' ? Landmark : CATEGORY_ICON[tx.category] ?? ScanLine;
@@ -59,14 +60,17 @@ function Leading({ tx }: { tx: Transaction }) {
   );
 }
 
-/** One History/Recent row (FR-HOME-04). Pending items are visibly marked (pill + label). */
-export function TransactionRow({ tx, now }: { tx: Transaction; now: number }) {
+/**
+ * One History/Recent row (FR-HOME-04). Pending items are visibly marked (pill + label).
+ * `when` replaces the relative day, e.g. with just the time under a History day header.
+ */
+export function TransactionRow({ tx, now, when: whenOverride }: { tx: Transaction; now: number; when?: string }) {
   const incoming = isIncoming(tx.type);
   const amount = `${incoming ? '+' : '-'}${core.formatMoney(tx.amount)}`;
   const badge = statusBadge(tx);
   const TypeIcon = TYPE_ICON[tx.type];
   const name = counterpartyName(tx);
-  const when = relativeDay(tx.createdAt, now);
+  const when = whenOverride ?? relativeDay(tx.createdAt, now);
 
   return (
     <View
@@ -75,7 +79,7 @@ export function TransactionRow({ tx, now }: { tx: Transaction; now: number }) {
       accessibilityLabel={`${name}, ${TYPE_LABEL[tx.type]}, ${amount}, ${badge.label}, ${when}`}
       testID={`tx-${tx.id}`}
     >
-      <Leading tx={tx} />
+      <TransactionLeading tx={tx} />
       <View style={styles.middle}>
         <Text style={styles.name} numberOfLines={1}>
           {name}
