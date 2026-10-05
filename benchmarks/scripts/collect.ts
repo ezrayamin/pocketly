@@ -109,6 +109,7 @@ interface Row {
 interface Comparison {
   scenario: string;
   metric: string;
+  unit: string;
   diffPct: number;
   shift: number;
   low: number;
@@ -139,26 +140,71 @@ function collectStartup(dir: string, scenario: string, rows: Row[], verdicts: st
     }
   }
 
-  for (const [metric, byBuild] of Object.entries(values)) {
-    const s = { jsCore: stats(byBuild.jsCore), kmpCore: stats(byBuild.kmpCore) };
-    for (const build of BUILDS) rows.push({ scenario, metric, build, unit: 'ms', stats: s[build] });
+  for (const [metric, byBuild] of Object.entries(values)) compare(scenario, metric, 'ms', byBuild, rows, verdicts);
+}
 
-    const diff = (s.kmpCore.median - s.jsCore.median) / s.jsCore.median;
-    const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
-    const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
-    const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
-    const noisy = BUILDS.filter((b) => s[b].cv > 0.1);
-    const meaningful = Math.abs(diff) > 0.05 && !overlap;
-    const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
-    comparisons.push({ scenario, metric, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });
-    verdicts.push(
-      `${scenario} ${metric}: kmpCore vs jsCore median ${diff >= 0 ? '+' : ''}${(diff * 100).toFixed(1)}%, ` +
-        `shift ${signed(hl.shift)} ms (95% CI ${signed(hl.low)} to ${signed(hl.high)} ms), ` +
-        `IQRs ${overlap ? 'overlap' : "don't overlap"}, Mann-Whitney p=${p.toFixed(3)} → ` +
-        `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: >5% and non-overlapping IQRs)` +
-        (noisy.length ? ` · ⚠ CV > 10% for ${noisy.join(', ')}: rerun per §4.3` : ''),
-    );
+/** Stats per build, kmpCore − jsCore shift, and the §4.3 verdict (>5% and non-overlapping IQRs). */
+function compare(scenario: string, metric: string, unit: string, byBuild: Record<Build, number[]>, rows: Row[], verdicts: string[]) {
+  const s = { jsCore: stats(byBuild.jsCore), kmpCore: stats(byBuild.kmpCore) };
+  for (const build of BUILDS) rows.push({ scenario, metric, build, unit, stats: s[build] });
+
+  const diff = (s.kmpCore.median - s.jsCore.median) / s.jsCore.median;
+  const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
+  const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
+  const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
+  const noisy = BUILDS.filter((b) => s[b].cv > 0.1);
+  const meaningful = Math.abs(diff) > 0.05 && !overlap;
+  const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
+  comparisons.push({ scenario, metric, unit, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });
+  verdicts.push(
+    `${scenario} ${metric}: kmpCore vs jsCore median ${diff >= 0 ? '+' : ''}${(diff * 100).toFixed(1)}%, ` +
+      `shift ${signed(hl.shift)} ${unit} (95% CI ${signed(hl.low)} to ${signed(hl.high)} ${unit}), ` +
+      `IQRs ${overlap ? 'overlap' : "don't overlap"}, Mann-Whitney p=${p.toFixed(3)} → ` +
+      `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: >5% and non-overlapping IQRs)` +
+      (noisy.length ? ` · ⚠ CV > 10% for ${noisy.join(', ')}: rerun per §4.3` : ''),
+  );
+}
+
+/**
+ * Flashlight runs (BM-02; later BM-05, BM-07): <scenario>/<block>-<build>.json, one value per
+ * successful iteration. Each measure is a ~500 ms sample: fps (UI frames), cpu.perName (% per
+ * thread, 100% = one core), ram (MB). mqt_v_js is React Native's JS thread.
+ */
+const FLASHLIGHT_METRICS: { metric: string; unit: string; of: (m: FlashlightMeasure[]) => number }[] = [
+  { metric: 'fps', unit: 'fps', of: (m) => mean(m.map((x) => x.fps)) },
+  { metric: 'cpuTotal', unit: '%', of: (m) => mean(m.map((x) => sum(Object.values(x.cpu.perName)))) },
+  { metric: 'cpuJsThread', unit: '%', of: (m) => mean(m.map((x) => x.cpu.perName.mqt_v_js ?? 0)) },
+  { metric: 'cpuUiThread', unit: '%', of: (m) => mean(m.map((x) => x.cpu.perName['UI Thread'] ?? 0)) },
+  { metric: 'cpuRenderThread', unit: '%', of: (m) => mean(m.map((x) => x.cpu.perName.RenderThread ?? 0)) },
+  { metric: 'ramMax', unit: 'MB', of: (m) => Math.max(...m.map((x) => x.ram)) },
+];
+type FlashlightMeasure = { fps: number; ram: number; cpu: { perName: Record<string, number> } };
+const sum = (v: number[]) => v.reduce((a, b) => a + b, 0);
+const mean = (v: number[]) => sum(v) / v.length;
+
+function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const raw = join(dir, scenario.toLowerCase());
+  if (!existsSync(join(raw, 'meta.json'))) return;
+  const values: Record<string, Record<Build, number[]>> = {};
+  let failed = 0;
+  for (const file of readdirSync(raw).filter((f) => /^\d+-(jsCore|kmpCore)\.json$/.test(f)).sort()) {
+    const build = file.split('-')[1].replace('.json', '') as Build;
+    const data = JSON.parse(readFileSync(join(raw, file), 'utf8'));
+    for (const it of data.iterations as { status: string; measures: FlashlightMeasure[] }[]) {
+      if (it.status !== 'SUCCESS' || it.measures.length === 0) {
+        failed++;
+        continue;
+      }
+      for (const { metric, of } of FLASHLIGHT_METRICS) {
+        values[metric] ??= { jsCore: [], kmpCore: [] };
+        values[metric][build].push(of(it.measures));
+      }
+    }
   }
+  for (const { metric, unit } of FLASHLIGHT_METRICS) {
+    if (values[metric]) compare(scenario, metric, unit, values[metric], rows, verdicts);
+  }
+  if (failed) verdicts.push(`${scenario}: ${failed} iteration(s) not SUCCESS, excluded`);
 }
 
 function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string[]) {
@@ -237,6 +283,7 @@ function main() {
   const extra: string[] = [];
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
+  collectFlashlight(dir, 'BM-02', rows, verdicts);
   collectSize(dir, rows, verdicts, extra);
   collectDownload(dir, verdicts, extra);
 
@@ -250,12 +297,12 @@ function main() {
   writeFileSync(join(dir, 'summary.csv'), [header, ...csv].join('\n') + '\n');
 
   const md = ['# Summary', '', `_Generated by benchmarks/scripts/collect.ts from raw files in this folder._`, ''];
-  const timed = rows.filter((r) => r.unit === 'ms');
-  if (timed.length) {
+  const measured = rows.filter((r) => r.unit !== 'bytes');
+  if (measured.length) {
     md.push('| Scenario | Metric | Build | n | Median | p90 | IQR (p25–p75) | CV |', '|---|---|---|---:|---:|---:|---|---:|');
-    for (const r of timed) {
+    for (const r of measured) {
       const s = r.stats;
-      md.push(`| ${r.scenario} | ${r.metric} | ${r.build} | ${s.n} | ${s.median.toFixed(1)} ms | ${s.p90.toFixed(1)} ms | ${s.iqr.toFixed(1)} (${s.p25.toFixed(1)}–${s.p75.toFixed(1)}) | ${(s.cv * 100).toFixed(1)}% |`);
+      md.push(`| ${r.scenario} | ${r.metric} | ${r.build} | ${s.n} | ${s.median.toFixed(1)} ${r.unit} | ${s.p90.toFixed(1)} ${r.unit} | ${s.iqr.toFixed(1)} (${s.p25.toFixed(1)}–${s.p75.toFixed(1)}) | ${(s.cv * 100).toFixed(1)}% |`);
     }
     md.push('');
   }
@@ -270,7 +317,7 @@ function main() {
     );
     for (const c of comparisons) {
       const f = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
-      md.push(`| ${c.scenario} | ${c.metric} | ${f(c.diffPct)}% | ${f(c.shift)} ms | ${f(c.low)} to ${f(c.high)} ms | ${c.p.toFixed(3)} | ${c.meaningful ? 'yes' : 'no'} |`);
+      md.push(`| ${c.scenario} | ${c.metric} | ${f(c.diffPct)}% | ${f(c.shift)} ${c.unit} | ${f(c.low)} to ${f(c.high)} ${c.unit} | ${c.p.toFixed(3)} | ${c.meaningful ? 'yes' : 'no'} |`);
     }
     md.push('');
   }

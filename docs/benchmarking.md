@@ -177,6 +177,16 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 > from a JS effect is too early: it runs before Fabric mounts the native views, so Android
 > stamps an earlier, sometimes empty, frame.
 >
+> **Change (2026-10-05): BM-02 drives flings with `adb shell input`, not Maestro.** On the same
+> device, Maestro 2.11's driver hangs or fails on the view-hierarchy call (120 s timeouts), while
+> `uiautomator dump` takes ~3 s. `benchmarks/scripts/bm-02-scroll.sh` makes a fixed number of
+> flings per pass (no screen reads while scrolling), and `bm-02-run.sh` runs it under Flashlight
+> as three steps so that only the scrolling is measured: the cold start with launch arguments is
+> `--beforeEachCommand`, the end-of-list check `--afterEachCommand` (with `--skipRestart`).
+> Blocks of 2 iterations alternate builds and each waits until the battery is ≤ 40 °C: a first
+> run without the gate drifted from 39 to 45 °C and skewed one build. The Maestro flow
+> (`bm-02-scroll.yaml`) stays for devices where Maestro works.
+>
 > **Live feeds stay out of other scenarios.** Home has no price feed (Invest/F10 is hidden
 > until it ships). When a live feed returns, it must not run during BM-01/BM-02: start it only
 > after "fully drawn" and give it a launch flag that disables it. BM-05 measures it alone.
@@ -266,7 +276,7 @@ iOS has no equivalent yet.
 | ID | Scenario | Metrics | Tool | Tests |
 |---|---|---|---|---|
 | **BM-01** | **Cold start → Home rendered** with 200 cached transactions | Time to initial display, time to fully drawn | Platform startup logs (§5 note) | H6 |
-| **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, JS FPS, frame overrun, CPU | Flashlight + Maestro | H4 (control) |
+| **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, CPU per thread (JS, UI, Render), RAM. Flashlight has no JS FPS or frame overrun on Android | Flashlight + adb input (§5 note) | H4 (control) |
 | **BM-03** | **Spending summary from 10,000 ledger entries** (group by category and day, totals, balance check) | End-to-end ms, compute ms | In-app harness | H1 |
 | **BM-04** | **Ingest 5,000 transactions** from JSON → validate → write to SQLite cache | End-to-end ms, peak memory | In-app harness + `dumpsys meminfo` | H1 |
 | **BM-05** | **Live price stream**: 20 assets × 10 ticks/s for 15 s, with throttled UI updates | JS-thread CPU, JS FPS, UI FPS, RAM | Flashlight + Maestro | H2 |
@@ -280,7 +290,7 @@ iOS has no equivalent yet.
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
 - **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
 - **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
-- **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use.
+- **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
