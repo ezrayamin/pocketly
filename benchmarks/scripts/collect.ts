@@ -152,7 +152,8 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
   const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
   const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
   const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
-  const noisy = BUILDS.filter((b) => s[b].cv > 0.1);
+  // §4.3: for timings, the CV rule applies only above a 2 ms median (timer precision).
+  const noisy = BUILDS.filter((b) => s[b].cv > 0.1 && (unit !== 'ms' || s[b].median > 2));
   const meaningful = Math.abs(diff) > 0.05 && !overlap;
   const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
   comparisons.push({ scenario, metric, unit, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });

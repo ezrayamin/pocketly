@@ -148,6 +148,13 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 
 - Report **median, p90 and IQR**, plus the number of runs. Don't report averages alone.
 - Report the **coefficient of variation** (CV). If CV is > 10%, the environment is too noisy: fix it and rerun.
+  **For timings, the CV rule applies only to metrics with a median above 2 ms.** Below that, the
+  spread is set by timer precision and scheduling jitter rather than by the environment: a
+  0.1–0.3 ms wobble (a thread wake-up, a GC tick, clock granularity) is already more than 10% of
+  a 1 ms median, and derived timings (bridge overhead = end-to-end − compute − storage) add up
+  the jitter of three clocks. Sub-2 ms timings are still reported with their CV, IQR and CI;
+  they just don't trigger a rerun. Non-time metrics (frame rate, CPU %, memory) keep the plain
+  10% rule. (Added 2026-10-11, before the 2026-10-11 session; earlier summaries flag all rows.)
 - Treat a difference as meaningful only if it's **> 5%** *and* the IQRs don't overlap. Optional: a Mann-Whitney U test.
 
 ## 5. Tools
