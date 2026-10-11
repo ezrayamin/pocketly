@@ -93,6 +93,15 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.ingestTransactions(json: json).toNitro() }
   }
 
+  func stageIngestPayload(json: String) throws -> Promise<Void> {
+    core.stageIngestPayload(json: json)
+    return Promise.resolved()
+  }
+
+  func ingestStaged() throws -> Promise<IngestResult> {
+    return Promise.async { [core] in try await core.ingestStaged().toNitro() }
+  }
+
   func echo(value: Double) throws -> Double {
     return core.echo(value: value)
   }

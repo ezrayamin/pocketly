@@ -34,6 +34,16 @@ describe('bench harness (benchmarking.md §5.2)', () => {
     expect(r.output.checksum).not.toBe(checksum('MISMATCH'));
   });
 
+  it('BM-04b ingests the same payload, staged in the core before each timed call', async () => {
+    const plain = await runBench('BM-04', opts);
+    const staged = await runBench('BM-04b', opts);
+    expect(staged.runs).toHaveLength(2);
+    expect(Object.keys(staged.runs[0]).sort()).toEqual(['computeMs', 'endToEndMs', 'storageMs']);
+    expect(staged.input.checksum).toBe(plain.input.checksum);
+    expect(staged.output.checksum).toBe(plain.output.checksum);
+    expect(staged.input.description).toContain('staged in the core');
+  });
+
   it('logs no markers in timing rounds, and phase markers around each measured op in memory rounds', async () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const marks = () => info.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[Pocketly] bench-mark '));

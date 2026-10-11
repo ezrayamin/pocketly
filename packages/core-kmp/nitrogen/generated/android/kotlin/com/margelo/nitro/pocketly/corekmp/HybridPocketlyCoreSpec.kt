@@ -72,6 +72,14 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun stageIngestPayload(json: String): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun ingestStaged(): Promise<IngestResult>
+  
+  @DoNotStrip
+  @Keep
   abstract fun echo(value: Double): Double
   
   @DoNotStrip

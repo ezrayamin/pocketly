@@ -152,6 +152,19 @@ class PocketlyCore internal constructor(
         timed { SpendingCalculator.compute(month, timeZone.current.month(month), transactions, walletBalance) }
     }
 
+    /** BM-04b: a payload held in Kotlin, as a network response would be. Survives resetData. */
+    @Volatile
+    private var stagedPayload: String? = null
+
+    fun stageIngestPayload(json: String) {
+        stagedPayload = json
+    }
+
+    /** BM-04b: [ingestTransactions] on the staged payload, so nothing crosses the bridge in the call. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun ingestStaged(): IngestResult =
+        ingestTransactions(stagedPayload ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "no ingest payload staged"))
+
     @Throws(CoreException::class, CancellationException::class)
     suspend fun ingestTransactions(json: String): IngestResult = onDb {
         val parsed = timed { TransactionIngestor.parseAndValidate(json) }

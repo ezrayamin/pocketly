@@ -1,0 +1,8 @@
+Starting: Intent { cmp=com.pocketly.kmp/com.pocketly.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.pocketly.kmp/com.pocketly.MainActivity
+TotalTime: 295
+WaitTime: 298
+Complete
+  ACTIVITY com.pocketly.kmp/com.pocketly.MainActivity 718a8a0 pid=21600 userId=0 uid=10537 displayId=0(type=INTERNAL)

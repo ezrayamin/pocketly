@@ -82,6 +82,14 @@ export class KmpCore implements Core {
     return this.native.ingestTransactions(json).catch(rethrow);
   }
 
+  stageIngestPayload(json: string): Promise<void> {
+    return this.native.stageIngestPayload(json).catch(rethrow);
+  }
+
+  ingestStaged(): Promise<IngestResult> {
+    return this.native.ingestStaged().catch(rethrow);
+  }
+
   // Straight through: it can't throw, and BM-06 times exactly this path.
   echo(value: number): number {
     return this.native.echo(value);

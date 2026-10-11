@@ -13,7 +13,7 @@ import { core } from '../core';
  * neither bundle carries the other core's code (BM-08). Each result includes a checksum of its
  * input and of its output so collect.ts can confirm both builds did the same work.
  */
-export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-06'] as const;
+export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-04b', 'BM-06'] as const;
 export type BenchScenario = (typeof BENCH_SCENARIOS)[number];
 
 /** One measured run. Keys depend on the scenario; all values are milliseconds. */
@@ -178,16 +178,22 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         setupMs,
       };
     }
-    case 'BM-04': {
+    case 'BM-04':
+    case 'BM-04b': {
       await core.resetData(scaled(BM04_SOURCE, options.scale));
       const payload = JSON.stringify((await allTransactions()).map((tx) => canonical({ ...tx, id: tx.id.replace(/^tx-/, 'in-') })));
+      // BM-04b: the payload is already on the core's side when the timed call starts, as a
+      // network response would be in a core that owns the network. Staged before every run
+      // (not timed), like a fresh response each time.
+      const staged = scenario === 'BM-04b';
       const setupMs = now() - setupStart;
       let last = '';
       const runs = await repeat(options, async (mark) => {
         await core.resetData(DEFAULT_DATASET); // same starting replica for every run (not timed)
+        if (staged) await core.stageIngestPayload(payload);
         mark('op-start');
         const t0 = now();
-        const result = await core.ingestTransactions(payload);
+        const result = staged ? await core.ingestStaged() : await core.ingestTransactions(payload);
         const endToEndMs = now() - t0;
         mark('op-end');
         last = JSON.stringify(result);
@@ -198,7 +204,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         build,
         warmup: options.warmup,
         runs,
-        input: { description: `ingest payload: seed ${BM04_SOURCE.seed} × ${scaled(BM04_SOURCE, options.scale).transactionCount}, ids "in-…", onto DEFAULT_DATASET`, checksum: checksum(payload) },
+        input: { description: `ingest payload: seed ${BM04_SOURCE.seed} × ${scaled(BM04_SOURCE, options.scale).transactionCount}, ids "in-…", onto DEFAULT_DATASET${staged ? ', staged in the core' : ''}`, checksum: checksum(payload) },
         output: { description: 'IngestResult JSON', checksum: checksum(last) },
         setupMs,
       };

@@ -64,6 +64,8 @@ namespace margelo::nitro::pocketly {
     void setTimeZone(const std::string& zoneId) override;
     std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) override;
     std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override;
+    std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override;
+    std::shared_ptr<Promise<IngestResult>> ingestStaged() override;
     double echo(double value) override;
     std::string formatMoney(double minor) override;
     std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;

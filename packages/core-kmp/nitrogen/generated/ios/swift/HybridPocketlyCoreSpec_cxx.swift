@@ -299,6 +299,44 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func stageIngestPayload(json: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.stageIngestPayload(json: String(json))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func ingestStaged() -> bridge.Result_std__shared_ptr_Promise_IngestResult___ {
+    do {
+      let __result = try self.__implementation.ingestStaged()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_IngestResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_IngestResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_IngestResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func echo(value: Double) -> bridge.Result_double_ {
     do {
       let __result = try self.__implementation.echo(value: value)

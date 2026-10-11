@@ -271,7 +271,8 @@ function collectRetries(dir: string, label: string, verdicts: string[]) {
  * Memory rounds (bm-harness.sh MEMORY=1): <scenario>/memory/<round>-<build>{-rss.txt,
  * -logcat.txt, -status.txt, -meminfo.txt}. RSS samples ("<epoch s> <VmRSS kB> <VmSwap kB>") are
  * lined up with the harness's bench-mark lines (logcat -v epoch, same clock). Per round:
- * baseline = median RSS over the idle second before measure-start; peak = max RSS from
+ * start = median RSS over the first second sampled (before setup and warm-up); baseline =
+ * median RSS over the idle second before measure-start (after them); peak = max RSS from
  * measure-start to measure-end. Per measured op: max RSS between op-start and op-end minus the
  * last sample before op-start. Plus VmHWM and `dumpsys meminfo` taken after the run.
  */
@@ -330,6 +331,8 @@ function collectMemory(raw: string, scenario: string, rows: Row[], verdicts: str
     }
     rounds++;
     for (let i = 1; i < block.length; i++) gapsMs.push((block[i].t - block[i - 1].t) * 1000);
+    const first = samples.filter((s) => s.t <= samples[0].t + 1);
+    add('rssStart', build, mb(stats(first.map((s) => s.rss)).median));
     const baseline = stats(idle.map((s) => s.rss)).median;
     const peak = Math.max(...block.map((s) => s.rss));
     add('rssBaseline', build, mb(baseline));
@@ -512,7 +515,7 @@ function main() {
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
-  for (const scenario of ['BM-03', 'BM-04', 'BM-06']) {
+  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
   }

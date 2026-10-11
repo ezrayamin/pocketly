@@ -23,6 +23,8 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func setTimeZone(zoneId: String) throws -> Void
   func computeSpendingSummary(month: String) throws -> Promise<SpendingSummary>
   func ingestTransactions(json: String) throws -> Promise<IngestResult>
+  func stageIngestPayload(json: String) throws -> Promise<Void>
+  func ingestStaged() throws -> Promise<IngestResult>
   func echo(value: Double) throws -> Double
   func formatMoney(minor: Double) throws -> String
   func formatMoneyBatch(minors: [Double]) throws -> [String]

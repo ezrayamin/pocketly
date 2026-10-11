@@ -1,0 +1,26 @@
+--------- beginning of main
+         1791711728.067 31199 31233 I ReactNativeJS: Running "Pocketly"
+         1791711730.630 31199 31233 I ReactNativeJS: [Pocketly] bench-mark measure-start
+         1791711730.756 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 0
+         1791711730.833 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 0
+         1791711730.931 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 1
+         1791711730.996 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 1
+         1791711731.104 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 2
+         1791711731.168 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 2
+         1791711731.285 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 3
+         1791711731.351 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 3
+         1791711731.454 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 4
+         1791711731.521 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 4
+         1791711731.629 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 5
+         1791711731.695 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 5
+         1791711731.802 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 6
+         1791711731.863 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 6
+         1791711731.980 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 7
+         1791711732.048 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 7
+         1791711732.156 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 8
+         1791711732.223 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 8
+         1791711732.328 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-start 9
+         1791711732.393 31199 31233 I ReactNativeJS: [Pocketly] bench-mark op-end 9
+         1791711732.394 31199 31233 I ReactNativeJS: [Pocketly] bench-mark measure-end
+         1791711732.514 31199 31233 I ReactNativeJS: [Pocketly] bench-chunk 1/1 {"scenario":"BM-04","build":"js","warmup":5,"runs":[{"endToEndMs":76.45244699716568,"computeMs":35.689583003520966,"storageMs":40.6884890049696},{"endToEndMs":64.6793750077486,"computeMs":25.45083399116993,"storageMs":39.18489599227905},{"endToEndMs":64.19385400414467,"computeMs":27.768281996250153,"storageMs":36.382083997130394},{"endToEndMs":65.40635399520397,"computeMs":32.37567700445652,"storageMs":32.98062500357628},{"endToEndMs":66.6158850044012,"computeMs":26.93088600039482,"storageMs":39.64057299494743},{"endToEndMs":65.8831249922514,"computeMs":29.740676999092102,"storageMs":36.09520800411701},{"endToEndMs":60.842083007097244,"computeMs":25.859165996313095,"storageMs":34.9332289993763},{"endToEndMs":67.4561979919672,"computeMs":28.459217995405197,"storageMs":38.94083300232887},{"endToEndMs":67.15874999761581,"computeMs":30.857291996479034,"storageMs":36.25578099489212},{"endToEndMs":65.0708339959383,"computeMs":29.22291600704193,"storageMs":35.79770900309086}],"input":{"description":"ingest payload: seed 2026 × 5000, ids \"in-…\", onto DEFAULT_DATASET","checksum":"6fc3563c:1308125"},"output":{"description":"IngestResult JSON","checksum":"7707af6c:57"},"setupMs":371.5370829999447}
+         1791711732.514 31199 31233 I ReactNativeJS: [Pocketly] bench-done BM-04 js

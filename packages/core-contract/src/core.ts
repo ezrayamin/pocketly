@@ -76,6 +76,17 @@ export interface Core {
    * the local replica (not the server: balances are unaffected). Existing ids are duplicates.
    */
   ingestTransactions(json: string): Promise<IngestResult>;
+  /**
+   * BM-04b: hands the core a payload to ingest later, as if it had arrived on the core's own
+   * side (in a real app, from the network). Not timed by the harness. Replaces any staged
+   * payload; resetData leaves it alone.
+   */
+  stageIngestPayload(json: string): Promise<void>;
+  /**
+   * BM-04b: ingestTransactions on the staged payload, so no data crosses into the core during
+   * the call. The payload stays staged. Throws INVALID_ARGUMENT if nothing is staged.
+   */
+  ingestStaged(): Promise<IngestResult>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
   /**

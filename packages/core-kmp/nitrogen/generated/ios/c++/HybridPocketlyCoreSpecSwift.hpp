@@ -221,6 +221,22 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override {
+      auto __result = _swiftPart.stageIngestPayload(json);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<IngestResult>> ingestStaged() override {
+      auto __result = _swiftPart.ingestStaged();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline double echo(double value) override {
       auto __result = _swiftPart.echo(std::forward<decltype(value)>(value));
       if (__result.hasError()) [[unlikely]] {

@@ -1,0 +1,8 @@
+Starting: Intent { cmp=com.pocketly.js/com.pocketly.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.pocketly.js/com.pocketly.MainActivity
+TotalTime: 310
+WaitTime: 313
+Complete
+  ACTIVITY com.pocketly.js/com.pocketly.MainActivity 39c7c23 pid=21761 userId=0 uid=10536 displayId=0(type=INTERNAL)

@@ -196,6 +196,16 @@ class ContractFixturesTest {
         assertEquals(0, second.accepted)
     }
 
+    @Test
+    fun ingestStaged() = runTest {
+        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.ingestStaged() }.code)
+        core.stageIngestPayload(ingest["input"].toString())
+        core.resetData(DatasetConfig.DEFAULT) // the staged payload is the core's, not the database's
+        assertEquals(ingest["expected"], core.ingestStaged().toJson())
+        assertEquals("Iced latte", core.getTransaction("ing-0001").note)
+        assertEquals(0, core.ingestStaged().accepted) // still staged: only duplicates now
+    }
+
     // ── developer menu (F11) ───────────────────────────────────────────────
 
     private fun simulation(o: JsonObject) = NetworkSimulation(

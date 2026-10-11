@@ -66,6 +66,8 @@ export class JsCore implements Core {
   private readonly ready: Promise<void>;
   private computeMs = 0;
   private storageMs = 0;
+  /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
+  private stagedPayload: string | undefined;
 
   constructor(options: JsCoreOptions) {
     const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
@@ -143,6 +145,17 @@ export class JsCore implements Core {
     this.storageMs = now() - start;
     const walletBalance = cachedWallet?.wallet.balance ?? 0;
     return this.timed(() => computeSpendingSummary(month, this.zone.month(month), transactions, walletBalance));
+  }
+
+  async stageIngestPayload(json: string): Promise<void> {
+    this.stagedPayload = json;
+  }
+
+  ingestStaged(): Promise<IngestResult> {
+    if (this.stagedPayload === undefined) {
+      return Promise.reject(new CoreError('INVALID_ARGUMENT', 'no ingest payload staged'));
+    }
+    return this.ingestTransactions(this.stagedPayload);
   }
 
   async ingestTransactions(json: string): Promise<IngestResult> {

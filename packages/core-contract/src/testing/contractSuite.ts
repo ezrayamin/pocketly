@@ -206,6 +206,27 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
     });
 
+    describe('ingestStaged (BM-04b)', () => {
+      it('throws INVALID_ARGUMENT when nothing is staged', async () => {
+        await expectCoreError(core.ingestStaged(), 'INVALID_ARGUMENT');
+      });
+
+      it('ingests the staged payload exactly as ingestTransactions does, and keeps it staged', async () => {
+        await core.stageIngestPayload(JSON.stringify(ingest.input));
+        expect(await core.ingestStaged()).toEqual(ingest.expected);
+        expect((await core.getTransaction('ing-0001')).note).toBe('Iced latte');
+        const again = await core.ingestStaged();
+        expect(again.accepted).toBe(0);
+        expect(again.duplicates).toBe(ingest.expected.accepted + ingest.expected.duplicates);
+      });
+
+      it('survives resetData: the payload is the core\'s, not the database\'s', async () => {
+        await core.stageIngestPayload(JSON.stringify(ingest.input));
+        await core.resetData();
+        expect(await core.ingestStaged()).toEqual(ingest.expected);
+      });
+    });
+
     describe('developer menu: network simulation (FR-DEV-02/03, FR-FAKE-04)', () => {
       it('starts NORMAL with no failures', () => {
         expect(core.getNetworkSimulation()).toEqual(network.defaultSimulation);

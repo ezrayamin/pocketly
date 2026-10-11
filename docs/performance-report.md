@@ -9,22 +9,33 @@
 > **Current code:** BM-01 and BM-08 were rerun on the slice-4 code (`2026-10-05_mid-02`: SQLite
 > storage, local replica, History). BM-02, BM-03, BM-04 and BM-06 come from `2026-10-11_mid-01`,
 > which also measured BM-04's memory for the first time and fixed jsCore's bulk writes (see
-> BM-04). Earlier sessions stay below as history.
+> BM-04); BM-04b and the memory follow-up come from `2026-10-11_mid-02`. Earlier sessions stay
+> below as history.
 
 ## TL;DR (so far)
-- **KMP wins when the core computes; it doesn't when the core mostly writes.** Spending summary
-  over 10,000 entries (BM-03): 42 ms vs 53 ms end-to-end (−20%), the calculation itself 0.4 vs
-  4.7 ms. Ingesting 5,000 transactions (BM-04) is now **10% slower** in kmpCore (71 vs 65 ms):
-  once jsCore writes the way kmpCore does (one prepared statement in one transaction), writing
-  takes the same 39–40 ms in both, and kmpCore's faster parsing doesn't cover the 9.7 ms it
-  costs to pass 1.3 MB of JSON across the bridge. The earlier −38% came from jsCore's slower
-  write path, not from KMP.
-- **kmpCore's process is ~61 MB bigger** (RSS and PSS, before any work). The ingest itself adds
-  only 2–4 MB in either build.
-- **The bridge is cheap.** 0.6 ms to return a summary, 9.7 ms to pass a 1.3 MB JSON string in,
-  ~0.3 µs per tiny call (10,000 calls to a function that does nothing: 4.2 ms through Nitro vs
-  1.2 ms in plain JS). 10,000 `formatMoney` calls through Nitro (10.6 ms) still beat the same
-  calls in plain JS (13.3 ms). H3 (chatty calls are slower in KMP) is rejected.
+- **KMP pays off when the work happens where the data already is, and only results cross the
+  bridge.** Spending summary over 10,000 entries (BM-03): the entries stay on the native side and
+  a ~2 KB summary crosses; 42 vs 53 ms end-to-end (−20%), the calculation itself 0.4 vs 4.7 ms.
+  Ingesting 5,000 transactions (BM-04): 1.3 MB of JSON must cross into Kotlin first, which costs
+  ~10 ms; kmpCore is **10–25% slower** (71 vs 65 ms, and 81 vs 65 ms in a second session).
+- **If the core owns the network, the bridge cost disappears (BM-04b), but KMP doesn't win
+  either.** With the payload already in the core, kmpCore's bridge overhead drops from 9.9 to
+  0.7 ms and the import is 73 vs 66 ms, no meaningful difference. Kotlin parses faster for the
+  first ~10 imports in a process (~60 ms end-to-end), then slows down for the rest of the launch
+  (~76 ms), probably garbage collection; not investigated yet.
+- **The earlier "KMP writes twice as fast" was jsCore's code.** Once jsCore writes the way
+  kmpCore does (one prepared statement in one transaction), writing takes the same 39–40 ms in
+  both. The fair comparison only appeared once both cores used the same write strategy.
+- **Both processes start the same size; kmpCore keeps more after heavy work.** At launch they are
+  within ~5 MB (PSS ~116 MB at Home). After repeatedly parsing 1.3 MB payloads, kmpCore holds
+  ~60 MB more during the benchmark and ~110 MB more a minute later (clean pages in the ART heap;
+  live objects are the same 5 MB). jsCore returns to its launch size.
+- **A bridge call costs ~0.3 µs; data costs more.** A call that does nothing takes ~0.42 µs
+  through Nitro vs ~0.12 µs in plain JS, so trivial calls really are ~3.5× slower in kmpCore.
+  Formatting money costs ~1.1 µs in JS and ~0.22 µs in Kotlin, so moving it still wins (10,000
+  calls: 10.6 vs 13.3 ms). Rule: moving a function to Kotlin pays off when it saves more than
+  ~0.3 µs per call. Moving data is the real cost: 9.8 ms for a 1.3 MB string, 0.6 ms for a
+  summary.
 - **kmpCore is now 423 KB (4.7%) smaller to download on arm64, but only because jsCore bundles
   SQLite.** Storage differs by design (ADR-0009): op-sqlite ships its own SQLite build in
   jsCore (1,564 KB in the APK), while kmpCore uses the phone's. **The KMP architecture itself
@@ -56,15 +67,16 @@
   | `2026-10-05_mid-02` | tag `bench/2026-10-05_mid-02` (slice 4) | Home (BM-01) and app size (BM-08), release builds |
   | `2026-10-05_mid-03` | tag `bench/2026-10-05_mid-03` (slice 4 + harness) | In-app harness (BM-03, BM-04, BM-06), `perf` builds |
   | `2026-10-11_mid-01` | tag `bench/2026-10-11_mid-01` (+ `echo`, jsCore write fix, memory rounds) | BM-02 rerun with jank; BM-03, BM-04 (+ memory), BM-06; `perf` builds; OS update 16.0.21.0 |
+  | `2026-10-11_mid-02` | tag `bench/2026-10-11_mid-02` (+ `ingestStaged`) | BM-04 and BM-04b (+ memory); memory at Home and after BM-04; `perf` builds |
 - Method: [benchmarking.md](benchmarking.md), with the BM-01 and BM-02 tool changes noted in §5.
 
 ## Hypotheses vs results
 | ID | Hypothesis | Result | Confirmed? |
 |---|---|---|---|
-| H1 | CPU-heavy work is faster in Kotlin | Compute only: BM-03 4.7 → 0.4 ms (−92%); BM-04 parse + validate 27.3 → 20.0 ms (−27%, not meaningful: kmpCore's runs spread 15–52 ms). End-to-end: BM-03 −20%, but BM-04 **+10%** once both cores write the same way: the bridge cost of the 1.3 MB input outweighs the parsing gain | **Confirmed for computation, not for imports (interim)** |
+| H1 | CPU-heavy work is faster in Kotlin | The calculation is: BM-03 4.7 → 0.4 ms (−92%); BM-04 parse + validate ~20 ms vs ~27 ms until kmpCore slows down after ~10 imports in a process. End to end, it depends on where the data lives: BM-03 −20% (data already native, a summary crosses); BM-04 +10% / +25% (1.3 MB crosses into Kotlin first); BM-04b (data already in the core) +10%, not meaningful | **Confirmed for the calculation; end to end only when the data is already on the native side (interim)** |
 | H2 | JS-thread CPU is lower during streams in `kmpCore` | not measured yet (BM-05) | — |
-| H3 | Many tiny calls are slower in `kmpCore` | A call that does nothing costs ~0.42 µs through Nitro vs ~0.12 µs in JS (10,000 × `echo`: 4.2 vs 1.2 ms). With real work behind it, Kotlin's speed wins: 10,000 `formatMoney` calls 10.6 vs 13.3 ms (−20%) | **Rejected (interim)** |
-| H4 | Scrolling and animation are the same (control) | BM-02 scrolling, two sessions: frame rate −0.2% / +0.1%, janky frames +0.1 pp, every metric not meaningful. BM-07 not measured yet | **Confirmed for scrolling (interim)** |
+| H3 | Many tiny calls are slower in `kmpCore` | A call that does nothing costs ~0.42 µs through Nitro vs ~0.12 µs in JS (10,000 × `echo`: 4.2 vs 1.2 ms), ~3.5× slower. With real work behind it, Kotlin's speed wins: formatting costs ~0.22 µs in Kotlin vs ~1.1 µs in JS, so 10,000 `formatMoney` calls take 10.6 vs 13.3 ms (−20%). Moving a function pays off when it saves more than ~0.3 µs per call | **Confirmed for trivial calls, rejected for realistic ones (interim)** |
+| H4 | Scrolling and animation are the same (control) | BM-02 scrolling in two sessions six days apart, before and after an OS update: frame rate +0.1% / −0.2%, janky frames +0.1 pp, no metric meaningful in either. BM-07 not measured yet | **Confirmed for scrolling (interim)** |
 | H5 | `kmpCore` is slightly larger | Architecture alone: about +250 KB download, +918 KB APK (arm64). With storage included, kmpCore is 423 KB *smaller* to download, because jsCore bundles SQLite (ADR-0009) | **Confirmed for the architecture (interim)** |
 | H6 | Cold start differs by < 10% | Slice 4: TTID +4 ms (CI −3 to +11), TTFD −17 ms (CI −26 to −8 ms, −3.1%, kmpCore faster). Home slice: TTFD +3 ms | **Confirmed (interim)** |
 | H7 | A Baseline Profile helps `kmpCore` more | not measured yet (BM-09) | — |
@@ -180,32 +192,67 @@ every run the replica is reset to the same 200 entries (not timed). Both builds 
 **What changed since the last session.** Until `a9cf596`, jsCore wrote the rows with op-sqlite's
 `executeBatch`, which ran in one transaction but prepared the INSERT again for every row;
 kmpCore's SQLDelight reuses one prepared statement. jsCore now does the same, and its write time
-fell from 76.7 to 39.3 ms, level with kmpCore. With that difference gone, kmpCore's lead (−38%
-on `2026-10-05_mid-03`) turns into a 10% deficit: its parsing is faster, but passing the 1.3 MB
-string through Nitro costs 9.8 ms.
+fell from 76.7 to 39.3 ms, level with kmpCore. **The earlier "writes twice as fast in kmpCore" was
+jsCore's code, not the SQLite library: the fair comparison only appeared once both cores used the
+same write strategy.** With that difference gone, kmpCore's lead (−38% on `2026-10-05_mid-03`)
+turns into a 10% deficit: its parsing is faster, but passing the 1.3 MB string through Nitro
+costs 9.8 ms.
 
-**kmpCore's parsing is uneven.** In 4 of 5 launches, parse + validate runs at ~19 ms for the
-first five measured runs, then steps up to 30–50 ms and stays there (CV 35.7%); the fifth launch
-stays at 15–22 ms. That spread is why the compute difference isn't meaningful by the §4.3 rule.
-Garbage collection in ART is the first suspect; not investigated yet.
+**kmpCore's parsing is uneven: median 20.0 ms, p90 38.0 ms** (jsCore 27.3 / 30.2 ms). In 4 of 5
+launches, parse + validate runs at ~19 ms for the first five measured runs, then steps up to
+30–50 ms and stays there (CV 35.7%); the fifth launch stays at 15–22 ms. That spread is why the
+compute difference isn't meaningful by the §4.3 rule. Garbage collection in ART is the first
+suspect (kmpCore's Java heap PSS also swings between ~8 and ~26 MB across the memory rounds); one
+system trace of a launch would confirm it. Not rerun.
+
+#### BM-04b: the payload already in the core
+Session `2026-10-11_mid-02`, same protocol, run right after a BM-04 rerun. BM-04 passes the
+1.3 MB payload from JS inside the timed call; in a KMP app whose core owns the network, the
+response would arrive in Kotlin and never cross the bridge. BM-04b stages the same payload in
+the core before each run (`stageIngestPayload`, not timed) and times `ingestStaged()`.
+
+| Per run (median, n = 50) | BM-04 jsCore | BM-04 kmpCore | BM-04b jsCore | BM-04b kmpCore |
+|---|---:|---:|---:|---:|
+| **End-to-end** | 65.2 ms | 81.3 ms | 66.1 ms | 72.9 ms |
+| Parse + validate | 26.4 ms | 24.7 ms | 27.4 ms | 31.1 ms |
+| Write | 38.5 ms | 40.6 ms | 38.7 ms | 40.1 ms |
+| Bridge overhead | 0.0 ms | 9.9 ms | 0.0 ms | 0.7 ms |
+| kmpCore − jsCore, end-to-end | | **+14.3 ms (+25%)**, CI +8.1 to +19.4 | | **+5.6 ms (+10%), not meaningful**, CI +0.9 to +8.3 |
+
+**Reading it.** Owning the network removes the bridge cost (9.9 → 0.7 ms), and jsCore is
+unchanged, as it should be. What's left is the parse step, and it isn't stable in kmpCore: in
+every launch it takes 17–21 ms for about the first ten imports since the process started, then
+30–64 ms for the rest. Before the step, kmpCore's BM-04b runs take ~60 ms end-to-end (faster than
+jsCore's ~66 ms); after it, ~76 ms. So "the core owns the network" makes KMP competitive for
+imports, not clearly better, until the slowdown is understood. The same step showed up in 4 of 5
+BM-04 launches on `2026-10-11_mid-01`.
 
 #### BM-04 memory
 Separate memory rounds (5 cold starts per build; benchmarking.md §5.2): resident memory sampled
-every ~3.4 ms on the device, lined up with the harness's phase markers.
+every ~3.4 ms on the device, lined up with the harness's phase markers. Session
+`2026-10-11_mid-02` (the same numbers as `mid-01` within 1 MB).
 
 | Per cold start (median) | jsCore | kmpCore | Shift (kmp − js) | 95% CI |
 |---|---:|---:|---:|---|
-| **RSS before ingesting** (idle second after warm-up) | 201.4 MB | 262.8 MB | **+61.5 MB (+31%)** | +61.3 to +61.7 MB |
-| PSS after the run (`dumpsys meminfo`) | 108.0 MB | 169.3 MB | +61.4 MB | +60.3 to +62.4 MB |
-| Peak RSS over the measured runs, minus the baseline | 3.6 MB | 2.3 MB | −1.3 MB (not meaningful) | −1.4 to +0.3 MB |
-| Rise during one `ingestTransactions` call (50 calls) | 0.0 MB | 1.8 MB | +1.8 MB | +1.7 to +1.8 MB |
+| RSS at launch (first second sampled, before setup) | 171.1 MB | 175.7 MB | +4.5 MB (+2.7%, not meaningful) | +2.2 to +5.5 MB |
+| **RSS after setup and 5 warm-up imports** | 200.5 MB | 262.3 MB | **+61.8 MB (+31%)** | +61.6 to +62.1 MB |
+| PSS after the run (`dumpsys meminfo`) | 106.8 MB | 167.8 MB | +61.0 MB | +59.9 to +63.0 MB |
+| Peak RSS over the measured runs, minus the line above | 3.6 MB | 2.0 MB | −1.6 MB | −2.1 to −0.3 MB |
 
-**Reading it.** The cost of KMP here is the size of the process, not the work: kmpCore starts
-~61 MB bigger (ART with the Kotlin core, SQLDelight, coroutines and Koin loaded next to Hermes).
-Ingesting 5,000 transactions adds only a few MB in either build. kmpCore's small ingest figures
-are uncertain by about their own size: a new process inherits swapped-out pages from the zygote,
-and in every kmpCore round ~2.2 MB of them were paged back in around the baseline window, which
-RSS counts without any new allocation.
+**Where the gap comes from** (`2026-10-11_mid-02` NOTES.md):
+- At a normal cold start to Home, without benchmark mode, both builds use PSS ~116 MB and RSS
+  ~238 MB.
+- During BM-04's setup and warm-up, jsCore grows ~40 MB and kmpCore ~101 MB.
+- A minute after a BM-04 run, jsCore is back at its launch size (PSS 116 MB) while kmpCore holds
+  PSS 225 MB. The extra ~110 MB is **private clean pages in the ART heap**; live Java objects are
+  5.0 MB in both builds. Which mapping holds them can't be read from `adb shell` on a release
+  build; a heap profile would show it.
+
+**Reading it.** KMP doesn't make the process bigger at rest. Parsing large payloads in Kotlin
+leaves memory behind that ART doesn't return quickly, which matters on low-end phones (not
+measured yet) and is probably linked to the parse slowdown above. The ingest itself adds only a
+few MB at its peak in either build; kmpCore's figure is within the ~2 MB of swapped-in zygote
+pages it gets in every round.
 
 ### BM-06: bridge calls (10,000 amounts)
 Same session and protocol. Both builds formatted the same 10,000 amounts to the same strings.
@@ -219,8 +266,10 @@ Same session and protocol. Both builds formatted the same 10,000 amounts to the 
 | **10,000 × `echo`** (a call that does nothing) | 1.2 ms | 4.2 ms | **+3.0 ms** |
 
 **Reading it.** `echo` isolates the cost of a call: ~0.12 µs as a plain JS call, ~0.42 µs through
-Nitro into Kotlin, so ~0.3 µs of bridge per call. Formatting a number costs more than that, and
-Kotlin does it faster, so even the chatty pattern is faster in kmpCore. Batching still halves
+Nitro into Kotlin, so trivial calls are ~3.5× slower in kmpCore, ~0.3 µs of bridge each.
+Formatting a number costs ~1.1 µs in JS (batch: 11.0 ms / 10,000) and ~0.22 µs in Kotlin (2.2 ms
+/ 10,000), a saving of ~0.9 µs that covers the crossing, so even the chatty pattern is faster in
+kmpCore. **Rule: moving a function to Kotlin pays off when it saves more than ~0.3 µs per call.** Batching still halves
 the time: 3.3 ms to move 10,000 values each way is far less than 10,000 separate calls. For
 bridge API design (ADR-worthy), batch when you have the data in hand, but don't contort an API
 to avoid single calls.
@@ -276,6 +325,7 @@ Overhead = end-to-end (timed in JS) − compute − storage (timed inside the co
 |---|---:|---:|
 | BM-03: month string in, `SpendingSummary` out | 0.6 ms | 1% |
 | BM-04: 1.3 MB JSON string in, `IngestResult` out | 9.8 ms | 14% |
+| BM-04b: nothing in (payload already staged), `IngestResult` out | 0.7 ms | 1% |
 | BM-06: 10,000 numbers in, 10,000 strings out (one call) | 3.3 ms | 59% |
 | BM-06: one call that does nothing (`echo`), vs the same call in JS | ~0.3 µs | — |
 
@@ -314,7 +364,8 @@ See BM-08 above.
   as failed iterations (§4.3).
 - BM-04 memory is resident memory (RSS) sampled every ~3.4 ms; a peak shorter than that can be
   missed. The phone swaps to zram, so kmpCore's small ingest figures (~2 MB) are within the
-  swap-in noise; the ~61 MB baseline difference is not.
+  swap-in noise; the ~60 MB retained after the warm-up imports is not. That retained memory is
+  measured after a benchmark workload (repeated 1.3 MB imports), not at rest.
 - The phone's OS was updated between `2026-10-05` and `2026-10-11` (16.0.19.3 → 16.0.21.0).
 
 ## Found by benchmarking
@@ -335,12 +386,12 @@ which is a UX improvement, not a KMP finding. Deferred.
 
 ## When I'd choose each
 _Interim, before BM-05 and BM-07._ Neither startup, scrolling nor download size is a reason to
-avoid KMP: they're the same, or differ by a fixed ~250 KB. Memory is a cost: kmpCore's process
-is ~61 MB bigger, which matters most on low-end phones (not measured yet). KMP pays off when the
-core computes over data it already holds: a summary over 10,000 records ran 20% faster
-end-to-end. It doesn't when the work is mostly storage, or when megabytes must cross the bridge
-to reach Kotlin: importing 5,000 records was 10% slower, because both builds write to SQLite
-equally fast and the 1.3 MB input costs ~10 ms to pass. Keep large inputs on the side that
-receives them (fetch and parse in Kotlin, not in JS). If an app's core is thin (format,
-validate, forward to a server), the gain is a few milliseconds and doesn't justify a second
-language.
+avoid KMP: they're the same, or differ by a fixed ~250 KB. **KMP pays off when the work happens
+where the data already is, and only results cross the bridge**: a summary over 10,000 records
+ran 20% faster end-to-end. It doesn't when megabytes must cross the bridge to reach Kotlin
+(importing 5,000 records from JS: 10–25% slower). Owning the network in Kotlin removes that cost
+but, today, doesn't make imports faster: Kotlin's parsing slows down after repeated large
+payloads and the memory they leave behind stays (~110 MB a minute later). Fetch and parse large
+payloads where they will be used, keep bridge traffic to results, and move a function to Kotlin
+only if it saves more than ~0.3 µs per call. If an app's core is thin (format, validate, forward
+to a server), the gain is a few milliseconds and doesn't justify a second language.

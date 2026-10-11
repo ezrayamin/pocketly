@@ -251,7 +251,7 @@ which is kept out of compute in both cores:
 For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
 
 **Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
-build started with `pocketly.bench=BM-03|BM-04|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders
+build started with `pocketly.bench=BM-03|BM-04|BM-04b|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders
 only the harness screen, runs the scenario in-process and logs the result to logcat, where the
 runner collects it. Inputs are built through the `Core` API rather than bundled files, so both
 builds get byte-identical inputs (each result carries input and output checksums, compared by
@@ -261,6 +261,7 @@ builds get byte-identical inputs (each result carries input and output checksums
 |---|---|---|
 | BM-03 | `resetData({ seed: 7, transactionCount: 10000 })` (syncs the replica) | `computeSpendingSummary('2026-09')` |
 | BM-04 | payload: the seed-2026 × 5,000 dataset paged out of the core, ids `in-…`, canonical JSON; before every run `resetData(DEFAULT_DATASET)` | `ingestTransactions(payload)` |
+| BM-04b | as BM-04, plus `stageIngestPayload(payload)` before every run: the payload is already on the core's side, as a network response would be in a core that owns the network | `ingestStaged()` |
 | BM-06 | 10,000 deterministic amounts | 10,000 × `formatMoney`, then 1 × `formatMoneyBatch`, then 10,000 × `echo` (call cost with no work: `echoEndToEndMs`) |
 
 Each cold start runs the warm-up and measured iterations; rounds alternate builds and wait for
@@ -277,7 +278,8 @@ and `dumpsys meminfo`. `collect.ts` reports, in MB:
 
 | Metric | Per | Meaning |
 |---|---|---|
-| `rssBaseline` | cold start | median RSS over the idle second before `measure-start` |
+| `rssStart` | cold start | median RSS over the first second of samples (~0.5 s after launch, before setup and warm-up) |
+| `rssBaseline` | cold start | median RSS over the idle second before `measure-start`, i.e. **after** setup and the warm-up runs: it includes whatever the warm-up left behind |
 | `rssPeak`, `rssPeakOverBaseline` | cold start | max RSS from `measure-start` to `measure-end`, and minus the baseline |
 | `rssOpDelta` | measured call | max RSS during the call − the last sample before it |
 | `vmHwm` | cold start | kernel peak RSS since process start (includes startup and setup) |
@@ -334,6 +336,7 @@ iOS has no equivalent yet.
 | **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, CPU per thread (JS, UI, Render), RAM. Flashlight has no JS FPS or frame overrun on Android | Flashlight + adb input (§5 note) | H4 (control) |
 | **BM-03** | **Spending summary from 10,000 ledger entries** (group by category and day, totals, balance check) | End-to-end ms, compute ms | In-app harness | H1 |
 | **BM-04** | **Ingest 5,000 transactions** from JSON → validate → write to SQLite cache | End-to-end ms, peak memory | In-app harness + `dumpsys meminfo` | H1 |
+| **BM-04b** | BM-04 with the payload **already in the core** (staged before the timed call), as if the core had fetched it | End-to-end ms | In-app harness | H1 |
 | **BM-05** | **Live price stream**: 20 assets × 10 ticks/s for 15 s, with throttled UI updates | JS-thread CPU, JS FPS, UI FPS, RAM | Flashlight + Maestro | H2 |
 | **BM-06** | **Bridge stress**: 10,000 sequential tiny calls (e.g. `formatMoney`) and 1 batched call with 10,000 items | Total ms, ms per call | In-app harness | H3 |
 | **BM-07** | **Full transfer flow** (Home → Send → amount → review → PIN → result), fake latency fixed at 300 ms | Flow duration, FPS during transitions, CPU | Flashlight + Maestro | H4 |
@@ -343,6 +346,7 @@ iOS has no equivalent yet.
 ### Scenario notes
 
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
+- **BM-04 vs BM-04b** (added 2026-10-11): BM-04 passes the 1.3 MB payload from JS into the core inside the timed call, which is the path when data starts in JS. In a KMP app whose core owns the network, the response arrives in Kotlin and never crosses the bridge; BM-04b measures that path. Report both.
 - **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
 - **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
 - **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.

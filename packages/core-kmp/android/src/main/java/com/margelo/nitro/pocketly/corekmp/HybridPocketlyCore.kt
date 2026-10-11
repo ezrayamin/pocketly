@@ -51,6 +51,12 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun ingestTransactions(json: String): Promise<IngestResult> =
         Promise.async { core.ingestTransactions(json).toNitro() }
 
+    override fun stageIngestPayload(json: String): Promise<Unit> =
+        Promise.async { core.stageIngestPayload(json) }
+
+    override fun ingestStaged(): Promise<IngestResult> =
+        Promise.async { core.ingestStaged().toNitro() }
+
     override fun echo(value: Double): Double = core.echo(value)
 
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
