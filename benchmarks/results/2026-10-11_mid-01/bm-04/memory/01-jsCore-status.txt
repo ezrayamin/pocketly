@@ -1,0 +1,54 @@
+Name:	com.pocketly.js
+Umask:	0077
+State:	S (sleeping)
+Tgid:	12911
+Ngid:	0
+Pid:	12911
+PPid:	1915
+TracerPid:	0
+Uid:	10536	10536	10536	10536
+Gid:	10536	10536	10536	10536
+FDSize:	256
+Groups:	3003 9997 20536 50536 99909997 
+Kthread:	0
+VmPeak:	19108964 kB
+VmSize:	19091444 kB
+VmLck:	       0 kB
+VmPin:	       0 kB
+VmHWM:	  208940 kB
+VmRSS:	  203668 kB
+RssAnon:	   75908 kB
+RssFile:	  125988 kB
+RssShmem:	    1772 kB
+VmData:	 1043068 kB
+VmStk:	    8192 kB
+VmExe:	       8 kB
+VmLib:	  201800 kB
+VmPTE:	    1872 kB
+VmSwap:	   31324 kB
+CoreDumping:	0
+THP_enabled:	1
+untag_mask:	0xffffffffffffff
+Threads:	38
+SigQ:	1/27307
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000080001204
+SigIgn:	0000000000000001
+SigCgt:	0000006e400084f8
+CapInh:	0000000000000000
+CapPrm:	0000000000000000
+CapEff:	0000000000000000
+CapBnd:	0000000000000000
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	2
+Seccomp_filters:	1
+Speculation_Store_Bypass:	thread vulnerable
+SpeculationIndirectBranch:	unknown
+Cpus_allowed:	ff
+Cpus_allowed_list:	0-7
+Mems_allowed:	1
+Mems_allowed_list:	0
+voluntary_ctxt_switches:	541
+nonvoluntary_ctxt_switches:	37

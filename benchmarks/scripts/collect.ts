@@ -152,8 +152,11 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
   const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
   const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
   const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
-  // §4.3: for timings, the CV rule applies only above a 2 ms median (timer precision).
-  const noisy = BUILDS.filter((b) => s[b].cv > 0.1 && (unit !== 'ms' || s[b].median > 2));
+  // §4.3: for timings, the CV rule applies only above a 2 ms median (timer precision); rates
+  // under 5% (janky frames) are judged in percentage points, not by CV.
+  const noisy = BUILDS.filter(
+    (b) => s[b].cv > 0.1 && (unit !== 'ms' || s[b].median > 2) && (unit !== '%' || s[b].median >= 5),
+  );
   const meaningful = Math.abs(diff) > 0.05 && !overlap;
   const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
   comparisons.push({ scenario, metric, unit, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });
@@ -249,6 +252,18 @@ function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: st
   verdicts.push(
     `${scenario} inputs and outputs ${same ? 'identical in both builds' : 'DIFFER between builds'}: ` +
       `jsCore ${[...sums.jsCore].join(', ')} · kmpCore ${[...sums.kmpCore].join(', ')}`,
+  );
+  collectRetries(raw, scenario, verdicts);
+}
+
+/** <dir>/retries.csv (bm-harness.sh): cold starts relaunched because none of their log lines arrived. */
+function collectRetries(dir: string, label: string, verdicts: string[]) {
+  const file = join(dir, 'retries.csv');
+  if (!existsSync(file)) return;
+  const rows = readFileSync(file, 'utf8').trim().split('\n').slice(1).filter(Boolean);
+  verdicts.push(
+    `${label}: ${rows.length} cold start(s) relaunched (excluded, §4.3)` +
+      (rows.length ? `: ${rows.map((r) => r.split(',').slice(0, 2).join(' ')).join('; ')}` : ''),
   );
 }
 
@@ -352,6 +367,7 @@ function collectMemory(raw: string, scenario: string, rows: Row[], verdicts: str
       `, VmSwap moved > 1 MB in ${swapRounds} round(s), inputs and outputs ${same ? 'identical in both builds' : 'DIFFER between builds'}` +
       (problems.length ? ` · ⚠ skipped: ${problems.join('; ')}` : ''),
   );
+  collectRetries(dir, `${scenario} memory rounds`, verdicts);
 }
 
 /**

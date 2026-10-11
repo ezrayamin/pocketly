@@ -1,0 +1,6 @@
+{ "scenario": "BM-04", "rounds": 5, "runsPerRound": 10, "warmupPerRound": 5,
+  "order": "alternating js,kmp per round, one cold start per build per round",
+  "tool": "in-app harness (apps/mobile/src/bench) via launch arguments, perf builds",
+  "coolDownToC": 40, "adbTransport": "default",
+  "memory": { "sampler": "rss-sampler.sh (VmRSS, VmSwap)", "intervalS": 0.002 },
+  "at": "2026-10-11T08:52:06Z" }

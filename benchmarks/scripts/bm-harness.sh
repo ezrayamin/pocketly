@@ -11,6 +11,11 @@
 # - Before each launch: adb answers (else `adb reconnect`), and the battery is at most
 #   COOL_C °C (default 40); the start temperature goes to <scenario>/temperatures.csv.
 # - Raw files are never edited by hand. collect.ts summarizes them.
+# - On the vivo V2538 a cold start can come up with none of its log lines in logcat (seen
+#   2026-10-11: the app ran and showed its result, logcat had nothing from its process). A
+#   normal start logs ~150 lines within 2 s, so with fewer than 10 after LOG_CHECK_S (15 s)
+#   the cold start is relaunched, at most MAX_RETRIES (2) times, and the retry is recorded in
+#   <scenario>/retries.csv (benchmarking.md §4.3: exclude only failed iterations, say how many).
 # - MEMORY=1: memory rounds, kept apart from the timing rounds in <scenario>/memory/. The app
 #   logs bench-mark phase markers (pocketly.benchMemory) and rss-sampler.sh, running on the
 #   device, records VmRSS/VmSwap every SAMPLE_S (default 0.002) into <round>-<build>-rss.txt.
@@ -30,11 +35,14 @@ MEMORY="${MEMORY:-0}"
 SAMPLE_S="${SAMPLE_S:-0.002}"
 RAW="$OUT_DIR/$(tr A-Z a-z <<<"$SCENARIO")"
 [ "$MEMORY" = 1 ] && RAW="$RAW/memory"
+MAX_RETRIES="${MAX_RETRIES:-2}"
+LOG_CHECK_S="${LOG_CHECK_S:-15}"
 SAMPLER=/data/local/tmp/pocketly-rss-sampler.sh
 SAMPLES=/data/local/tmp/pocketly-rss.txt
 
 mkdir -p "$RAW"
 [ -f "$RAW/temperatures.csv" ] || echo "round,build,startC,at" > "$RAW/temperatures.csv"
+[ -f "$RAW/retries.csv" ] || echo "round,build,attempt,reason,at" > "$RAW/retries.csv"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$OUT_DIR/device.json" ] || "$HERE/device-info.sh" "$OUT_DIR"
 [ "$MEMORY" = 1 ] && adb push "$HERE/rss-sampler.sh" "$SAMPLER" >/dev/null
@@ -67,42 +75,64 @@ stop_sampler() { # the sampler ends by itself when the app's process goes; this 
   adb shell 'pkill -f "^sh /data/local/tmp/pocketly-rss-sampler"; pkill -f "^sleep 86398"' >/dev/null 2>&1 || true
 }
 
-run_one() { # <round> <build>
-  local round=$1 build=$2 pkg log deadline pid base
-  pkg=$(pkg_of "$build")
-  base="$RAW/$(printf '%02d' "$round")-$build"
-  adb_alive
-  cool_down "$round" "$build"
-  adb shell am force-stop "$pkg"
+launch() { # <pkg>: cold start with this scenario's launch arguments; prints the pid
+  adb shell am force-stop "$1"
   adb logcat -c
   adb shell input keyevent KEYCODE_WAKEUP
   if [ "$MEMORY" = 1 ]; then
     stop_sampler
     adb shell rm -f "$SAMPLES"
   fi
-  adb shell am start -W -n "$pkg/$ACTIVITY" -e pocketly.bench "$SCENARIO" \
+  adb shell am start -W -n "$1/$ACTIVITY" -e pocketly.bench "$SCENARIO" \
     --ei pocketly.benchRuns "$RUNS" --ei pocketly.benchWarmup "$WARMUP" \
     -e pocketly.benchMemory "$([ "$MEMORY" = 1 ] && echo true || echo false)" >/dev/null
-  if [ "$MEMORY" = 1 ]; then
-    # The harness waits 500 ms, sets up, warms up, then idles MEMORY_SETTLE_MS before
-    # measure-start: the sampler is running long before the baseline window.
-    pid=$(adb shell pidof -s "$pkg" | tr -d '\r')
-    [ -n "$pid" ] || { echo "✗ round $round $build: $pkg not running after start" >&2; exit 1; }
-    adb shell "nohup sh $SAMPLER $pid $SAMPLES $SAMPLE_S >/dev/null 2>&1 &"
-  fi
-  deadline=$(($(date +%s) + TIMEOUT_S))
+  adb shell pidof -s "$1" | tr -d '\r'
+}
+
+wait_result() { # <round> <build> <pid>: sets $log; returns 1 if the process logged nothing
+  local started deadline checked=0 lines
+  started=$(date +%s)
+  deadline=$((started + TIMEOUT_S))
   while :; do
     sleep 5
     adb_alive
     log=$(adb logcat -d -s ReactNativeJS:V | tr -d '\r')
-    grep -q "\[Pocketly\] bench-done $SCENARIO" <<<"$log" && break
+    grep -q "\[Pocketly\] bench-done $SCENARIO" <<<"$log" && return 0
     if grep -q "\[Pocketly\] bench-failed" <<<"$log"; then
-      echo "✗ round $round $build: $(grep -o '\[Pocketly\] bench-failed.*' <<<"$log" | head -1)" >&2
+      echo "✗ round $1 $2: $(grep -o '\[Pocketly\] bench-failed.*' <<<"$log" | head -1)" >&2
       exit 1
     fi
-    [ "$(date +%s)" -lt "$deadline" ] || { echo "✗ round $round $build: no result after ${TIMEOUT_S}s" >&2; exit 1; }
+    if [ "$checked" = 0 ] && [ $(($(date +%s) - started)) -ge "$LOG_CHECK_S" ]; then
+      checked=1
+      lines=$(adb shell logcat -d --pid="$3" | wc -l | tr -d ' ')
+      [ "$lines" -ge 10 ] || return 1
+    fi
+    [ "$(date +%s)" -lt "$deadline" ] || { echo "✗ round $1 $2: no result after ${TIMEOUT_S}s" >&2; exit 1; }
   done
-  # Join the chunks in order (the log may hold several result sets if a run was retried).
+}
+
+run_one() { # <round> <build>
+  local round=$1 build=$2 pkg log pid base attempt=1
+  pkg=$(pkg_of "$build")
+  base="$RAW/$(printf '%02d' "$round")-$build"
+  adb_alive
+  cool_down "$round" "$build"
+  while :; do
+    pid=$(launch "$pkg")
+    [ -n "$pid" ] || { echo "✗ round $round $build: $pkg not running after start" >&2; exit 1; }
+    if [ "$MEMORY" = 1 ]; then
+      # The harness waits 500 ms, sets up, warms up, then idles MEMORY_SETTLE_MS before
+      # measure-start: the sampler is running long before the baseline window.
+      adb shell "nohup sh $SAMPLER $pid $SAMPLES $SAMPLE_S >/dev/null 2>&1 &"
+    fi
+    wait_result "$round" "$build" "$pid" && break
+    echo "$round,$build,$attempt,no log lines from pid $pid after ${LOG_CHECK_S}s,$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$RAW/retries.csv"
+    adb shell am force-stop "$pkg"
+    [ "$attempt" -le "$MAX_RETRIES" ] || { echo "✗ round $round $build: no log lines after $attempt launches" >&2; exit 1; }
+    echo "  ⟳ no log lines from $pkg (pid $pid) after ${LOG_CHECK_S}s: relaunching"
+    attempt=$((attempt + 1))
+  done
+  # Join the chunks in order.
   grep -oE '\[Pocketly\] bench-chunk [0-9]+/[0-9]+ .*' <<<"$log" |
     sed -E 's/^\[Pocketly\] bench-chunk [0-9]+\/[0-9]+ //' | tr -d '\n' > "$base.json"
   node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$base.json" ||

@@ -157,6 +157,15 @@ Record each device's **model, chipset, RAM, Android version and build number** i
   the jitter of three clocks. Sub-2 ms timings are still reported with their CV, IQR and CI;
   they just don't trigger a rerun. Non-time metrics (frame rate, CPU %, memory) keep the plain
   10% rule. (Added 2026-10-11, before the 2026-10-11 session; earlier summaries flag all rows.)
+  **For rate metrics under 5% (e.g. janky frames), judge differences in absolute percentage
+  points, not by CV.** A few frames move a 0.8% rate by a third, so its CV says nothing about
+  the environment. `collect.ts` doesn't flag their CV; the shift and its CI are in points.
+  (Added 2026-10-11, during that session's write-up.)
+- **Keep every iteration that completed; exclude only failed ones**, and report how many were
+  excluded. Flashlight: status `SUCCESS` is kept even if its trace lost events (that affects
+  the frame-time trace of that iteration, not whether it ran). Harness: a cold start whose
+  result was logged. Never drop an iteration because its numbers look odd. (`collect.ts` has
+  worked this way since the first BM-02 session; written down 2026-10-11.)
 - Treat a difference as meaningful only if it's **> 5%** *and* the IQRs don't overlap. Optional: a Mann-Whitney U test.
 
 ## 5. Tools
