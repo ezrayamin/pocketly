@@ -285,6 +285,11 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
+  double JHybridPocketlyCoreSpec::echo(double value) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<double(double /* value */)>("echo");
+    auto __result = method(_javaPart, value);
+    return __result;
+  }
   std::string JHybridPocketlyCoreSpec::formatMoney(double minor) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>(double /* minor */)>("formatMoney");
     auto __result = method(_javaPart, minor);

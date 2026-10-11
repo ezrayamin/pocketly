@@ -82,6 +82,11 @@ export class KmpCore implements Core {
     return this.native.ingestTransactions(json).catch(rethrow);
   }
 
+  // Straight through: it can't throw, and BM-06 times exactly this path.
+  echo(value: number): number {
+    return this.native.echo(value);
+  }
+
   formatMoney(minor: number): string {
     try {
       return this.native.formatMoney(minor);

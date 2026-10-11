@@ -178,6 +178,10 @@ export class JsCore implements Core {
     }
   }
 
+  echo(value: number): number {
+    return value;
+  }
+
   formatMoney(minor: number): string {
     return formatMoney(minor);
   }

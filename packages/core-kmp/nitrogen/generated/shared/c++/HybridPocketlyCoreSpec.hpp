@@ -95,6 +95,7 @@ namespace margelo::nitro::pocketly {
       virtual void setTimeZone(const std::string& zoneId) = 0;
       virtual std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) = 0;
       virtual std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) = 0;
+      virtual double echo(double value) = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;

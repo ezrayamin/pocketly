@@ -28,9 +28,9 @@ describe('bench harness (benchmarking.md §5.2)', () => {
     expect(output.checksum).toBe(checksum(JSON.stringify({ accepted: 100, rejected: 0, duplicates: 0, errors: [] })));
   });
 
-  it('BM-06 formats the same amounts one by one and in one batch', async () => {
+  it('BM-06 formats the same amounts one by one and in one batch, and echoes them', async () => {
     const r = await runBench('BM-06', opts);
-    expect(Object.keys(r.runs[0]).sort()).toEqual(['batchComputeMs', 'batchEndToEndMs', 'chattyEndToEndMs']);
+    expect(Object.keys(r.runs[0]).sort()).toEqual(['batchComputeMs', 'batchEndToEndMs', 'chattyEndToEndMs', 'echoEndToEndMs']);
     expect(r.output.checksum).not.toBe(checksum('MISMATCH'));
   });
 

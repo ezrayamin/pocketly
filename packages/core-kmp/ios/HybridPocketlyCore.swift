@@ -93,6 +93,10 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.ingestTransactions(json: json).toNitro() }
   }
 
+  func echo(value: Double) throws -> Double {
+    return core.echo(value: value)
+  }
+
   func formatMoney(minor: Double) throws -> String {
     return core.formatMoney(minor: try convert.toLongExact(value: minor, field: "amount"))
   }

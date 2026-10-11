@@ -250,7 +250,7 @@ builds get byte-identical inputs (each result carries input and output checksums
 |---|---|---|
 | BM-03 | `resetData({ seed: 7, transactionCount: 10000 })` (syncs the replica) | `computeSpendingSummary('2026-09')` |
 | BM-04 | payload: the seed-2026 × 5,000 dataset paged out of the core, ids `in-…`, canonical JSON; before every run `resetData(DEFAULT_DATASET)` | `ingestTransactions(payload)` |
-| BM-06 | 10,000 deterministic amounts | 10,000 × `formatMoney`, then 1 × `formatMoneyBatch` |
+| BM-06 | 10,000 deterministic amounts | 10,000 × `formatMoney`, then 1 × `formatMoneyBatch`, then 10,000 × `echo` (call cost with no work: `echoEndToEndMs`) |
 
 Each cold start runs the warm-up and measured iterations; rounds alternate builds and wait for
 the battery to cool (`temperatures.csv`), as BM-02 does.

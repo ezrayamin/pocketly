@@ -221,6 +221,14 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline double echo(double value) override {
+      auto __result = _swiftPart.echo(std::forward<decltype(value)>(value));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline std::string formatMoney(double minor) override {
       auto __result = _swiftPart.formatMoney(std::forward<decltype(minor)>(minor));
       if (__result.hasError()) [[unlikely]] {

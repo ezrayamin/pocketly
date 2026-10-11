@@ -85,6 +85,10 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(core.formatMoney(minor)).toBe(expected);
       });
 
+      it('echo returns its argument (BM-06 call-cost probe)', () => {
+        for (const v of [0, -1.5, 42, Number.MAX_SAFE_INTEGER]) expect(core.echo(v)).toBe(v);
+      });
+
       it('formatMoneyBatch matches formatMoney element-wise', () => {
         const minors = money.format.map((c) => c.minor);
         expect(core.formatMoneyBatch(minors)).toEqual(money.format.map((c) => c.expected));

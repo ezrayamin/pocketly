@@ -72,6 +72,10 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun echo(value: Double): Double
+  
+  @DoNotStrip
+  @Keep
   abstract fun formatMoney(minor: Double): String
   
   @DoNotStrip

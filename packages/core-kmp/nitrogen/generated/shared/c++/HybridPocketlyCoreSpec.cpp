@@ -24,6 +24,7 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("setTimeZone", &HybridPocketlyCoreSpec::setTimeZone);
       prototype.registerHybridMethod("computeSpendingSummary", &HybridPocketlyCoreSpec::computeSpendingSummary);
       prototype.registerHybridMethod("ingestTransactions", &HybridPocketlyCoreSpec::ingestTransactions);
+      prototype.registerHybridMethod("echo", &HybridPocketlyCoreSpec::echo);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("formatMoneyBatch", &HybridPocketlyCoreSpec::formatMoneyBatch);
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);

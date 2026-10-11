@@ -682,6 +682,15 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Result<std::shared_ptr<Promise<IngestResult>>>::withError(error);
   }
   
+  // pragma MARK: Result<double>
+  using Result_double_ = Result<double>;
+  inline Result_double_ create_Result_double_(double value) noexcept {
+    return Result<double>::withValue(std::move(value));
+  }
+  inline Result_double_ create_Result_double_(const std::exception_ptr& error) noexcept {
+    return Result<double>::withError(error);
+  }
+  
   // pragma MARK: Result<std::string>
   using Result_std__string_ = Result<std::string>;
   inline Result_std__string_ create_Result_std__string_(const std::string& value) noexcept {
@@ -716,15 +725,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridPriceSubscriptionSpec__ create_Result_std__shared_ptr_HybridPriceSubscriptionSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridPriceSubscriptionSpec>>::withError(error);
-  }
-  
-  // pragma MARK: Result<double>
-  using Result_double_ = Result<double>;
-  inline Result_double_ create_Result_double_(double value) noexcept {
-    return Result<double>::withValue(std::move(value));
-  }
-  inline Result_double_ create_Result_double_(const std::exception_ptr& error) noexcept {
-    return Result<double>::withError(error);
   }
 
 } // namespace margelo::nitro::pocketly::bridge::swift

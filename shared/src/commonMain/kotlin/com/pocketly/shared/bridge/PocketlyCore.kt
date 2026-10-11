@@ -163,6 +163,9 @@ class PocketlyCore internal constructor(
 
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
+    /** BM-06: the pure cost of a call. No conversion, so only the crossing is timed. */
+    fun echo(value: Double): Double = value
+
     fun formatMoney(minor: Long): String = MoneyFormatter.format(Money(minor))
 
     fun formatMoneyBatch(minors: LongArray): List<String> {

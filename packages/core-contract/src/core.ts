@@ -78,6 +78,11 @@ export interface Core {
   ingestTransactions(json: string): Promise<IngestResult>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
+  /**
+   * Returns its argument and does nothing else: BM-06 times it to get the pure cost of a call
+   * (in kmpCore, one JS → Nitro → Kotlin round trip; in jsCore, a plain function call).
+   */
+  echo(value: number): number;
   formatMoney(minor: MinorUnits): string;
   formatMoneyBatch(minors: MinorUnits[]): string[];
   parseMoney(input: string): MoneyParseResult;

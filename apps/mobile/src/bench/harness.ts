@@ -173,6 +173,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
     }
     case 'BM-06': {
       const minors = amounts(Math.max(2, Math.round(BM06_COUNT * (options.scale ?? 1))));
+      const echoTotal = minors.reduce((a, b) => a + b, 0);
       const setupMs = now() - setupStart;
       let last = '';
       const runs = await repeat(options, async () => {
@@ -183,8 +184,14 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         const t1 = now();
         const batch = core.formatMoneyBatch(minors);
         const batchEndToEndMs = now() - t1;
-        last = one.join('|') === batch.join('|') ? batch.join('|') : 'MISMATCH';
-        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: core.lastComputeMs() };
+        // Pure call cost: the same number of calls as the chatty loop, with no work in the core.
+        const t2 = now();
+        let echoed = 0;
+        for (let i = 0; i < minors.length; i++) echoed += core.echo(minors[i]);
+        const echoEndToEndMs = now() - t2;
+        const formatted = one.join('|') === batch.join('|') ? batch.join('|') : 'MISMATCH';
+        last = echoed === echoTotal ? formatted : 'MISMATCH';
+        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: core.lastComputeMs(), echoEndToEndMs };
       });
       return {
         scenario,
@@ -192,7 +199,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         warmup: options.warmup,
         runs,
         input: { description: `${minors.length} amounts, LCG seed 12345`, checksum: checksum(minors.join(',')) },
-        output: { description: 'formatted amounts (chatty and batch must match)', checksum: checksum(last) },
+        output: { description: 'formatted amounts (chatty and batch must match; echo must return its inputs)', checksum: checksum(last) },
         setupMs,
       };
     }

@@ -47,6 +47,7 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
   ingestTransactions(json: string): Promise<IngestResult>;
 
+  echo(value: number): number;
   formatMoney(minor: number): string;
   formatMoneyBatch(minors: number[]): string[];
   parseMoney(input: string): MoneyParseResult;
