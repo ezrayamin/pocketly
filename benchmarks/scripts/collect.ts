@@ -253,6 +253,108 @@ function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: st
 }
 
 /**
+ * Memory rounds (bm-harness.sh MEMORY=1): <scenario>/memory/<round>-<build>{-rss.txt,
+ * -logcat.txt, -status.txt, -meminfo.txt}. RSS samples ("<epoch s> <VmRSS kB> <VmSwap kB>") are
+ * lined up with the harness's bench-mark lines (logcat -v epoch, same clock). Per round:
+ * baseline = median RSS over the idle second before measure-start; peak = max RSS from
+ * measure-start to measure-end. Per measured op: max RSS between op-start and op-end minus the
+ * last sample before op-start. Plus VmHWM and `dumpsys meminfo` taken after the run.
+ */
+const MEMORY_BASELINE_S = 1; // harness MEMORY_SETTLE_MS
+const MEMINFO_METRICS: { metric: string; rx: RegExp }[] = [
+  { metric: 'meminfoTotalPss', rx: /TOTAL PSS:\s+(\d+)/ },
+  { metric: 'meminfoTotalRss', rx: /TOTAL RSS:\s+(\d+)/ },
+  { metric: 'meminfoJavaHeapPss', rx: /^\s*Java Heap:\s+(\d+)/m },
+  { metric: 'meminfoNativeHeapPss', rx: /^\s*Native Heap:\s+(\d+)\s+\d+\s*$/m },
+];
+
+function collectMemory(raw: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const dir = join(raw, 'memory');
+  if (!existsSync(join(dir, 'meta.json'))) return;
+  const mb = (kb: number) => kb / 1024;
+  const values: Record<string, Record<Build, number[]>> = {};
+  const add = (metric: string, build: Build, v: number) => {
+    values[metric] ??= { jsCore: [], kmpCore: [] };
+    values[metric][build].push(v);
+  };
+  const sums: Record<Build, Set<string>> = { jsCore: new Set(), kmpCore: new Set() };
+  const problems: string[] = [];
+  const gapsMs: number[] = [];
+  let swapRounds = 0;
+  let rounds = 0;
+
+  for (const file of readdirSync(dir).filter((f) => /^\d+-(jsCore|kmpCore)\.json$/.test(f)).sort()) {
+    const base = join(dir, file.replace('.json', ''));
+    const build = file.split('-')[1].replace('.json', '') as Build;
+    const result = JSON.parse(readFileSync(`${base}.json`, 'utf8')) as HarnessResult;
+    sums[build].add(`${result.input.checksum} → ${result.output.checksum}`);
+
+    const marks = new Map<string, number>();
+    for (const line of readFileSync(`${base}-logcat.txt`, 'utf8').split('\n')) {
+      const m = /^\s*(\d+\.\d+)\s.*\[Pocketly\] bench-mark (.+)$/.exec(line);
+      if (m) marks.set(m[2].trim(), Number(m[1]));
+    }
+    const samples = readFileSync(`${base}-rss.txt`, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => l.split(' ').map(Number))
+      .filter((s) => s.length === 3 && s.every(Number.isFinite))
+      .map(([t, rss, swap]) => ({ t, rss, swap }));
+    const start = marks.get('measure-start');
+    const end = marks.get('measure-end');
+    if (start === undefined || end === undefined || samples.length === 0) {
+      problems.push(`${file}: missing markers or samples`);
+      continue;
+    }
+    const between = (from: number, to: number) => samples.filter((s) => s.t >= from && s.t <= to);
+    const idle = between(start - MEMORY_BASELINE_S, start);
+    const block = between(start, end);
+    if (idle.length < 10 || block.length < 2) {
+      problems.push(`${file}: only ${idle.length} baseline / ${block.length} measured samples`);
+      continue;
+    }
+    rounds++;
+    for (let i = 1; i < block.length; i++) gapsMs.push((block[i].t - block[i - 1].t) * 1000);
+    const baseline = stats(idle.map((s) => s.rss)).median;
+    const peak = Math.max(...block.map((s) => s.rss));
+    add('rssBaseline', build, mb(baseline));
+    add('rssPeak', build, mb(peak));
+    add('rssPeakOverBaseline', build, mb(peak - baseline));
+    const swaps = [...idle, ...block].map((s) => s.swap);
+    if (Math.max(...swaps) - Math.min(...swaps) > 1024) swapRounds++;
+
+    for (let i = 0; marks.has(`op-start ${i}`); i++) {
+      const opStart = marks.get(`op-start ${i}`)!;
+      const opEnd = marks.get(`op-end ${i}`);
+      const before = samples.filter((s) => s.t <= opStart).at(-1);
+      if (opEnd === undefined || !before) continue;
+      const during = between(opStart, opEnd);
+      add('rssOpDelta', build, mb(Math.max(before.rss, ...during.map((s) => s.rss)) - before.rss));
+    }
+
+    const hwm = /^VmHWM:\s+(\d+)/m.exec(readFileSync(`${base}-status.txt`, 'utf8'));
+    if (hwm) add('vmHwm', build, mb(Number(hwm[1])));
+    const meminfo = readFileSync(`${base}-meminfo.txt`, 'utf8');
+    for (const { metric, rx } of MEMINFO_METRICS) {
+      const m = rx.exec(meminfo);
+      if (m) add(metric, build, mb(Number(m[1])));
+    }
+  }
+
+  for (const [metric, byBuild] of Object.entries(values)) {
+    if (byBuild.jsCore.length > 1 && byBuild.kmpCore.length > 1) compare(scenario, metric, 'MB', byBuild, rows, verdicts);
+  }
+  const same = sums.jsCore.size === 1 && sums.kmpCore.size === 1 && [...sums.jsCore][0] === [...sums.kmpCore][0];
+  const gap = gapsMs.length ? stats(gapsMs) : undefined;
+  verdicts.push(
+    `${scenario} memory rounds: ${rounds} usable cold starts` +
+      (gap ? `, RSS sampled every ${gap.median.toFixed(1)} ms (median; max gap ${gap.max.toFixed(1)} ms)` : '') +
+      `, VmSwap moved > 1 MB in ${swapRounds} round(s), inputs and outputs ${same ? 'identical in both builds' : 'DIFFER between builds'}` +
+      (problems.length ? ` · ⚠ skipped: ${problems.join('; ')}` : ''),
+  );
+}
+
+/**
  * `dumpsys gfxinfo` per iteration (<scenario>/gfxinfo/<block>-<build>/<n>.txt), reset right
  * before the measured part: frame-level numbers that don't drop when the list is at rest.
  */
@@ -394,7 +496,10 @@ function main() {
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
-  for (const scenario of ['BM-03', 'BM-04', 'BM-06']) collectHarness(dir, scenario, rows, verdicts);
+  for (const scenario of ['BM-03', 'BM-04', 'BM-06']) {
+    collectHarness(dir, scenario, rows, verdicts);
+    collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
+  }
   collectSize(dir, rows, verdicts, extra);
   collectDownload(dir, verdicts, extra);
 

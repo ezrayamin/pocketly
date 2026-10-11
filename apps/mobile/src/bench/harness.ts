@@ -35,6 +35,11 @@ export interface BenchOptions {
   warmup: number;
   /** Tests only: smaller datasets. */
   scale?: number;
+  /**
+   * Memory round (bm-harness.sh MEMORY=1): logs phase markers that the runner lines up with
+   * its VmRSS samples by logcat time. Off in timing rounds, so they log nothing extra.
+   */
+  memory?: boolean;
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -111,14 +116,37 @@ function amounts(count: number): number[] {
   return out;
 }
 
-async function repeat(options: BenchOptions, body: () => Promise<BenchRun>): Promise<BenchRun[]> {
+/** Idle time before the measured runs of a memory round: the runner's baseline window. */
+export const MEMORY_SETTLE_MS = 1000;
+
+/** `[Pocketly] bench-mark <event>`; collect.ts reads these from logcat (`-v epoch`). */
+function logMark(event: string): void {
+  console.info(`[Pocketly] bench-mark ${event}`);
+}
+
+/**
+ * Runs `body` warmup + runs times; returns the measured runs. Each body calls `mark('op-start')`
+ * just before its timed part and `mark('op-end')` just after, both outside the timed span. In a
+ * memory round the measured block is preceded by MEMORY_SETTLE_MS idle and logged as
+ * `measure-start`, `op-start <i>`/`op-end <i>` per run, and `measure-end`.
+ */
+type Mark = (event: 'op-start' | 'op-end') => void;
+const noMark: Mark = () => {};
+
+async function repeat(options: BenchOptions, body: (mark: Mark) => Promise<BenchRun>): Promise<BenchRun[]> {
   const total = options.warmup + options.runs;
   const runs: BenchRun[] = [];
   for (let i = 0; i < total; i++) {
-    const run = await body();
-    if (i >= options.warmup) runs.push(run);
+    const measured = i - options.warmup;
+    if (options.memory && measured === 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, MEMORY_SETTLE_MS));
+      logMark('measure-start');
+    }
+    const run = await body(options.memory && measured >= 0 ? (event) => logMark(`${event} ${measured}`) : noMark);
+    if (measured >= 0) runs.push(run);
     options.onProgress?.(i + 1, total);
   }
+  if (options.memory) logMark('measure-end');
   return runs;
 }
 
@@ -131,10 +159,12 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       const month = BM03_MONTH;
       const setupMs = now() - setupStart;
       let last = '';
-      const runs = await repeat(options, async () => {
+      const runs = await repeat(options, async (mark) => {
+        mark('op-start');
         const t0 = now();
         const summary = await core.computeSpendingSummary(month);
         const endToEndMs = now() - t0;
+        mark('op-end');
         last = JSON.stringify(summary);
         return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
       });
@@ -153,11 +183,13 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       const payload = JSON.stringify((await allTransactions()).map((tx) => canonical({ ...tx, id: tx.id.replace(/^tx-/, 'in-') })));
       const setupMs = now() - setupStart;
       let last = '';
-      const runs = await repeat(options, async () => {
+      const runs = await repeat(options, async (mark) => {
         await core.resetData(DEFAULT_DATASET); // same starting replica for every run (not timed)
+        mark('op-start');
         const t0 = now();
         const result = await core.ingestTransactions(payload);
         const endToEndMs = now() - t0;
+        mark('op-end');
         last = JSON.stringify(result);
         return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
       });
@@ -176,7 +208,8 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       const echoTotal = minors.reduce((a, b) => a + b, 0);
       const setupMs = now() - setupStart;
       let last = '';
-      const runs = await repeat(options, async () => {
+      const runs = await repeat(options, async (mark) => {
+        mark('op-start');
         const t0 = now();
         const one: string[] = new Array(minors.length);
         for (let i = 0; i < minors.length; i++) one[i] = core.formatMoney(minors[i]);
@@ -189,6 +222,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         let echoed = 0;
         for (let i = 0; i < minors.length; i++) echoed += core.echo(minors[i]);
         const echoEndToEndMs = now() - t2;
+        mark('op-end');
         const formatted = one.join('|') === batch.join('|') ? batch.join('|') : 'MISMATCH';
         last = echoed === echoTotal ? formatted : 'MISMATCH';
         return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: core.lastComputeMs(), echoEndToEndMs };

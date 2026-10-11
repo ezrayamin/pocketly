@@ -242,7 +242,7 @@ which is kept out of compute in both cores:
 For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
 
 **Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
-build started with `pocketly.bench=BM-03|BM-04|BM-06` (plus `benchRuns`, `benchWarmup`) renders
+build started with `pocketly.bench=BM-03|BM-04|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders
 only the harness screen, runs the scenario in-process and logs the result to logcat, where the
 runner collects it. Inputs are built through the `Core` API rather than bundled files, so both
 builds get byte-identical inputs (each result carries input and output checksums, compared by
@@ -256,6 +256,26 @@ builds get byte-identical inputs (each result carries input and output checksums
 
 Each cold start runs the warm-up and measured iterations; rounds alternate builds and wait for
 the battery to cool (`temperatures.csv`), as BM-02 does.
+
+**Memory rounds** (`MEMORY=1 bm-harness.sh …`, BM-04's peak memory) are separate from the
+timing rounds and go to `<scenario>/memory/`; their timings are not used. The app gets
+`pocketly.benchMemory=true`, idles 1 s after the warm-up and logs `bench-mark` lines:
+`measure-start`, `op-start <i>`/`op-end <i>` around each measured call (outside the timed
+span), `measure-end`. Meanwhile `rss-sampler.sh`, running on the device, appends VmRSS and
+VmSwap from `/proc/<pid>/status` every ~2–4 ms, timestamped with the shell's `$EPOCHREALTIME`,
+the clock `logcat -v epoch` uses. After the run the runner saves `/proc/<pid>/status` (VmHWM)
+and `dumpsys meminfo`. `collect.ts` reports, in MB:
+
+| Metric | Per | Meaning |
+|---|---|---|
+| `rssBaseline` | cold start | median RSS over the idle second before `measure-start` |
+| `rssPeak`, `rssPeakOverBaseline` | cold start | max RSS from `measure-start` to `measure-end`, and minus the baseline |
+| `rssOpDelta` | measured call | max RSS during the call − the last sample before it |
+| `vmHwm` | cold start | kernel peak RSS since process start (includes startup and setup) |
+| `meminfoTotalPss`, `meminfoTotalRss`, `meminfoJavaHeapPss`, `meminfoNativeHeapPss` | cold start | `dumpsys meminfo` App Summary after the run |
+
+RSS leaves out swapped pages, and this phone swaps to zram, so the verdict line counts rounds in
+which VmSwap moved more than 1 MB. A peak shorter than the sampling interval can be missed.
 
 ```json
 {

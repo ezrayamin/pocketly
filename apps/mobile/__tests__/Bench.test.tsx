@@ -34,6 +34,23 @@ describe('bench harness (benchmarking.md §5.2)', () => {
     expect(r.output.checksum).not.toBe(checksum('MISMATCH'));
   });
 
+  it('logs no markers in timing rounds, and phase markers around each measured op in memory rounds', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    const marks = () => info.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[Pocketly] bench-mark '));
+    await runBench('BM-04', opts);
+    expect(marks()).toEqual([]);
+    await runBench('BM-04', { ...opts, memory: true });
+    expect(marks().map((l) => l.replace('[Pocketly] bench-mark ', ''))).toEqual([
+      'measure-start',
+      'op-start 0',
+      'op-end 0',
+      'op-start 1',
+      'op-end 1',
+      'measure-end',
+    ]);
+    info.mockRestore();
+  });
+
   it('logs results in chunks that join back into the same JSON', () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const result: BenchResult = {
@@ -58,12 +75,18 @@ describe('bench harness (benchmarking.md §5.2)', () => {
 
 describe('bench launch arguments', () => {
   it('reads the scenario with default and given counts', () => {
-    expect(parseLaunchArgs({ bench: 'BM-03' }).bench).toEqual({ scenario: 'BM-03', runs: 10, warmup: 5 });
-    expect(parseLaunchArgs({ bench: 'BM-04', benchRuns: '20', benchWarmup: '0' }).bench).toEqual({ scenario: 'BM-04', runs: 20, warmup: 0 });
+    expect(parseLaunchArgs({ bench: 'BM-03' }).bench).toEqual({ scenario: 'BM-03', runs: 10, warmup: 5, memory: false });
+    expect(parseLaunchArgs({ bench: 'BM-04', benchRuns: '20', benchWarmup: '0', benchMemory: 'true' }).bench).toEqual({
+      scenario: 'BM-04',
+      runs: 20,
+      warmup: 0,
+      memory: true,
+    });
   });
 
   it('rejects unknown scenarios and bad counts', () => {
     expect(() => parseLaunchArgs({ bench: 'BM-99' })).toThrow(/bench="BM-99"/);
     expect(() => parseLaunchArgs({ bench: 'BM-03', benchRuns: '0' })).toThrow(/benchRuns/);
+    expect(() => parseLaunchArgs({ bench: 'BM-03', benchMemory: '1' })).toThrow(/benchMemory="1"/);
   });
 });

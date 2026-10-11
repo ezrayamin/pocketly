@@ -11,6 +11,11 @@
 # - Before each launch: adb answers (else `adb reconnect`), and the battery is at most
 #   COOL_C °C (default 40); the start temperature goes to <scenario>/temperatures.csv.
 # - Raw files are never edited by hand. collect.ts summarizes them.
+# - MEMORY=1: memory rounds, kept apart from the timing rounds in <scenario>/memory/. The app
+#   logs bench-mark phase markers (pocketly.benchMemory) and rss-sampler.sh, running on the
+#   device, records VmRSS/VmSwap every SAMPLE_S (default 0.002) into <round>-<build>-rss.txt.
+#   At the end of each run: /proc/<pid>/status (VmHWM), `dumpsys meminfo`, and logcat with
+#   epoch times (to line markers up with samples). Timings from these rounds aren't used.
 set -euo pipefail
 
 OUT_DIR="${1:?usage: bm-harness.sh <results-dir> <BM-03|BM-04|BM-06> [rounds] [runs] [warmup]}"
@@ -21,12 +26,18 @@ WARMUP="${5:-5}"
 COOL_C="${COOL_C:-40}"
 TIMEOUT_S="${TIMEOUT_S:-900}"
 ACTIVITY="com.pocketly.MainActivity"
+MEMORY="${MEMORY:-0}"
+SAMPLE_S="${SAMPLE_S:-0.002}"
 RAW="$OUT_DIR/$(tr A-Z a-z <<<"$SCENARIO")"
+[ "$MEMORY" = 1 ] && RAW="$RAW/memory"
+SAMPLER=/data/local/tmp/pocketly-rss-sampler.sh
+SAMPLES=/data/local/tmp/pocketly-rss.txt
 
 mkdir -p "$RAW"
 [ -f "$RAW/temperatures.csv" ] || echo "round,build,startC,at" > "$RAW/temperatures.csv"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$OUT_DIR/device.json" ] || "$HERE/device-info.sh" "$OUT_DIR"
+[ "$MEMORY" = 1 ] && adb push "$HERE/rss-sampler.sh" "$SAMPLER" >/dev/null
 
 pkg_of() { [ "$1" = jsCore ] && echo com.pocketly.js || echo com.pocketly.kmp; }
 battery_c() { adb shell dumpsys battery | awk -F': ' '/^ *temperature:/ {printf "%.1f", $2 / 10}'; }
@@ -52,16 +63,33 @@ cool_down() { # <round> <build>
   echo "  battery $t °C"
 }
 
+stop_sampler() { # the sampler ends by itself when the app's process goes; this is the backstop
+  adb shell 'pkill -f "^sh /data/local/tmp/pocketly-rss-sampler"; pkill -f "^sleep 86398"' >/dev/null 2>&1 || true
+}
+
 run_one() { # <round> <build>
-  local round=$1 build=$2 pkg log deadline
+  local round=$1 build=$2 pkg log deadline pid base
   pkg=$(pkg_of "$build")
+  base="$RAW/$(printf '%02d' "$round")-$build"
   adb_alive
   cool_down "$round" "$build"
   adb shell am force-stop "$pkg"
   adb logcat -c
   adb shell input keyevent KEYCODE_WAKEUP
+  if [ "$MEMORY" = 1 ]; then
+    stop_sampler
+    adb shell rm -f "$SAMPLES"
+  fi
   adb shell am start -W -n "$pkg/$ACTIVITY" -e pocketly.bench "$SCENARIO" \
-    --ei pocketly.benchRuns "$RUNS" --ei pocketly.benchWarmup "$WARMUP" >/dev/null
+    --ei pocketly.benchRuns "$RUNS" --ei pocketly.benchWarmup "$WARMUP" \
+    -e pocketly.benchMemory "$([ "$MEMORY" = 1 ] && echo true || echo false)" >/dev/null
+  if [ "$MEMORY" = 1 ]; then
+    # The harness waits 500 ms, sets up, warms up, then idles MEMORY_SETTLE_MS before
+    # measure-start: the sampler is running long before the baseline window.
+    pid=$(adb shell pidof -s "$pkg" | tr -d '\r')
+    [ -n "$pid" ] || { echo "✗ round $round $build: $pkg not running after start" >&2; exit 1; }
+    adb shell "nohup sh $SAMPLER $pid $SAMPLES $SAMPLE_S >/dev/null 2>&1 &"
+  fi
   deadline=$(($(date +%s) + TIMEOUT_S))
   while :; do
     sleep 5
@@ -76,10 +104,25 @@ run_one() { # <round> <build>
   done
   # Join the chunks in order (the log may hold several result sets if a run was retried).
   grep -oE '\[Pocketly\] bench-chunk [0-9]+/[0-9]+ .*' <<<"$log" |
-    sed -E 's/^\[Pocketly\] bench-chunk [0-9]+\/[0-9]+ //' | tr -d '\n' > "$RAW/$(printf '%02d' "$round")-$build.json"
-  node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$RAW/$(printf '%02d' "$round")-$build.json" ||
+    sed -E 's/^\[Pocketly\] bench-chunk [0-9]+\/[0-9]+ //' | tr -d '\n' > "$base.json"
+  node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$base.json" ||
     { echo "✗ round $round $build: result isn't valid JSON" >&2; exit 1; }
+  if [ "$MEMORY" = 1 ]; then
+    adb shell cat "/proc/$pid/status" | tr -d '\r' > "$base-status.txt"
+    adb shell dumpsys meminfo "$pkg" | tr -d '\r' > "$base-meminfo.txt"
+    adb logcat -d -v epoch -s ReactNativeJS:V | tr -d '\r' > "$base-logcat.txt"
+  fi
   adb shell am force-stop "$pkg"
+  if [ "$MEMORY" = 1 ]; then
+    sleep 1 # the sampler notices the process is gone
+    stop_sampler
+    adb_alive
+    timeout 60 adb exec-out cat "$SAMPLES" > "$base-rss.txt"
+    adb shell rm -f "$SAMPLES"
+    grep -q 'bench-mark measure-end' "$base-logcat.txt" ||
+      { echo "✗ round $round $build: no bench-mark lines in logcat (old APK without benchMemory?)" >&2; exit 1; }
+    echo "  $(wc -l < "$base-rss.txt" | tr -d ' ') RSS samples"
+  fi
 }
 
 for round in $(seq 1 "$ROUNDS"); do
@@ -94,6 +137,7 @@ cat > "$RAW/meta.json" <<JSON
   "order": "alternating js,kmp per round, one cold start per build per round",
   "tool": "in-app harness (apps/mobile/src/bench) via launch arguments, perf builds",
   "coolDownToC": $COOL_C, "adbTransport": "${ANDROID_SERIAL:-default}",
+  "memory": $([ "$MEMORY" = 1 ] && echo "{ \"sampler\": \"rss-sampler.sh (VmRSS, VmSwap)\", \"intervalS\": $SAMPLE_S }" || echo false),
   "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)" }
 JSON
 echo "▸ raw results in $RAW"

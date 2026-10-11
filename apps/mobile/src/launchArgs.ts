@@ -17,13 +17,14 @@ import { applyNetworkParams } from './features/devmenu/devLinks';
  *   network.readTimeoutMs, network.seed                      fake backend, as the dev link
  *   bench                  BM-03 | BM-04 | BM-06              run the in-app harness instead
  *   benchRuns, benchWarmup integers (default 10, 5)           of the app (bench/harness.ts)
+ *   benchMemory            true | false (default false)       memory round: log phase markers
  *
  * Everything is applied before the first screen loads, so a cold start measures the
  * requested setup. Unknown keys are rejected: a typo must not silently benchmark defaults.
  */
 export interface LaunchArgs {
   tab?: TabKey;
-  bench?: { scenario: BenchScenario; runs: number; warmup: number };
+  bench?: { scenario: BenchScenario; runs: number; warmup: number; memory: boolean };
   dataset?: DatasetConfig;
   network?: Record<string, string>;
 }
@@ -47,16 +48,22 @@ export function parseLaunchArgs(raw: Readonly<Record<string, string>> | undefine
   const dataset: Partial<DatasetConfig> = {};
   let benchRuns = 10;
   let benchWarmup = 5;
+  let benchMemory = false;
   for (const [key, value] of Object.entries(raw)) {
     if (key === 'bench') {
       if (!(BENCH_SCENARIOS as readonly string[]).includes(value)) {
         throw new CoreError('INVALID_ARGUMENT', `launch argument bench="${value}" must be one of ${BENCH_SCENARIOS.join(', ')}`);
       }
-      args.bench = { scenario: value as BenchScenario, runs: 0, warmup: 0 };
+      args.bench = { scenario: value as BenchScenario, runs: 0, warmup: 0, memory: false };
     } else if (key === 'benchRuns') {
       benchRuns = integer(key, value);
     } else if (key === 'benchWarmup') {
       benchWarmup = integer(key, value);
+    } else if (key === 'benchMemory') {
+      if (value !== 'true' && value !== 'false') {
+        throw new CoreError('INVALID_ARGUMENT', `launch argument benchMemory="${value}" must be true or false`);
+      }
+      benchMemory = value === 'true';
     } else if (key === 'tab') {
       if (!(TABS as readonly string[]).includes(value)) {
         throw new CoreError('INVALID_ARGUMENT', `launch argument tab="${value}" must be one of ${TABS.join(', ')}`);
@@ -74,7 +81,7 @@ export function parseLaunchArgs(raw: Readonly<Record<string, string>> | undefine
     if (benchRuns < 1 || benchWarmup < 0) {
       throw new CoreError('INVALID_ARGUMENT', 'launch arguments benchRuns must be ≥ 1 and benchWarmup ≥ 0');
     }
-    args.bench = { ...args.bench, runs: benchRuns, warmup: benchWarmup };
+    args.bench = { ...args.bench, runs: benchRuns, warmup: benchWarmup, memory: benchMemory };
   }
   if (Object.keys(dataset).length > 0) {
     args.dataset = {

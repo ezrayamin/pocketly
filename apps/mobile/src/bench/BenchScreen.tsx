@@ -15,7 +15,7 @@ function median(values: number[]): number {
  * logs the result for benchmarks/scripts/bm-harness.sh. Shows progress and a short summary.
  * Nothing else renders while it runs, so the app does no other work during the measurement.
  */
-export function BenchScreen({ scenario, runs, warmup }: { scenario: BenchScenario; runs: number; warmup: number }) {
+export function BenchScreen({ scenario, runs, warmup, memory }: { scenario: BenchScenario; runs: number; warmup: number; memory: boolean }) {
   const [progress, setProgress] = useState('starting');
   const [result, setResult] = useState<BenchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export function BenchScreen({ scenario, runs, warmup }: { scenario: BenchScenari
   useEffect(() => {
     // Let the first frame render before the work starts.
     const id = setTimeout(() => {
-      runBench(scenario, { runs, warmup, onProgress: (done, total) => setProgress(`${done}/${total}`) }).then(
+      runBench(scenario, { runs, warmup, memory, onProgress: (done, total) => setProgress(`${done}/${total}`) }).then(
         (r) => {
           logResult(r);
           setResult(r);
@@ -35,7 +35,7 @@ export function BenchScreen({ scenario, runs, warmup }: { scenario: BenchScenari
       );
     }, 500);
     return () => clearTimeout(id);
-  }, [scenario, runs, warmup]);
+  }, [scenario, runs, warmup, memory]);
 
   const summary = result
     ? Object.keys(result.runs[0] ?? {})
