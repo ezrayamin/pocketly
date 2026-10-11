@@ -42,17 +42,25 @@ jest.mock('@op-engineering/op-sqlite', () => {
           }
           return execute(sql, params);
         },
-        executeBatch: async (commands) => {
+        transaction: async (fn) => {
           db.exec('BEGIN');
           try {
-            let rowsAffected = 0;
-            for (const [sql, params] of commands) rowsAffected += execute(sql, params).rowsAffected;
+            await fn();
             db.exec('COMMIT');
-            return { rowsAffected };
           } catch (e) {
             db.exec('ROLLBACK');
             throw e;
           }
+        },
+        prepareStatement: (sql) => {
+          const statement = db.prepare(sql);
+          let bound = [];
+          return {
+            bindSync: (params) => {
+              bound = params;
+            },
+            executeSync: () => ({ rows: [], rowsAffected: Number(statement.run(...bound).changes) }),
+          };
         },
         close: () => {},
       };

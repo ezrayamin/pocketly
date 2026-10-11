@@ -111,7 +111,9 @@ export const core: Core =
 > libraries: `jsCore` uses op-sqlite (its own bundled SQLite, over JSI), `kmpCore` uses
 > SQLDelight on the platform's SQLite. Same schema (generated from the same `.sq` files),
 > different engine builds. So every scenario that touches storage reports it separately:
-> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2).
+> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2). Bulk writes follow the same
+> pattern in both: one transaction, one prepared statement bound and stepped per row (from
+> 2026-10-11; before that, `jsCore` re-prepared the statement for every row).
 
 ## 4. Environment & Test Rules
 
