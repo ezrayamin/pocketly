@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-written. Ingested on top of DEFAULT_DATASET. Validation runs field by field in a fixed order and the first failure is the reason (see ingest rules in docs/contract.md).",
+  "$comment": "Hand-written. Ingested into the replica on top of DEFAULT_DATASET. Validation runs field by field in a fixed order and the first failure is the reason (see ingest rules in docs/contract.md).",
   "input": [
     {
       "id": "ing-0000",
@@ -374,6 +374,6 @@
       }
     ]
   },
-  "$balanceDelta": "Accepted entries: +2500 (TRANSFER_IN) -1875 (QR_PAYMENT) +0 (FAILED top-up) = +625",
-  "expectedBalanceDelta": 625
+  "$balanceDelta": "Ingest writes to the local replica only (ADR-0009): the server balance doesn't change. Accepted entries are visible in the replica (history, offline reads).",
+  "expectedBalanceDelta": 0
 }

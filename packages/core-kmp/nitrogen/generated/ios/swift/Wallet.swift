@@ -18,8 +18,14 @@ public extension Wallet {
   /**
    * Create a new instance of `Wallet`.
    */
-  init(id: String, balance: Double, dailyLimit: Double, usedToday: Double, updatedAt: Double) {
-    self.init(std.string(id), balance, dailyLimit, usedToday, updatedAt)
+  init(id: String, balance: Double, dailyLimit: Double, usedToday: Double, updatedAt: Double, stale: StaleInfo?) {
+    self.init(std.string(id), balance, dailyLimit, usedToday, updatedAt, { () -> bridge.std__optional_StaleInfo_ in
+      if let __unwrappedValue = stale {
+        return bridge.create_std__optional_StaleInfo_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }())
   }
 
   @inline(__always)
@@ -45,5 +51,10 @@ public extension Wallet {
   @inline(__always)
   var updatedAt: Double {
     return self.__updatedAt
+  }
+  
+  @inline(__always)
+  var stale: StaleInfo? {
+    return self.__stale.value
   }
 }

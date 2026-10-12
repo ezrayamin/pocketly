@@ -23,7 +23,10 @@ data class TransactionPage(
   val items: Array<Transaction>,
   @DoNotStrip
   @Keep
-  val nextCursor: String?
+  val nextCursor: String?,
+  @DoNotStrip
+  @Keep
+  val stale: StaleInfo?
 ) {
   /* primary constructor */
 
@@ -32,12 +35,14 @@ data class TransactionPage(
     if (other !is TransactionPage) return false
     return Objects.deepEquals(this.items, other.items)
       && Objects.deepEquals(this.nextCursor, other.nextCursor)
+      && Objects.deepEquals(this.stale, other.stale)
   }
 
   override fun hashCode(): Int {
     return arrayOf<Any?>(
       items,
-      nextCursor
+      nextCursor,
+      stale
     ).contentDeepHashCode()
   }
 
@@ -49,8 +54,8 @@ data class TransactionPage(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(items: Array<Transaction>, nextCursor: String?): TransactionPage {
-      return TransactionPage(items, nextCursor)
+    private fun fromCpp(items: Array<Transaction>, nextCursor: String?, stale: StaleInfo?): TransactionPage {
+      return TransactionPage(items, nextCursor, stale)
     }
   }
 }

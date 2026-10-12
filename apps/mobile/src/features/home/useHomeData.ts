@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { SpendingSummary, Transaction, Wallet } from '@pocketly/core-contract';
+import type { SpendingSummary, StaleInfo, Transaction, Wallet } from '@pocketly/core-contract';
 import { uiPreferences } from '@pocketly/native-preferences';
 import { core } from '../../core';
 import { toUserError, type UserError } from '../errors';
@@ -11,13 +11,18 @@ export interface HomeData {
   wallet: Wallet;
   recent: Transaction[];
   month: SpendingSummary;
-  /** Device time of the last successful load (FR-HOME-05 "Last updated hh:mm"). */
-  loadedAt: number;
+  /** Set when the server was unreachable and this is the local replica (ADR-0009). */
+  stale?: StaleInfo;
+  /** When this data last came from the server (FR-HOME-05 "Last updated hh:mm"). */
+  syncedAt: number;
 }
 
 export interface HomeState {
   data: HomeData | null;
-  /** Latest load/refresh failure. Data from the last success stays on screen (FR-HIST-04). */
+  /**
+   * Latest load/refresh failure. Data from the last success stays on screen (FR-HIST-04).
+   * Rare: when the server is unreachable the core serves the replica (`data.stale`) instead.
+   */
   error: UserError | null;
   refreshing: boolean;
   balanceHidden: boolean;
@@ -28,7 +33,8 @@ export interface HomeState {
 async function load(): Promise<HomeData> {
   const [wallet, recent] = await Promise.all([core.getWallet(), core.getTransactions(undefined, RECENT_COUNT)]);
   const month = await core.computeSpendingSummary(localMonth(wallet.updatedAt));
-  return { wallet, recent: recent.items, month, loadedAt: Date.now() };
+  const stale = wallet.stale ?? recent.stale;
+  return { wallet, recent: recent.items, month, stale, syncedAt: stale?.cachedAt ?? Date.now() };
 }
 
 /** Home screen state. Wallet data comes from the core; hide/show is a UI preference (ADR-0005). */

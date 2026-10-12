@@ -10,6 +10,11 @@
 #include <fbjni/fbjni.h>
 #include "Wallet.hpp"
 
+#include "ErrorCode.hpp"
+#include "JErrorCode.hpp"
+#include "JStaleInfo.hpp"
+#include "StaleInfo.hpp"
+#include <optional>
 #include <string>
 
 namespace margelo::nitro::pocketly {
@@ -41,12 +46,15 @@ namespace margelo::nitro::pocketly {
       double usedToday = this->getFieldValue(fieldUsedToday);
       static const auto fieldUpdatedAt = clazz->getField<double>("updatedAt");
       double updatedAt = this->getFieldValue(fieldUpdatedAt);
+      static const auto fieldStale = clazz->getField<JStaleInfo>("stale");
+      jni::local_ref<JStaleInfo> stale = this->getFieldValue(fieldStale);
       return Wallet(
         id->toStdString(),
         balance,
         dailyLimit,
         usedToday,
-        updatedAt
+        updatedAt,
+        stale != nullptr ? std::make_optional(stale->toCpp()) : std::nullopt
       );
     }
 
@@ -56,7 +64,7 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JWallet::javaobject> fromCpp(const Wallet& value) {
-      using JSignature = JWallet(jni::alias_ref<jni::JString>, double, double, double, double);
+      using JSignature = JWallet(jni::alias_ref<jni::JString>, double, double, double, double, jni::alias_ref<JStaleInfo>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -65,7 +73,8 @@ namespace margelo::nitro::pocketly {
         value.balance,
         value.dailyLimit,
         value.usedToday,
-        value.updatedAt
+        value.updatedAt,
+        value.stale.has_value() ? JStaleInfo::fromCpp(value.stale.value()) : nullptr
       );
     }
   };

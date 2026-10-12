@@ -1,26 +1,38 @@
-import { DEFAULT_DATASET, DEFAULT_PAGE_SIZE, DEFAULT_PRICE_INTERVAL_MS } from '@pocketly/core-contract';
+import {
+  CoreError,
+  DEFAULT_DATASET,
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_PRICE_INTERVAL_MS,
+  MAX_PAGE_SIZE,
+  toCoreError,
+} from '@pocketly/core-contract';
 import type {
   Core,
   DatasetConfig,
+  ErrorCode,
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
+  StaleInfo,
   Subscription,
   Transaction,
   TransactionPage,
   TxFilter,
   Wallet,
 } from '@pocketly/core-contract';
-import { FakeWalletApi } from './data/fakeWalletApi';
-import { ingestTransactions } from './data/transactionIngestor';
+import { CacheStore } from './data/cacheStore';
+import type { SqlDriver } from './data/db/sqlDriver';
+import { FakeWalletApi } from './data/fake/fakeWalletApi';
+import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
-import { InMemoryTransactionStore } from './data/transactionStore';
+import { parseAndValidate } from './data/transactionIngestor';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
 import { computeSpendingSummary } from './domain/spendingSummary';
+import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
 
 const now: () => number =
@@ -28,7 +40,15 @@ const now: () => number =
     ? () => performance.now()
     : () => Date.now();
 
+/** Failures where the local replica stands in for the server (ADR-0009). */
+const STALEABLE: ReadonlySet<ErrorCode> = new Set(['NETWORK_UNAVAILABLE', 'NETWORK_TIMEOUT', 'SERVER_ERROR']);
+
 export interface JsCoreOptions {
+  /** The fake backend's database (pocketly-server.db). */
+  server: SqlDriver;
+  /** The app's local replica (pocketly-cache.db). */
+  cache: SqlDriver;
+  /** Seeds the server only if its database is empty. Default: DEFAULT_DATASET (frozen clock). */
   dataset?: DatasetConfig;
 }
 
@@ -36,41 +56,120 @@ export interface JsCoreOptions {
 export class JsCore implements Core {
   readonly impl = 'js' as const;
 
-  private readonly store = new InMemoryTransactionStore();
   private zone = new UserTimeZone('UTC');
-  private readonly backend = new FakeWalletApi(this.store, () => this.zone);
+  private readonly backend: FakeWalletApi;
   /** NFR-REL-01: the core only talks to the backend through a timeout. */
-  private readonly api = new TimeoutWalletApi(this.backend, () => this.backend.network.get().readTimeoutMs!);
+  private readonly api: TimeoutWalletApi;
+  private readonly cache: CacheStore;
+  private readonly ledgerSync: LedgerSync;
+  /** Databases open lazily; every data call awaits this first. */
+  private readonly ready: Promise<void>;
   private computeMs = 0;
+  private storageMs = 0;
+  /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
+  private stagedPayload: string | undefined;
 
-  constructor(options: JsCoreOptions = {}) {
-    this.backend.reset(options.dataset ?? DEFAULT_DATASET);
+  constructor(options: JsCoreOptions) {
+    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
+    const cache = new CacheStore(options.cache);
+    this.backend = backend;
+    this.api = new TimeoutWalletApi(backend, () => backend.network.get().readTimeoutMs!);
+    this.cache = cache;
+    this.ledgerSync = new LedgerSync(this.api, cache);
+    this.ready = (async () => {
+      await backend.open(options.dataset ?? DEFAULT_DATASET);
+      await cache.init();
+    })();
   }
 
   async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
-    this.backend.reset(config);
+    await this.ready;
+    await this.backend.reset(config);
+    await this.cache.clear();
+    try {
+      await this.ledgerSync.sync();
+      await this.cache.upsertWallet(await this.api.getWallet(), Date.now());
+    } catch (e) {
+      if (!STALEABLE.has(toCoreError(e).code)) throw e; // offline reset: replica stays empty
+    }
   }
 
-  getWallet(): Promise<Wallet> {
-    return this.api.getWallet();
+  async getWallet(): Promise<Wallet> {
+    await this.ready;
+    try {
+      const wallet = await this.api.getWallet();
+      await this.cache.upsertWallet(wallet, Date.now());
+      return wallet;
+    } catch (e) {
+      const error = toCoreError(e);
+      const cached = STALEABLE.has(error.code) ? await this.cache.getWallet() : undefined;
+      if (cached === undefined) throw error;
+      return { ...cached.wallet, stale: { reason: error.code, cachedAt: cached.cachedAt } };
+    }
   }
 
-  getTransactions(cursor?: string, limit: number = DEFAULT_PAGE_SIZE, filter?: TxFilter): Promise<TransactionPage> {
-    return this.api.getTransactions(cursor, limit, filter);
+  async getTransactions(
+    cursor?: string,
+    limit: number = DEFAULT_PAGE_SIZE,
+    filter?: TxFilter,
+  ): Promise<TransactionPage> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
+      throw new CoreError('INVALID_ARGUMENT', `limit must be 1..${MAX_PAGE_SIZE}, got ${limit}`);
+    }
+    await this.ready;
+    let stale: StaleInfo | undefined;
+    if (cursor === undefined) {
+      try {
+        await this.ledgerSync.sync(); // the first page is a refresh
+      } catch (e) {
+        const error = toCoreError(e);
+        const cachedAt = STALEABLE.has(error.code) ? await this.cache.lastSyncedAt() : undefined;
+        if (cachedAt === undefined) throw error;
+        stale = { reason: error.code, cachedAt };
+      }
+    }
+    const page = await this.cache.page(cursor, limit, filter);
+    return stale ? { ...page, stale } : page;
   }
 
-  getTransaction(id: string): Promise<Transaction> {
-    return this.api.getTransaction(id);
+  async getTransaction(id: string): Promise<Transaction> {
+    await this.ready;
+    return (await this.cache.get(id)) ?? this.api.getTransaction(id);
   }
 
   async computeSpendingSummary(month: string): Promise<SpendingSummary> {
-    return this.timed(() =>
-      computeSpendingSummary(month, this.zone.month(month), this.store.all(), this.store.balance()),
-    );
+    await this.ready;
+    const start = now();
+    const transactions = await this.cache.all();
+    const cachedWallet = await this.cache.getWallet();
+    this.storageMs = now() - start;
+    const walletBalance = cachedWallet?.wallet.balance ?? 0;
+    return this.timed(() => computeSpendingSummary(month, this.zone.month(month), transactions, walletBalance));
+  }
+
+  async stageIngestPayload(json: string): Promise<void> {
+    this.stagedPayload = json;
+  }
+
+  ingestStaged(): Promise<IngestResult> {
+    if (this.stagedPayload === undefined) {
+      return Promise.reject(new CoreError('INVALID_ARGUMENT', 'no ingest payload staged'));
+    }
+    return this.ingestTransactions(this.stagedPayload);
   }
 
   async ingestTransactions(json: string): Promise<IngestResult> {
-    return this.timed(() => ingestTransactions(json, this.store));
+    await this.ready;
+    const parsed = this.timed(() => parseAndValidate(json));
+    const start = now();
+    const inserted = await this.cache.insertIfAbsentMany(parsed.valid);
+    this.storageMs = now() - start;
+    return {
+      accepted: inserted,
+      rejected: parsed.rejected,
+      duplicates: parsed.valid.length - inserted,
+      errors: parsed.errors,
+    };
   }
 
   setNetworkSimulation(simulation: NetworkSimulation): void {
@@ -82,6 +181,7 @@ export class JsCore implements Core {
   }
 
   async simulateIncomingTransfer(): Promise<Transaction> {
+    await this.ready;
     return this.backend.simulateIncomingTransfer();
   }
 
@@ -91,11 +191,16 @@ export class JsCore implements Core {
     }
   }
 
+  echo(value: number): number {
+    return value;
+  }
+
   formatMoney(minor: number): string {
     return formatMoney(minor);
   }
 
   formatMoneyBatch(minors: number[]): string[] {
+    this.storageMs = 0;
     return this.timed(() => minors.map(formatMoney));
   }
 
@@ -117,6 +222,10 @@ export class JsCore implements Core {
     return this.computeMs;
   }
 
+  lastStorageMs(): number {
+    return this.storageMs;
+  }
+
   private timed<T>(work: () => T): T {
     const start = now();
     try {
@@ -127,6 +236,6 @@ export class JsCore implements Core {
   }
 }
 
-export function createJsCore(options?: JsCoreOptions): JsCore {
+export function createJsCore(options: JsCoreOptions): JsCore {
   return new JsCore(options);
 }

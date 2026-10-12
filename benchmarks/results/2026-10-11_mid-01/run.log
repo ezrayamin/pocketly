@@ -1,0 +1,303 @@
+=== BM-02 15:01:55
+▸ warm-up (not recorded)
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+▸ block 1/5 jsCore × 2
+  battery 32.2 °C
+[15:04:42] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:04:42] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:04:42] ℹ️  Running iteration 1/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:06:09] ✅  Finished iteration 1/2 in 78196.40712499619ms (0 retry so far)
+[15:06:09] ℹ️  Running iteration 2/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:07:43] ✅  Finished iteration 2/2 in 78126.46470880508ms (0 retry so far)
+[15:07:43] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/01-jsCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/01-jsCore.json
+▸ block 1/5 kmpCore × 2
+  battery 33.5 °C
+[15:07:45] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:07:45] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:07:54] ℹ️  Running iteration 1/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:09:19] ✅  Finished iteration 1/2 in 76307.92758393288ms (0 retry so far)
+[15:09:19] ℹ️  Running iteration 2/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:10:53] ✅  Finished iteration 2/2 in 77357.4132091999ms (0 retry so far)
+[15:10:53] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/01-kmpCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/01-kmpCore.json
+▸ block 2/5 jsCore × 2
+  battery 34.3 °C
+[15:10:55] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:10:55] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:11:04] ℹ️  Running iteration 1/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:12:29] ✅  Finished iteration 1/2 in 76747.56666707993ms (0 retry so far)
+[15:12:29] ℹ️  Running iteration 2/2
+Error: Could not parse ATrace line "CPU:4 [LOST 788 EVENTS]"
+    at parseLine (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/atrace/pollFpsUsage.js:11:19)
+    at FrameTimeParser.getFrameTimes (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/atrace/pollFpsUsage.js:75:45)
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/platforms/UnixProfiler.js:139:42
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/platforms/UnixProfiler.js:42:17
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/shell.js:85:13
+    at Array.forEach (<anonymous>)
+    at Socket.<anonymous> (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/shell.js:84:33)
+    at Socket.emit (node:events:537:28)
+    at addChunk (node:internal/streams/readable:324:12)
+    at readableAddChunk (node:internal/streams/readable:297:9)
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:14:04] ✅  Finished iteration 2/2 in 77970.5606250763ms (0 retry so far)
+[15:14:04] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/02-jsCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/02-jsCore.json
+▸ block 2/5 kmpCore × 2
+  battery 35.3 °C
+[15:14:05] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:14:05] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:14:15] ℹ️  Running iteration 1/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:15:39] ✅  Finished iteration 1/2 in 76291.05583286285ms (0 retry so far)
+[15:15:39] ℹ️  Running iteration 2/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:17:14] ✅  Finished iteration 2/2 in 77049.78633284569ms (0 retry so far)
+[15:17:14] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/02-kmpCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/02-kmpCore.json
+▸ block 3/5 jsCore × 2
+  battery 35.5 °C
+[15:17:15] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:17:15] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:17:25] ℹ️  Running iteration 1/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:18:50] ✅  Finished iteration 1/2 in 77703.9431669712ms (0 retry so far)
+[15:18:50] ℹ️  Running iteration 2/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:20:26] ✅  Finished iteration 2/2 in 78101.56941604614ms (0 retry so far)
+[15:20:26] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/03-jsCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/03-jsCore.json
+▸ block 3/5 kmpCore × 2
+  battery 35.7 °C
+[15:20:27] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:20:27] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:20:37] ℹ️  Running iteration 1/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:22:01] ✅  Finished iteration 1/2 in 76276.18954181671ms (0 retry so far)
+[15:22:01] ℹ️  Running iteration 2/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:23:35] ✅  Finished iteration 2/2 in 77401.1410419941ms (0 retry so far)
+[15:23:35] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/03-kmpCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/03-kmpCore.json
+▸ block 4/5 jsCore × 2
+  battery 36.2 °C
+[15:23:37] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:23:37] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:23:46] ℹ️  Running iteration 1/2
+Error: Could not parse ATrace line "CPU:2 [LOST 79 EVENTS]"
+    at parseLine (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/atrace/pollFpsUsage.js:11:19)
+    at FrameTimeParser.getFrameTimes (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/atrace/pollFpsUsage.js:75:45)
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/platforms/UnixProfiler.js:139:42
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/platforms/UnixProfiler.js:42:17
+    at /snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/shell.js:85:13
+    at Array.forEach (<anonymous>)
+    at Socket.<anonymous> (/snapshot/flashlight-cloud/flashlight-open-source/packages/platforms/android/dist/src/commands/shell.js:84:33)
+    at Socket.emit (node:events:537:28)
+    at addChunk (node:internal/streams/readable:324:12)
+    at readableAddChunk (node:internal/streams/readable:297:9)
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:25:11] ✅  Finished iteration 1/2 in 76722.08683419228ms (0 retry so far)
+[15:25:11] ℹ️  Running iteration 2/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:26:45] ✅  Finished iteration 2/2 in 77435.55599999428ms (0 retry so far)
+[15:26:45] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/04-jsCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/04-jsCore.json
+▸ block 4/5 kmpCore × 2
+  battery 35.9 °C
+[15:26:47] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:26:47] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:26:57] ℹ️  Running iteration 1/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:28:24] ✅  Finished iteration 1/2 in 77588.66704201698ms (0 retry so far)
+[15:28:24] ℹ️  Running iteration 2/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:29:59] ✅  Finished iteration 2/2 in 77402.56258296967ms (0 retry so far)
+[15:29:59] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/04-kmpCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/04-kmpCore.json
+▸ block 5/5 jsCore × 2
+  battery 36.0 °C
+[15:30:00] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:30:00] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:30:10] ℹ️  Running iteration 1/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:31:35] ✅  Finished iteration 1/2 in 77370.03883314133ms (0 retry so far)
+[15:31:35] ℹ️  Running iteration 2/2
+✓ com.pocketly.js: 3 passes × 96 swipes, end reached
+
+[15:33:10] ✅  Finished iteration 2/2 in 77474.21841692924ms (0 retry so far)
+[15:33:10] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/05-jsCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/05-jsCore.json
+▸ block 5/5 kmpCore × 2
+  battery 35.7 °C
+[15:33:11] ℹ️  Installing C++ profiler for arm64-v8a architecture
+[15:33:12] ✅  C++ Profiler installed in /data/local/tmp/BAMPerfProfiler
+[15:33:21] ℹ️  Running iteration 1/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:34:47] ✅  Finished iteration 1/2 in 77529.29404187202ms (0 retry so far)
+[15:34:47] ℹ️  Running iteration 2/2
+✓ com.pocketly.kmp: 3 passes × 96 swipes, end reached
+
+[15:36:22] ✅  Finished iteration 2/2 in 78359.69716715813ms (0 retry so far)
+[15:36:22] ✅  Results written to benchmarks/results/2026-10-11_mid-01/bm-02/05-kmpCore.json.
+To open the web report, run:
+
+flashlight report benchmarks/results/2026-10-11_mid-01/bm-02/05-kmpCore.json
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-02
+=== BM-02 exit 0 15:36:22
+=== BM-03 15:36:34
+  battery 35.6 °C
+  battery 35.6 °C
+  round 1/5 ✓
+  battery 35.6 °C
+  battery 35.6 °C
+=== BM-03 FAILED 15:41:49
+[note] BM-03 first attempt (15:36:34–15:41:49) stopped by hand: round 2 kmpCore logged nothing to logcat (app finished, screen showed the result); files moved to bm-03/aborted-1/. bm-harness.sh now relaunches such cold starts (retries.csv).
+=== BM-03 15:44:59
+  battery 32.1 °C
+  battery 32.1 °C
+  round 1/5 ✓
+  battery 32.1 °C
+  battery 32.1 °C
+  round 2/5 ✓
+  battery 32.1 °C
+  battery 32.1 °C
+  ⟳ no log lines from com.pocketly.kmp (pid 5651) after 15s: relaunching
+  ⟳ no log lines from com.pocketly.kmp (pid 5843) after 15s: relaunching
+  round 3/5 ✓
+  battery 31.8 °C
+  battery 31.8 °C
+  round 4/5 ✓
+  battery 31.8 °C
+  ⟳ no log lines from com.pocketly.js (pid 6769) after 15s: relaunching
+  battery 31.8 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-03
+=== BM-04 15:46:57
+  battery 31.8 °C
+  battery 31.4 °C
+  round 1/5 ✓
+  battery 31.4 °C
+  ⟳ no log lines from com.pocketly.js (pid 7588) after 15s: relaunching
+  battery 31.4 °C
+  round 2/5 ✓
+  battery 31.4 °C
+  battery 31.4 °C
+  round 3/5 ✓
+  battery 31.4 °C
+  battery 31.4 °C
+  round 4/5 ✓
+  battery 31.2 °C
+  battery 31.2 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-04
+=== BM-06 15:48:16
+  battery 31.2 °C
+  battery 31.2 °C
+  round 1/5 ✓
+  battery 31.2 °C
+  battery 31.2 °C
+  round 2/5 ✓
+  battery 31.2 °C
+  battery 31.2 °C
+  round 3/5 ✓
+  battery 31.2 °C
+  battery 31.2 °C
+  round 4/5 ✓
+  battery 31.2 °C
+  battery 31.2 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-06
+=== BM-04 memory 15:49:19
+  battery 31.2 °C
+  1775 RSS samples
+  battery 31.2 °C
+  1533 RSS samples
+  round 1/5 ✓
+  battery 31.2 °C
+  ⟳ no log lines from com.pocketly.js (pid 13868) after 15s: relaunching
+  1727 RSS samples
+  battery 31.3 °C
+  ⟳ no log lines from com.pocketly.kmp (pid 14249) after 15s: relaunching
+  1594 RSS samples
+  round 2/5 ✓
+  battery 31.3 °C
+  1756 RSS samples
+  battery 31.3 °C
+  1657 RSS samples
+  round 3/5 ✓
+  battery 31.3 °C
+  1738 RSS samples
+  battery 31.3 °C
+  ⟳ no log lines from com.pocketly.kmp (pid 15180) after 15s: relaunching
+  1736 RSS samples
+  round 4/5 ✓
+  battery 30.9 °C
+  ⟳ no log lines from com.pocketly.js (pid 15539) after 15s: relaunching
+  1747 RSS samples
+  battery 30.9 °C
+  ⟳ no log lines from com.pocketly.kmp (pid 15905) after 15s: relaunching
+  1553 RSS samples
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-04/memory
+=== harness done 15:52:06
+[note] BM-03 second attempt (15:44:59–15:46:57) set aside after review: kmpCore round 4 ran ~6.7× slower for the whole cold start (CV 110%), §4.3 rerun; files in bm-03/aborted-2/.
+=== BM-03 rerun 15:56:48
+  battery 29.4 °C
+  ⟳ no log lines from com.pocketly.js (pid 16613) after 15s: relaunching
+  battery 29.2 °C
+  round 1/5 ✓
+  battery 29.2 °C
+  battery 29.2 °C
+  round 2/5 ✓
+  battery 29.2 °C
+  battery 29.2 °C
+  round 3/5 ✓
+  battery 29.2 °C
+  battery 29.2 °C
+  round 4/5 ✓
+  battery 29.2 °C
+  battery 29.6 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-01/bm-03

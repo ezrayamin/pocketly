@@ -34,7 +34,8 @@ export class KmpCore implements Core {
   constructor(private readonly native: PocketlyCore) {}
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
-    return this.native.resetData(config).catch(rethrow);
+    const { extraTransactions = [], ...seed } = config;
+    return this.native.resetData(seed, extraTransactions).catch(rethrow);
   }
 
   getWallet(): Promise<Wallet> {
@@ -81,6 +82,19 @@ export class KmpCore implements Core {
     return this.native.ingestTransactions(json).catch(rethrow);
   }
 
+  stageIngestPayload(json: string): Promise<void> {
+    return this.native.stageIngestPayload(json).catch(rethrow);
+  }
+
+  ingestStaged(): Promise<IngestResult> {
+    return this.native.ingestStaged().catch(rethrow);
+  }
+
+  // Straight through: it can't throw, and BM-06 times exactly this path.
+  echo(value: number): number {
+    return this.native.echo(value);
+  }
+
   formatMoney(minor: number): string {
     try {
       return this.native.formatMoney(minor);
@@ -117,6 +131,10 @@ export class KmpCore implements Core {
 
   lastComputeMs(): number {
     return this.native.lastComputeMs();
+  }
+
+  lastStorageMs(): number {
+    return this.native.lastStorageMs();
   }
 }
 

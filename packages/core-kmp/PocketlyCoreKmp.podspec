@@ -22,6 +22,9 @@ Pod::Spec.new do |s|
   # The KMP module, built by `yarn workspace @pocketly/core-kmp build:ios-framework`
   # (shared/ → assemblePocketlySharedReleaseXCFramework → ios/Frameworks/).
   s.vendored_frameworks = "ios/Frameworks/PocketlyShared.xcframework"
+  # The framework is static and SQLDelight's NativeSqliteDriver uses the system libsqlite3
+  # (ADR-0009), so the app has to link it.
+  s.libraries = "sqlite3"
 
   load 'nitrogen/generated/ios/PocketlyCoreKmp+autolinking.rb'
   add_nitrogen_files(s)

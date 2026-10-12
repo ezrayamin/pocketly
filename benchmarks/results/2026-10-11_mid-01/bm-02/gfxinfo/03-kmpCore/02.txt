@@ -1,0 +1,85 @@
+renderFrameRateHz: 60
+Applications Graphics Acceleration Info:
+Uptime: 103898734 Realtime: 301677646
+
+** Graphics info for pid 28653 [com.pocketly.kmp] **
+
+Stats since: 103821421711696ns
+Total frames rendered: 4377
+Janky frames: 22 (0.50%)
+Janky frames (legacy): 3031 (69.25%)
+50th percentile: 11ms
+90th percentile: 16ms
+95th percentile: 18ms
+99th percentile: 22ms
+Number Missed Vsync: 2
+Number High input latency: 4609
+Number Slow UI thread: 11
+Number Slow bitmap uploads: 11
+Number Slow issue draw commands: 6
+Number Frame deadline missed: 22
+Number Frame deadline missed (legacy): 2691
+HISTOGRAM: 5ms=0 6ms=8 7ms=82 8ms=233 9ms=574 10ms=669 11ms=745 12ms=533 13ms=354 14ms=328 15ms=296 16ms=192 17ms=144 18ms=78 19ms=50 20ms=29 21ms=14 22ms=10 23ms=7 24ms=2 25ms=2 26ms=3 27ms=2 28ms=4 29ms=2 30ms=1 31ms=2 32ms=2 34ms=0 36ms=0 38ms=2 40ms=0 42ms=0 44ms=2 46ms=1 48ms=0 53ms=2 57ms=0 61ms=0 65ms=0 69ms=0 73ms=0 77ms=0 81ms=0 85ms=0 89ms=0 93ms=0 97ms=0 101ms=0 105ms=0 109ms=0 113ms=0 117ms=0 121ms=1 125ms=1 129ms=0 133ms=0 150ms=2 200ms=0 250ms=0 300ms=0 350ms=0 400ms=0 450ms=0 500ms=0 550ms=0 600ms=0 650ms=0 700ms=0 750ms=0 800ms=0 850ms=0 900ms=0 950ms=0 1000ms=0 1050ms=0 1100ms=0 1150ms=0 1200ms=0 1250ms=0 1300ms=0 1350ms=0 1400ms=0 1450ms=0 1500ms=0 1550ms=0 1600ms=0 1650ms=0 1700ms=0 1750ms=0 1800ms=0 1850ms=0 1900ms=0 1950ms=0 2000ms=0 2050ms=0 2100ms=0 2150ms=0 2200ms=0 2250ms=0 2300ms=0 2350ms=0 2400ms=0 2450ms=0 2500ms=0 2550ms=0 2600ms=0 2650ms=0 2700ms=0 2750ms=0 2800ms=0 2850ms=0 2900ms=0 2950ms=0 3000ms=0 3050ms=0 3100ms=0 3150ms=0 3200ms=0 3250ms=0 3300ms=0 3350ms=0 3400ms=0 3450ms=0 3500ms=0 3550ms=0 3600ms=0 3650ms=0 3700ms=0 3750ms=0 3800ms=0 3850ms=0 3900ms=0 3950ms=0 4000ms=0 4050ms=0 4100ms=0 4150ms=0 4200ms=0 4250ms=0 4300ms=0 4350ms=0 4400ms=0 4450ms=0 4500ms=0 4550ms=0 4600ms=0 4650ms=0 4700ms=0 4750ms=0 4800ms=0 4850ms=0 4900ms=0 4950ms=0
+50th gpu percentile: 3ms
+90th gpu percentile: 3ms
+95th gpu percentile: 4ms
+99th gpu percentile: 4ms
+GPU HISTOGRAM: 1ms=8 2ms=138 3ms=3854 4ms=342 5ms=2 6ms=0 7ms=0 8ms=4 9ms=6 10ms=16 11ms=7 12ms=0 13ms=0 14ms=0 15ms=0 16ms=0 17ms=0 18ms=0 19ms=0 20ms=0 21ms=0 22ms=0 23ms=0 24ms=0 25ms=0 4950ms=0
+
+Pipeline=Skia (Vulkan)
+Memory policy:
+  Max surface area: 2546640
+  Max resource usage: 366.72MB (x144)
+  Background retention: 50% (altUiHidden = true)
+  GPU Context timeout: 10
+Contexts: 1 (stopped = 0)
+CPU Caches:
+  Glyph Cache: 355.01 KB (1 entry)
+  Glyph Count: 55 
+Total CPU memory usage:
+  363529 bytes, 355.01 KB (0.00 bytes is purgeable)
+GPU Caches:
+  Other:
+    Other: 161.22 KB (1 entry)
+    Buffer Object: 9.00 KB (1 entry)
+  Image:
+    Surface: 1.28 MB (202 entries)
+  Scratch:
+    Buffer Object: 494.00 KB (13 entries)
+    Surface: 58.37 MB (250 entries)
+Total GPU memory usage:
+  63235816 bytes, 60.31 MB (1.09 MB is purgeable)
+
+GraphicBufferAllocator buffers:
+            Handle |         Size |     W (Stride) x H | Layers |   Format |      Usage | Requestor
+0xb400007ce0314f30 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce0318bb0 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce0318fd0 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce031d540 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce03208d0 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce0329e00 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+0xb400007ce032a220 | 10021.50 KiB | 1080 (1088) x 2358 |      1 |        1 | 0x10000b00 | VRI[MainActivity,type=1]#0(BLAST Consumer)0
+Total allocated by GraphicBufferAllocator (estimate): 70150.50 KB
+Imported gralloc buffers:
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94588, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94587, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94583, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94581, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94582, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94589, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
++ name:P28653P_VRI[MainActivity,type=1]#0(BLAST Consumer)0, id:94585, size:10140.00KiB, w/h:1080x2358, usage: 0x10000b00, req fmt:1, fourcc/mod:0/0, dataspace: 0x8810000, compressed: true
+Total imported by gralloc: 70980.00KiB
+
+Profile data in ms:
+
+	com.pocketly.kmp/com.pocketly.MainActivity/android.view.ViewRootImpl@59f074a (visibility=0)
+View hierarchy:
+
+  com.pocketly.kmp/com.pocketly.MainActivity/android.view.ViewRootImpl@59f074a
+  1141 views, 2360.10 kB of render nodes
+
+
+Total ViewRootImpl   : 1
+Total attached Views : 1141
+Total RenderNode     : 2360.10 kB (used) / 6688.03 kB (capacity)
+

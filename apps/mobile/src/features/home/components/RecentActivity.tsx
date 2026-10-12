@@ -9,16 +9,30 @@ import { TransactionRow } from './TransactionRow';
 
 /**
  * FR-HOME-04: last 5 transactions. Five fixed rows, so a plain View list, not a
- * virtualized list. "See All" opens History once F4 exists.
+ * virtualized list. "See All" opens History.
  */
-export function RecentActivity({ items, now }: { items: Transaction[] | null; now: number }) {
+export function RecentActivity({
+  items,
+  now,
+  onSeeAll,
+}: {
+  items: Transaction[] | null;
+  now: number;
+  onSeeAll?: () => void;
+}) {
   return (
     <View>
       <View style={styles.header}>
         <Text style={styles.title} accessibilityRole="header">
           Recent Activity
         </Text>
-        <Pressable style={styles.seeAll} accessibilityRole="button" accessibilityLabel="See all transactions" accessibilityHint="Coming soon">
+        <Pressable
+          style={styles.seeAll}
+          onPress={onSeeAll}
+          accessibilityRole="button"
+          accessibilityLabel="See all transactions"
+          testID="home-see-all"
+        >
           <Text style={styles.seeAllText}>See All</Text>
           <ChevronRight color={colors.primary} size={16} />
         </Pressable>

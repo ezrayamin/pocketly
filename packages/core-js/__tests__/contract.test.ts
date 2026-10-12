@@ -1,4 +1,4 @@
 import { runContractSuite } from '@pocketly/core-contract/src/testing/contractSuite';
-import { JsCore } from '../src/jsCore';
+import { testCore } from '../testing/testCore';
 
-runContractSuite('core-js', () => new JsCore());
+runContractSuite('core-js', () => testCore());

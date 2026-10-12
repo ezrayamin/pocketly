@@ -1,4 +1,4 @@
-import type { ErrorCode } from '@pocketly/core-contract';
+import type { ErrorCode, StaleInfo } from '@pocketly/core-contract';
 import { toCoreError } from '@pocketly/core-contract';
 
 /** User-facing copy per error code (requirements §4.3). */
@@ -21,7 +21,15 @@ export interface UserError {
   offline: boolean;
 }
 
-export function toUserError(error: unknown): UserError {
-  const { code } = toCoreError(error);
+export function userErrorFor(code: ErrorCode): UserError {
   return { code, message: MESSAGES[code], offline: code === 'NETWORK_UNAVAILABLE' };
+}
+
+export function toUserError(error: unknown): UserError {
+  return userErrorFor(toCoreError(error).code);
+}
+
+/** Why cached data is on screen (FR-HIST-04): the failure the core fell back from. */
+export function staleNotice(stale: StaleInfo): UserError {
+  return userErrorFor(stale.reason);
 }

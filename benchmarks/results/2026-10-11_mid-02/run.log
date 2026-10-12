@@ -1,0 +1,93 @@
+=== BM-04 16:38:02
+  battery 27.3 °C
+  ⟳ no log lines from com.pocketly.js (pid 25275) after 15s: relaunching
+  battery 27.3 °C
+  round 1/5 ✓
+  battery 27.3 °C
+  ⟳ no log lines from com.pocketly.js (pid 25844) after 15s: relaunching
+  battery 27.3 °C
+  round 2/5 ✓
+  battery 27.8 °C
+  ⟳ no log lines from com.pocketly.js (pid 26331) after 15s: relaunching
+  battery 27.8 °C
+  round 3/5 ✓
+  battery 27.8 °C
+  battery 27.8 °C
+  round 4/5 ✓
+  battery 27.8 °C
+  battery 27.8 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-02/bm-04
+=== BM-04b 16:39:54
+  battery 27.8 °C
+  battery 28.1 °C
+  round 1/5 ✓
+  battery 28.1 °C
+  battery 28.1 °C
+  round 2/5 ✓
+  battery 28.1 °C
+  battery 28.1 °C
+  round 3/5 ✓
+  battery 28.1 °C
+  battery 28.5 °C
+  round 4/5 ✓
+  battery 28.5 °C
+  battery 28.5 °C
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-02/bm-04b
+=== BM-04 memory 16:41:18
+  battery 28.5 °C
+  1771 RSS samples
+  battery 28.5 °C
+  1539 RSS samples
+  round 1/5 ✓
+  battery 28.5 °C
+  1700 RSS samples
+  battery 28.5 °C
+  1496 RSS samples
+  round 2/5 ✓
+  battery 28.5 °C
+  1678 RSS samples
+  battery 28.8 °C
+  1539 RSS samples
+  round 3/5 ✓
+  battery 28.8 °C
+  1714 RSS samples
+  battery 28.8 °C
+  1606 RSS samples
+  round 4/5 ✓
+  battery 28.8 °C
+  1765 RSS samples
+  battery 28.8 °C
+  1663 RSS samples
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-02/bm-04/memory
+=== BM-04b memory 16:42:40
+  battery 28.8 °C
+  1733 RSS samples
+  battery 28.8 °C
+  ⟳ no log lines from com.pocketly.kmp (pid 32256) after 15s: relaunching
+  1507 RSS samples
+  round 1/5 ✓
+  battery 29.0 °C
+  1746 RSS samples
+  battery 29.0 °C
+  1571 RSS samples
+  round 2/5 ✓
+  battery 29.0 °C
+  1720 RSS samples
+  battery 29.0 °C
+  1497 RSS samples
+  round 3/5 ✓
+  battery 29.0 °C
+  1737 RSS samples
+  battery 29.0 °C
+  1575 RSS samples
+  round 4/5 ✓
+  battery 29.1 °C
+  1728 RSS samples
+  battery 29.1 °C
+  1577 RSS samples
+  round 5/5 ✓
+▸ raw results in benchmarks/results/2026-10-11_mid-02/bm-04b/memory
+=== harness done 16:44:19

@@ -1,0 +1,7 @@
+{ "scenario": "BM-02", "warmup": 1, "blocks": 5, "iterationsPerBlock": 2,
+  "order": "alternating blocks js,kmp", "coolDownToC": 40,
+  "tool": "Flashlight test (--skipRestart, prepare/verify outside the measured command) + adb input (bm-02-scroll.sh)",
+  "measured": "scrolling only: 3 passes x 96 swipes (80%→17% of height, 120 ms), History tab tap between passes",
+  "dataset": { "seed": 42, "transactionCount": 1000 }, "build": "perf",
+  "adbTransport": "default",
+  "at": "2026-10-11T08:36:22Z" }

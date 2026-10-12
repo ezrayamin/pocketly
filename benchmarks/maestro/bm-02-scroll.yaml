@@ -1,0 +1,35 @@
+# BM-02 (control, H4): scroll History through 1,000 transactions, top → bottom ×3.
+# Drives Flashlight (FPS, JS FPS, CPU); needs a perf build for the launch arguments
+# (docs/benchmarking.md §5.3).
+#   maestro test -e APP_ID=com.pocketly.kmp benchmarks/maestro/bm-02-scroll.yaml
+# Pages load 20 at a time from the replica while scrolling, as in normal use.
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+    arguments:
+      pocketly.tab: history
+      pocketly.transactionCount: 1000
+- assertVisible:
+    id: "history-list"
+- repeat:
+    times: 3
+    commands:
+      # The end check reads the whole view hierarchy (slow, and it loads the device while
+      # Flashlight measures), so check every 8 swipes. Extra swipes at the bottom are no-ops.
+      - repeat:
+          while:
+            notVisible:
+              id: "history-end"
+          commands:
+            - repeat:
+                times: 8
+                commands:
+                  - swipe:
+                      start: 50%, 80%
+                      end: 50%, 20%
+                      duration: 150
+      # Tapping the active tab scrolls to the top (product.md §7.3 rule 5).
+      - tapOn:
+          id: "tab-history"
+      - waitForAnimationToEnd

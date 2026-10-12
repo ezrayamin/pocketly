@@ -93,7 +93,7 @@ export function BalanceCard({ data, hidden, refreshing, onToggleHidden, onRefres
           <View style={styles.updated}>
             <View style={styles.liveDot} />
             <Text style={styles.caption}>
-              {data ? `Last updated ${formatTime(data.loadedAt)}` : 'Updating…'}
+              {data ? `Last updated ${formatTime(data.syncedAt)}` : 'Updating…'}
             </Text>
           </View>
           <Text style={styles.limitLabel}>DAILY LIMIT</Text>

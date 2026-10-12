@@ -1,0 +1,64 @@
+-- Fake backend's database (pocketly-server.db): the source of truth, "on another machine"
+-- (FR-FAKE-07, ADR-0009). Only FakeWalletApi touches it. Shared with core-js: this file is
+-- the single source for both cores (yarn sql:generate → core-js/src/data/db/sql.generated.ts).
+-- Repeated values use named `:params`; the JS generator maps them to positional `?`.
+
+CREATE TABLE server_transaction (
+  id TEXT NOT NULL PRIMARY KEY,
+  idempotency_key TEXT NOT NULL,
+  type TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  counterparty_kind TEXT,
+  counterparty_id TEXT,
+  counterparty_name TEXT,
+  counterparty_phone TEXT,
+  note TEXT,
+  status TEXT NOT NULL,
+  failure_reason TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX server_transaction_changes ON server_transaction(updated_at, id);
+
+CREATE TABLE server_meta (
+  key TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+insertTransaction:
+INSERT OR REPLACE INTO server_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getTransaction:
+SELECT * FROM server_transaction WHERE id = ?;
+
+changesSince:
+SELECT * FROM server_transaction
+WHERE updated_at > :afterUpdatedAt OR (updated_at = :afterUpdatedAt AND id > :afterId)
+ORDER BY updated_at, id
+LIMIT :limit;
+
+balance:
+SELECT COALESCE(SUM(CASE
+  WHEN status = 'SUCCESS' AND type IN ('TRANSFER_IN', 'TOP_UP') THEN amount
+  WHEN status IN ('SUCCESS', 'PENDING') AND type IN ('TRANSFER_OUT', 'QR_PAYMENT') THEN -amount
+  ELSE 0 END), 0) AS balance
+FROM server_transaction;
+
+usedSince:
+SELECT COALESCE(SUM(amount), 0) AS used FROM server_transaction
+WHERE created_at >= ? AND type IN ('TRANSFER_OUT', 'QR_PAYMENT') AND status IN ('SUCCESS', 'PENDING');
+
+deleteAllTransactions:
+DELETE FROM server_transaction;
+
+getMeta:
+SELECT value FROM server_meta WHERE key = ?;
+
+setMeta:
+INSERT OR REPLACE INTO server_meta(key, value) VALUES (?, ?);
+
+deleteAllMeta:
+DELETE FROM server_meta;

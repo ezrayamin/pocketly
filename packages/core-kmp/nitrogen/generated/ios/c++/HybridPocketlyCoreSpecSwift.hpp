@@ -12,12 +12,8 @@
 // Forward declaration of `HybridPocketlyCoreSpec_cxx` to properly resolve imports.
 namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 
-// Forward declaration of `DatasetConfig` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct DatasetConfig; }
-// Forward declaration of `Wallet` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct Wallet; }
-// Forward declaration of `TransactionPage` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct TransactionPage; }
+// Forward declaration of `DatasetSeed` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct DatasetSeed; }
 // Forward declaration of `Transaction` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `TransactionType` to properly resolve imports.
@@ -32,6 +28,12 @@ namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 namespace margelo::nitro::pocketly { enum class TransactionStatus; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `Wallet` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Wallet; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `TransactionPage` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
@@ -62,19 +64,20 @@ namespace margelo::nitro::pocketly { class HybridPriceSubscriptionSpec; }
 namespace margelo::nitro::pocketly { struct PriceTick; }
 
 #include <NitroModules/Promise.hpp>
-#include "DatasetConfig.hpp"
+#include "DatasetSeed.hpp"
 #include <optional>
-#include "Wallet.hpp"
-#include <string>
-#include "TransactionPage.hpp"
 #include "Transaction.hpp"
 #include <vector>
+#include <string>
 #include "TransactionType.hpp"
 #include "Category.hpp"
 #include "Counterparty.hpp"
 #include "CounterpartyKind.hpp"
 #include "TransactionStatus.hpp"
 #include "ErrorCode.hpp"
+#include "Wallet.hpp"
+#include "StaleInfo.hpp"
+#include "TransactionPage.hpp"
 #include "TxFilter.hpp"
 #include "NetworkSimulation.hpp"
 #include "NetworkMode.hpp"
@@ -142,8 +145,8 @@ namespace margelo::nitro::pocketly {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<void>> resetData(const DatasetConfig& config) override {
-      auto __result = _swiftPart.resetData(std::forward<decltype(config)>(config));
+    inline std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) override {
+      auto __result = _swiftPart.resetData(std::forward<decltype(config)>(config), extraTransactions);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -218,6 +221,30 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override {
+      auto __result = _swiftPart.stageIngestPayload(json);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<IngestResult>> ingestStaged() override {
+      auto __result = _swiftPart.ingestStaged();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline double echo(double value) override {
+      auto __result = _swiftPart.echo(std::forward<decltype(value)>(value));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline std::string formatMoney(double minor) override {
       auto __result = _swiftPart.formatMoney(std::forward<decltype(minor)>(minor));
       if (__result.hasError()) [[unlikely]] {
@@ -252,6 +279,14 @@ namespace margelo::nitro::pocketly {
     }
     inline double lastComputeMs() override {
       auto __result = _swiftPart.lastComputeMs();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline double lastStorageMs() override {
+      auto __result = _swiftPart.lastStorageMs();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

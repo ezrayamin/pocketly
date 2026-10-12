@@ -13,7 +13,7 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   
 
   // Methods
-  func resetData(config: DatasetConfig) throws -> Promise<Void>
+  func resetData(config: DatasetSeed, extraTransactions: [Transaction]) throws -> Promise<Void>
   func getWallet() throws -> Promise<Wallet>
   func getTransactions(cursor: String?, limit: Double, filter: TxFilter?) throws -> Promise<TransactionPage>
   func getTransaction(id: String) throws -> Promise<Transaction>
@@ -23,11 +23,15 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func setTimeZone(zoneId: String) throws -> Void
   func computeSpendingSummary(month: String) throws -> Promise<SpendingSummary>
   func ingestTransactions(json: String) throws -> Promise<IngestResult>
+  func stageIngestPayload(json: String) throws -> Promise<Void>
+  func ingestStaged() throws -> Promise<IngestResult>
+  func echo(value: Double) throws -> Double
   func formatMoney(minor: Double) throws -> String
   func formatMoneyBatch(minors: [Double]) throws -> [String]
   func parseMoney(input: String) throws -> MoneyParseResult
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)
   func lastComputeMs() throws -> Double
+  func lastStorageMs() throws -> Double
 }
 
 public extension HybridPocketlyCoreSpec_protocol {

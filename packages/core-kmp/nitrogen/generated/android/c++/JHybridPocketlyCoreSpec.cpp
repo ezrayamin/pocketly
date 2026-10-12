@@ -9,6 +9,10 @@
 
 // Forward declaration of `Wallet` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Wallet; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `ErrorCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class ErrorCode; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `Transaction` to properly resolve imports.
@@ -23,8 +27,6 @@ namespace margelo::nitro::pocketly { struct Counterparty; }
 namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TransactionStatus; }
-// Forward declaration of `ErrorCode` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class ErrorCode; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `NetworkMode` to properly resolve imports.
@@ -49,8 +51,8 @@ namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
 namespace margelo::nitro::pocketly { class HybridPriceSubscriptionSpec; }
-// Forward declaration of `DatasetConfig` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct DatasetConfig; }
+// Forward declaration of `DatasetSeed` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct DatasetSeed; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `PriceTick` to properly resolve imports.
@@ -62,6 +64,11 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "Wallet.hpp"
 #include "JWallet.hpp"
 #include <string>
+#include "StaleInfo.hpp"
+#include <optional>
+#include "JStaleInfo.hpp"
+#include "ErrorCode.hpp"
+#include "JErrorCode.hpp"
 #include "TransactionPage.hpp"
 #include "JTransactionPage.hpp"
 #include "Transaction.hpp"
@@ -72,14 +79,11 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "Category.hpp"
 #include "JCategory.hpp"
 #include "Counterparty.hpp"
-#include <optional>
 #include "JCounterparty.hpp"
 #include "CounterpartyKind.hpp"
 #include "JCounterpartyKind.hpp"
 #include "TransactionStatus.hpp"
 #include "JTransactionStatus.hpp"
-#include "ErrorCode.hpp"
-#include "JErrorCode.hpp"
 #include "NetworkSimulation.hpp"
 #include "JNetworkSimulation.hpp"
 #include "NetworkMode.hpp"
@@ -105,8 +109,8 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "JHybridPriceSubscriptionSpec.hpp"
-#include "DatasetConfig.hpp"
-#include "JDatasetConfig.hpp"
+#include "DatasetSeed.hpp"
+#include "JDatasetSeed.hpp"
 #include "TxFilter.hpp"
 #include "JTxFilter.hpp"
 #include "PriceTick.hpp"
@@ -148,9 +152,18 @@ namespace margelo::nitro::pocketly {
   
 
   // Methods
-  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetConfig& config) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetConfig> /* config */)>("resetData");
-    auto __result = method(_javaPart, JDatasetConfig::fromCpp(config));
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetSeed> /* config */, jni::alias_ref<jni::JArrayClass<JTransaction>> /* extraTransactions */)>("resetData");
+    auto __result = method(_javaPart, JDatasetSeed::fromCpp(config), [&](auto&& __input) {
+      size_t __size = __input.size();
+      jni::local_ref<jni::JArrayClass<JTransaction>> __array = jni::JArrayClass<JTransaction>::newArray(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        const auto& __element = __input[__i];
+        auto __elementJni = JTransaction::fromCpp(__element);
+        __array->setElement(__i, *__elementJni);
+      }
+      return __array;
+    }(extraTransactions));
     return [&]() {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
@@ -272,6 +285,42 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::stageIngestPayload(const std::string& json) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* json */)>("stageIngestPayload");
+    auto __result = method(_javaPart, jni::make_jstring(json));
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<IngestResult>> JHybridPocketlyCoreSpec::ingestStaged() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("ingestStaged");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<IngestResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JIngestResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  double JHybridPocketlyCoreSpec::echo(double value) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<double(double /* value */)>("echo");
+    auto __result = method(_javaPart, value);
+    return __result;
+  }
   std::string JHybridPocketlyCoreSpec::formatMoney(double minor) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>(double /* minor */)>("formatMoney");
     auto __result = method(_javaPart, minor);
@@ -317,6 +366,11 @@ namespace margelo::nitro::pocketly {
   }
   double JHybridPocketlyCoreSpec::lastComputeMs() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastComputeMs");
+    auto __result = method(_javaPart);
+    return __result;
+  }
+  double JHybridPocketlyCoreSpec::lastStorageMs() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastStorageMs");
     auto __result = method(_javaPart);
     return __result;
   }

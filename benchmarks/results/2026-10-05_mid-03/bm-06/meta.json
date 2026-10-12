@@ -1,0 +1,5 @@
+{ "scenario": "BM-06", "rounds": 5, "runsPerRound": 10, "warmupPerRound": 5,
+  "order": "alternating js,kmp per round, one cold start per build per round",
+  "tool": "in-app harness (apps/mobile/src/bench) via launch arguments, perf builds",
+  "coolDownToC": 40, "adbTransport": "10DG480BHX0009F",
+  "at": "2026-10-05T11:10:20Z" }

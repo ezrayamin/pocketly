@@ -1,29 +1,29 @@
 package com.pocketly.shared.data.fake
 
+import com.pocketly.shared.data.ChangesPage
 import com.pocketly.shared.data.FakeBackendControls
 import com.pocketly.shared.data.TimeZoneHolder
-import com.pocketly.shared.data.TransactionStore
+import com.pocketly.shared.data.TransactionDtoValidator
 import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
+import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.Transaction
-import com.pocketly.shared.domain.TransactionPage
-import com.pocketly.shared.domain.TxFilter
 import com.pocketly.shared.domain.Wallet
 import com.pocketly.shared.domain.ZonedCalendar
 import kotlin.concurrent.Volatile
 
 /**
- * In-process fake backend (requirements §4.2). Serves straight from the store.
- * Its clock is frozen at `DatasetConfig.nowMillis` when given (tests, benchmarks) and is
- * the device clock otherwise (the app). Latency/failure simulation (FR-FAKE-04) arrives
- * with the developer menu. Mirrors packages/core-js/src/data/fakeWalletApi.ts.
+ * In-process fake backend (requirements §4.2) on its own database (ADR-0009). Its clock is
+ * frozen at `DatasetConfig.nowMillis` when given (tests, benchmarks) and is the device clock
+ * otherwise (the app). State survives restarts (FR-FAKE-07).
+ * Mirrors packages/core-js/src/data/fake/fakeWalletApi.ts.
  */
 internal class FakeWalletApi(
-    private val store: TransactionStore,
+    private val store: ServerStore,
     private val timeZone: TimeZoneHolder,
 ) : WalletApi, FakeBackendControls {
     private val network = NetworkSimulator()
@@ -38,18 +38,42 @@ internal class FakeWalletApi(
 
     fun now(): Long = frozenNow ?: currentTimeMillis()
 
+    /** Seeds the database with [config] only if it's empty (the app keeps its data). */
+    fun open(config: DatasetConfig) {
+        if (store.getMeta(META_SEEDED) == null) {
+            reset(config)
+            return
+        }
+        frozenNow = store.getMeta(META_FROZEN_NOW)?.takeIf { it.isNotEmpty() }?.toLong()
+        simulatedIncoming = store.getMeta(META_SIMULATED_INCOMING)?.toInt() ?: 0
+    }
+
     override fun reset(config: DatasetConfig) {
         if (config.transactionCount < 1) {
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "transactionCount must be >= 1")
         }
+        config.extraTransactions.forEachIndexed { index, tx ->
+            TransactionDtoValidator.validate(tx)?.let {
+                throw CoreException(ErrorCode.INVALID_ARGUMENT, "extraTransactions[$index]: $it")
+            }
+        }
         frozenNow = config.nowMillis
         simulatedIncoming = 0
-        store.replaceAll(SeedData.generate(config, now()))
+        store.replaceAll(
+            SeedData.generate(config, now()) + config.extraTransactions,
+            mapOf(
+                META_SEEDED to "1",
+                META_FROZEN_NOW to (config.nowMillis?.toString() ?: ""),
+                META_SIMULATED_INCOMING to "0",
+            ),
+        )
     }
 
     override fun simulateIncomingTransfer(): Transaction {
-        val tx = SeedData.simulatedIncomingTransfer(++simulatedIncoming, now())
-        store.insertAll(listOf(tx))
+        val tx = SeedData.simulatedIncomingTransfer(simulatedIncoming + 1, now())
+        store.insert(tx)
+        simulatedIncoming += 1
+        store.setMeta(META_SIMULATED_INCOMING, simulatedIncoming.toString())
         return tx
     }
 
@@ -61,19 +85,29 @@ internal class FakeWalletApi(
         val todayStart = ZonedCalendar.localMidnight(ZonedCalendar.localEpochDay(now, zone), zone)
         return Wallet(
             id = SeedData.WALLET_ID,
-            balance = store.balance(),
+            balance = Money(store.balance()),
             dailyLimit = SeedData.DAILY_LIMIT,
-            usedToday = store.usedSince(todayStart),
+            usedToday = Money(store.usedSince(todayStart)),
             updatedAt = now,
         )
     }
 
-    override suspend fun getTransactions(cursor: String?, limit: Int, filter: TxFilter?): TransactionPage {
+    override suspend fun getChanges(afterToken: String?, limit: Int): ChangesPage {
         network.beforeCall()
-        if (limit !in 1..MAX_PAGE_SIZE) {
-            throw CoreException(ErrorCode.INVALID_ARGUMENT, "limit must be 1..$MAX_PAGE_SIZE, got $limit")
+        if (limit !in 1..MAX_CHANGES_PAGE) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "limit must be 1..$MAX_CHANGES_PAGE")
         }
-        return store.page(cursor, limit, filter)
+        var afterUpdatedAt = -1L
+        var afterId = ""
+        if (afterToken != null) {
+            val m = TOKEN.find(afterToken) ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "Malformed sync token")
+            afterUpdatedAt = m.groupValues[1].toLong()
+            afterId = m.groupValues[2]
+        }
+        val rows = store.changesSince(afterUpdatedAt, afterId, limit + 1L)
+        val items = rows.take(limit)
+        val next = items.lastOrNull()?.let { "${it.updatedAt}:${it.id}" } ?: afterToken
+        return ChangesPage(items, next, hasMore = rows.size > limit)
     }
 
     override suspend fun getTransaction(id: String): Transaction {
@@ -82,6 +116,11 @@ internal class FakeWalletApi(
     }
 
     companion object {
-        const val MAX_PAGE_SIZE = 100
+        /** Server-side page size cap for getChanges (sync). Same as core-js. */
+        const val MAX_CHANGES_PAGE = 500
+        private const val META_SEEDED = "seeded"
+        private const val META_FROZEN_NOW = "frozenNowMillis"
+        private const val META_SIMULATED_INCOMING = "simulatedIncoming"
+        private val TOKEN = Regex("""^(-?\d+):(.*)$""")
     }
 }

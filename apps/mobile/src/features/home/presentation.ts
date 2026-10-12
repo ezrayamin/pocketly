@@ -42,6 +42,14 @@ const ATTENTION: Partial<Record<TransactionStatus, StatusBadge>> = {
   REVERSED: { label: 'Reversed', tone: 'neutral', pill: true },
 };
 
+/** The persisted status in words (transaction detail, receipts). */
+export const STATUS_LABEL: Record<TransactionStatus, string> = {
+  PENDING: 'Pending',
+  SUCCESS: 'Completed',
+  FAILED: 'Failed',
+  REVERSED: 'Reversed',
+};
+
 /** NFR-A11Y-03: every status has a text label, never color alone. */
 export function statusBadge(tx: Transaction): StatusBadge {
   const attention = ATTENTION[tx.status];
@@ -79,6 +87,32 @@ export function relativeDay(ms: number, now: number): string {
   if (days === 1) return 'Yesterday';
   const d = new Date(ms);
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
+export const FULL_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/** "Today" / "Yesterday" / "October 1, 2026": History's day headers (FR-HIST-02). */
+export function dayLabel(ms: number, now: number): string {
+  const days = Math.round((startOfLocalDay(now) - startOfLocalDay(ms)) / 86_400_000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  const d = new Date(ms);
+  return `${FULL_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+/** Local calendar day, `YYYY-MM-DD`: groups History rows by the device's day. */
+export function localDayKey(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** "Oct 4, 2026, 09:40 AM" (transaction detail and receipts). */
+export function formatDateTime(ms: number): string {
+  const d = new Date(ms);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}, ${formatTime(ms)}`;
 }
 
 /** Local `YYYY-MM` of a timestamp: the month the core resolves in the same device zone. */

@@ -18,9 +18,11 @@
 #include "JCounterparty.hpp"
 #include "JCounterpartyKind.hpp"
 #include "JErrorCode.hpp"
+#include "JStaleInfo.hpp"
 #include "JTransaction.hpp"
 #include "JTransactionStatus.hpp"
 #include "JTransactionType.hpp"
+#include "StaleInfo.hpp"
 #include "Transaction.hpp"
 #include "TransactionStatus.hpp"
 #include "TransactionType.hpp"
@@ -51,6 +53,8 @@ namespace margelo::nitro::pocketly {
       jni::local_ref<jni::JArrayClass<JTransaction>> items = this->getFieldValue(fieldItems);
       static const auto fieldNextCursor = clazz->getField<jni::JString>("nextCursor");
       jni::local_ref<jni::JString> nextCursor = this->getFieldValue(fieldNextCursor);
+      static const auto fieldStale = clazz->getField<JStaleInfo>("stale");
+      jni::local_ref<JStaleInfo> stale = this->getFieldValue(fieldStale);
       return TransactionPage(
         [&](auto&& __input) {
           size_t __size = __input->size();
@@ -62,7 +66,8 @@ namespace margelo::nitro::pocketly {
           }
           return __vector;
         }(items),
-        nextCursor != nullptr ? std::make_optional(nextCursor->toStdString()) : std::nullopt
+        nextCursor != nullptr ? std::make_optional(nextCursor->toStdString()) : std::nullopt,
+        stale != nullptr ? std::make_optional(stale->toCpp()) : std::nullopt
       );
     }
 
@@ -72,7 +77,7 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JTransactionPage::javaobject> fromCpp(const TransactionPage& value) {
-      using JSignature = JTransactionPage(jni::alias_ref<jni::JArrayClass<JTransaction>>, jni::alias_ref<jni::JString>);
+      using JSignature = JTransactionPage(jni::alias_ref<jni::JArrayClass<JTransaction>>, jni::alias_ref<jni::JString>, jni::alias_ref<JStaleInfo>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -87,7 +92,8 @@ namespace margelo::nitro::pocketly {
           }
           return __array;
         }(value.items),
-        value.nextCursor.has_value() ? jni::make_jstring(value.nextCursor.value()) : nullptr
+        value.nextCursor.has_value() ? jni::make_jstring(value.nextCursor.value()) : nullptr,
+        value.stale.has_value() ? JStaleInfo::fromCpp(value.stale.value()) : nullptr
       );
     }
   };

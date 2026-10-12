@@ -24,11 +24,15 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("setTimeZone", &HybridPocketlyCoreSpec::setTimeZone);
       prototype.registerHybridMethod("computeSpendingSummary", &HybridPocketlyCoreSpec::computeSpendingSummary);
       prototype.registerHybridMethod("ingestTransactions", &HybridPocketlyCoreSpec::ingestTransactions);
+      prototype.registerHybridMethod("stageIngestPayload", &HybridPocketlyCoreSpec::stageIngestPayload);
+      prototype.registerHybridMethod("ingestStaged", &HybridPocketlyCoreSpec::ingestStaged);
+      prototype.registerHybridMethod("echo", &HybridPocketlyCoreSpec::echo);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("formatMoneyBatch", &HybridPocketlyCoreSpec::formatMoneyBatch);
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);
       prototype.registerHybridMethod("subscribePrices", &HybridPocketlyCoreSpec::subscribePrices);
       prototype.registerHybridMethod("lastComputeMs", &HybridPocketlyCoreSpec::lastComputeMs);
+      prototype.registerHybridMethod("lastStorageMs", &HybridPocketlyCoreSpec::lastStorageMs);
     });
   }
 

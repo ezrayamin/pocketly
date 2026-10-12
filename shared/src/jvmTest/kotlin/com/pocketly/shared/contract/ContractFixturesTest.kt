@@ -2,6 +2,8 @@ package com.pocketly.shared.contract
 
 import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.PocketlyCore
+import com.pocketly.shared.data.TransactionDtoValidator
+import com.pocketly.shared.data.db.JvmDatabaseDrivers
 import com.pocketly.shared.domain.BalanceCheck
 import com.pocketly.shared.domain.CategoryTotal
 import com.pocketly.shared.domain.Counterparty
@@ -65,7 +67,8 @@ class ContractFixturesTest {
 
     @BeforeTest
     fun setUp() = runTest {
-        core = PocketlyCore.create()
+        core = PocketlyCore.create(JvmDatabaseDrivers())
+        core.setTimeZone("UTC")
         core.resetData(DatasetConfig.DEFAULT)
     }
 
@@ -193,6 +196,16 @@ class ContractFixturesTest {
         assertEquals(0, second.accepted)
     }
 
+    @Test
+    fun ingestStaged() = runTest {
+        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.ingestStaged() }.code)
+        core.stageIngestPayload(ingest["input"].toString())
+        core.resetData(DatasetConfig.DEFAULT) // the staged payload is the core's, not the database's
+        assertEquals(ingest["expected"], core.ingestStaged().toJson())
+        assertEquals("Iced latte", core.getTransaction("ing-0001").note)
+        assertEquals(0, core.ingestStaged().accepted) // still staged: only duplicates now
+    }
+
     // ── developer menu (F11) ───────────────────────────────────────────────
 
     private fun simulation(o: JsonObject) = NetworkSimulation(
@@ -217,14 +230,39 @@ class ContractFixturesTest {
     }
 
     @Test
-    fun networkModeErrors() = runTest {
+    fun networkModeErrorsFallBackToTheReplica() = runTest {
         for (case in network["modeErrors"]!!.jsonArray.map { it.jsonObject }) {
+            core.setNetworkSimulation(NetworkSimulation.NORMAL)
+            val fresh = core.getWallet()
             core.setNetworkSimulation(simulation(case))
             val expected = case["error"]!!.jsonPrimitive.content
-            assertEquals(expected, assertFailsWith<CoreException> { core.getWallet() }.code.name)
-            assertEquals(expected, assertFailsWith<CoreException> { core.getTransactions(null, 20, null) }.code.name)
-            core.computeSpendingSummary("2026-09") // local work isn't a backend call
+            val wallet = core.getWallet()
+            assertEquals(expected, wallet.stale?.reason?.name)
+            assertEquals(fresh, wallet.copy(stale = null))
+            val page = core.getTransactions(null, 20, null)
+            assertEquals(expected, page.stale?.reason?.name)
+            assertEquals(golden["defaultDataset"]!!.jsonObject["firstPage"], page.copy(stale = null).toJson())
+            core.getTransactions(page.nextCursor, 20, null) // later pages never touch the server
+            core.computeSpendingSummary("2026-09")
         }
+    }
+
+    @Test
+    fun withNothingCachedAnUnreachableServerIsAnError() = runTest {
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.OFFLINE, failureRatePercent = 0))
+        core.resetData(DatasetConfig.DEFAULT) // replica cleared, sync fails
+        assertEquals(ErrorCode.NETWORK_UNAVAILABLE, assertFailsWith<CoreException> { core.getWallet() }.code)
+        assertEquals(ErrorCode.NETWORK_UNAVAILABLE, assertFailsWith<CoreException> { core.getTransactions(null, 20, null) }.code)
+    }
+
+    @Test
+    fun theReplicaIsSeparateFromTheServer() = runTest {
+        core.getTransactions(null, 20, null) // synced
+        core.simulateIncomingTransfer() // server-side change
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.OFFLINE, failureRatePercent = 0))
+        kotlin.test.assertFalse("sim-000001" in core.getTransactions(null, 20, null).items.map { it.id })
+        core.setNetworkSimulation(NetworkSimulation.NORMAL)
+        assertEquals("sim-000001", core.getTransactions(null, 20, null).items.first().id)
     }
 
     @Test
@@ -232,13 +270,7 @@ class ContractFixturesTest {
         val g = golden["network"]!!.jsonObject
         core.setNetworkSimulation(simulation(g["simulation"]!!.jsonObject))
         val outcomes = g["outcomes"]!!.jsonArray.map { it.jsonPrimitive.content }
-        val actual = outcomes.map {
-            try {
-                core.getWallet(); "OK"
-            } catch (e: CoreException) {
-                e.code.name
-            }
-        }
+        val actual = outcomes.map { core.getWallet().stale?.reason?.name ?: "OK" }
         assertEquals(outcomes, actual)
     }
 
@@ -246,10 +278,11 @@ class ContractFixturesTest {
     fun lateResponsesHaveNoEffect() = runTest {
         val late = network["lateResponse"]!!.jsonObject
         for (failureRate in listOf(0, 100)) {
-            val c = PocketlyCore.create()
+            val c = PocketlyCore.create(JvmDatabaseDrivers())
+            c.resetData(DatasetConfig.DEFAULT)
             val before = c.getWallet()
             c.setNetworkSimulation(simulation(late["simulation"]!!.jsonObject).copy(failureRatePercent = failureRate))
-            assertEquals(ErrorCode.NETWORK_TIMEOUT, assertFailsWith<CoreException> { c.getWallet() }.code)
+            assertEquals(ErrorCode.NETWORK_TIMEOUT, c.getWallet().stale?.reason) // answered from the replica
             kotlinx.coroutines.delay(late["waitAfterTimeoutMs"]!!.jsonPrimitive.long) // backend would answer now
             c.setNetworkSimulation(NetworkSimulation.NORMAL)
             assertEquals(before, c.getWallet(), "failureRate=$failureRate")
@@ -276,11 +309,14 @@ class ContractFixturesTest {
     fun timeZoneEdges() = runTest {
         for (case in timeZones["cases"]!!.jsonArray.map { it.jsonObject }) {
             val name = case["name"]!!.jsonPrimitive.content
-            val c = PocketlyCore.create()
-            c.resetData(DatasetConfig(seed = 1, transactionCount = 1, nowMillis = case["nowMillis"]!!.jsonPrimitive.long))
+            val c = PocketlyCore.create(JvmDatabaseDrivers())
             c.setTimeZone(case["zone"]!!.jsonPrimitive.content)
-            val txs = case["transactions"]!!.jsonArray
-            assertEquals(txs.size, c.ingestTransactions(txs.toString()).accepted, name)
+            val txs = case["transactions"]!!.jsonArray.map {
+                (TransactionDtoValidator.validate(it) as TransactionDtoValidator.Result.Valid).value
+            }
+            c.resetData(
+                DatasetConfig(seed = 1, transactionCount = 1, nowMillis = case["nowMillis"]!!.jsonPrimitive.long, extraTransactions = txs),
+            )
 
             val expected = case["expected"]!!.jsonObject
             assertEquals(expected["usedToday"]!!.jsonPrimitive.long, c.getWallet().usedToday.minor, "$name usedToday")

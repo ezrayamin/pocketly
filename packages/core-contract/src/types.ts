@@ -73,12 +73,24 @@ export interface Counterparty {
   phone?: string;
 }
 
+/**
+ * Present when data came from the local replica because the server couldn't be reached
+ * (FR-HIST-04, product §6.3 "Last updated hh:mm" + offline banner). ADR-0009.
+ */
+export interface StaleInfo {
+  /** Why the server wasn't used: NETWORK_UNAVAILABLE, NETWORK_TIMEOUT or SERVER_ERROR. */
+  reason: ErrorCode;
+  /** When the cached data was last synced from the server. */
+  cachedAt: EpochMillis;
+}
+
 export interface Wallet {
   id: string;
   balance: MinorUnits;
   dailyLimit: MinorUnits;
   usedToday: MinorUnits;
   updatedAt: EpochMillis;
+  stale?: StaleInfo;
 }
 
 export interface Transaction {
@@ -100,6 +112,8 @@ export interface TransactionPage {
   items: Transaction[];
   /** Opaque. Absent on the last page. */
   nextCursor?: string;
+  /** First page only: the refresh couldn't reach the server, so this is the replica as last synced. */
+  stale?: StaleInfo;
 }
 
 export interface TxFilter {
@@ -215,7 +229,8 @@ export interface NetworkSimulation {
   seed?: number;
 }
 
-export interface DatasetConfig {
+/** The generated part of a dataset. Split out so core-kmp can bridge it on its own. */
+export interface DatasetSeed {
   seed: number;
   /** Total ledger entries, including the opening top-up. Must be >= 1. */
   transactionCount: number;
@@ -225,4 +240,12 @@ export interface DatasetConfig {
    * backend follows the device clock and data is seeded relative to "now" (the app).
    */
   nowMillis?: EpochMillis;
+}
+
+export interface DatasetConfig extends DatasetSeed {
+  /**
+   * Extra transactions the fake server is seeded with, on top of the generated ones (tests,
+   * demos). Validated like ingest input; any invalid entry rejects the reset (INVALID_ARGUMENT).
+   */
+  extraTransactions?: Transaction[];
 }

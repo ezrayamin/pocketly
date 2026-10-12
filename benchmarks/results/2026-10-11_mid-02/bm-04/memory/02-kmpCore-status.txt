@@ -1,0 +1,54 @@
+Name:	om.pocketly.kmp
+Umask:	0077
+State:	S (sleeping)
+Tgid:	30599
+Ngid:	0
+Pid:	30599
+PPid:	1915
+TracerPid:	0
+Uid:	10537	10537	10537	10537
+Gid:	10537	10537	10537	10537
+FDSize:	256
+Groups:	3003 9997 20537 50537 99909997 
+Kthread:	0
+VmPeak:	19255588 kB
+VmSize:	19220596 kB
+VmLck:	       0 kB
+VmPin:	       0 kB
+VmHWM:	  275152 kB
+VmRSS:	  271860 kB
+RssAnon:	  140580 kB
+RssFile:	  129072 kB
+RssShmem:	    2208 kB
+VmData:	 1039484 kB
+VmStk:	    8192 kB
+VmExe:	       8 kB
+VmLib:	  202092 kB
+VmPTE:	    2040 kB
+VmSwap:	   29616 kB
+CoreDumping:	0
+THP_enabled:	1
+untag_mask:	0xffffffffffffff
+Threads:	41
+SigQ:	1/27307
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000080001204
+SigIgn:	0000000000000001
+SigCgt:	0000006e400084f8
+CapInh:	0000000000000000
+CapPrm:	0000000000000000
+CapEff:	0000000000000000
+CapBnd:	0000000000000000
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	2
+Seccomp_filters:	1
+Speculation_Store_Bypass:	thread vulnerable
+SpeculationIndirectBranch:	unknown
+Cpus_allowed:	ff
+Cpus_allowed_list:	0-7
+Mems_allowed:	1
+Mems_allowed_list:	0
+voluntary_ctxt_switches:	538
+nonvoluntary_ctxt_switches:	107

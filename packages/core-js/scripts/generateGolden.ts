@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { DEFAULT_DATASET } from '@pocketly/core-contract';
 import type { DatasetConfig } from '@pocketly/core-contract';
 import { readAllTransactions } from '@pocketly/core-contract/src/testing/contractSuite';
-import { JsCore } from '../src/jsCore';
+import { testCore } from '../testing/testCore';
 import { PriceFeed } from '../src/sync/priceFeed';
 
 const LARGE_DATASET: DatasetConfig = { ...DEFAULT_DATASET, seed: 7, transactionCount: 10_000 };
@@ -18,7 +18,8 @@ const PRICE_SYMBOLS = ['BTC', 'ETH', 'XAU', 'DOGE'];
 const PRICE_SEED = 7;
 
 async function main() {
-  const core = new JsCore({ dataset: DEFAULT_DATASET });
+  const core = testCore({ dataset: DEFAULT_DATASET });
+  await core.resetData(DEFAULT_DATASET); // as the contract suite's beforeEach does
 
   const defaultDataset = {
     config: DEFAULT_DATASET,
@@ -47,12 +48,15 @@ async function main() {
   const prices = { symbols: PRICE_SYMBOLS, seed: PRICE_SEED, batches: [feed.step(), feed.step(), feed.step()] };
 
   // Network failure sequence (FR-DEV-03): fixed seed, 30% failure rate, 24 calls.
-  const networkCore = new JsCore({ dataset: DEFAULT_DATASET });
+  // A failed call is answered from the replica, marked stale with the failure's reason (ADR-0009).
+  const networkCore = testCore({ dataset: DEFAULT_DATASET });
+  await networkCore.resetData(DEFAULT_DATASET);
   const simulation = { mode: 'NORMAL' as const, failureRatePercent: 30, seed: 7 };
   networkCore.setNetworkSimulation(simulation);
   const outcomes: string[] = [];
   for (let i = 0; i < 24; i++) {
-    outcomes.push(await networkCore.getWallet().then(() => 'OK', (e: { code: string }) => e.code));
+    const wallet = await networkCore.getWallet();
+    outcomes.push(wallet.stale ? wallet.stale.reason : 'OK');
   }
   const network = { simulation, outcomes };
 

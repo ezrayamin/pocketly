@@ -54,7 +54,7 @@ namespace margelo::nitro::pocketly {
 
   public:
     // Methods
-    std::shared_ptr<Promise<void>> resetData(const DatasetConfig& config) override;
+    std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) override;
     std::shared_ptr<Promise<Wallet>> getWallet() override;
     std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) override;
     std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) override;
@@ -64,11 +64,15 @@ namespace margelo::nitro::pocketly {
     void setTimeZone(const std::string& zoneId) override;
     std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) override;
     std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override;
+    std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override;
+    std::shared_ptr<Promise<IngestResult>> ingestStaged() override;
+    double echo(double value) override;
     std::string formatMoney(double minor) override;
     std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;
     MoneyParseResult parseMoney(const std::string& input) override;
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;
     double lastComputeMs() override;
+    double lastStorageMs() override;
 
   private:
     jni::global_ref<JHybridPocketlyCoreSpec::JavaPart> _javaPart;

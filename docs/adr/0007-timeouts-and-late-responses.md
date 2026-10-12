@@ -32,3 +32,12 @@ differently in exactly the case that looks fine: a response arriving *after* the
 - `NetworkSimulation.readTimeoutMs` (default 10 s) exists for tests and the developer menu.
 - When writes land in M3, add a contract test: a transfer that times out on the client still
   completes on the server and is visible on the next status check, in both cores.
+
+## Verified on device (2026-10-05, slice 4)
+
+`apps/mobile/scripts/late-response-check.sh` on the vivo V2538, both builds (perf): with 6 s
+latency and a 2 s timeout, a server-side incoming transfer made during the slow period stayed
+invisible after its late response arrived. Home kept the replica's balance and the "taking
+longer than usual" banner, the transfer row didn't appear, and an OFFLINE read showed the
+replica unchanged. Back on NORMAL the transfer appeared. This covers the wallet fetch and the
+first-page ledger sync, which the contract test's unchanged-data check can't distinguish.

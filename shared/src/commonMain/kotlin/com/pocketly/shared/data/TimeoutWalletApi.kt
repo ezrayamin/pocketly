@@ -3,8 +3,6 @@ package com.pocketly.shared.data
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Transaction
-import com.pocketly.shared.domain.TransactionPage
-import com.pocketly.shared.domain.TxFilter
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -22,8 +20,8 @@ internal class TimeoutWalletApi(
 ) : WalletApi {
     override suspend fun getWallet() = withReadTimeout { inner.getWallet() }
 
-    override suspend fun getTransactions(cursor: String?, limit: Int, filter: TxFilter?): TransactionPage =
-        withReadTimeout { inner.getTransactions(cursor, limit, filter) }
+    override suspend fun getChanges(afterToken: String?, limit: Int): ChangesPage =
+        withReadTimeout { inner.getChanges(afterToken, limit) }
 
     override suspend fun getTransaction(id: String): Transaction = withReadTimeout { inner.getTransaction(id) }
 

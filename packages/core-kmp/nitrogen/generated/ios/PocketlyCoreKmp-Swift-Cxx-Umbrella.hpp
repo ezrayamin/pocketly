@@ -18,8 +18,8 @@ namespace margelo::nitro::pocketly { enum class Category; }
 namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 // Forward declaration of `Counterparty` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Counterparty; }
-// Forward declaration of `DatasetConfig` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct DatasetConfig; }
+// Forward declaration of `DatasetSeed` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct DatasetSeed; }
 // Forward declaration of `DayTotal` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
@@ -46,6 +46,8 @@ namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 namespace margelo::nitro::pocketly { struct PriceTick; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -65,7 +67,7 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "CategoryTotal.hpp"
 #include "Counterparty.hpp"
 #include "CounterpartyKind.hpp"
-#include "DatasetConfig.hpp"
+#include "DatasetSeed.hpp"
 #include "DayTotal.hpp"
 #include "ErrorCode.hpp"
 #include "HybridPocketlyCoreSpec.hpp"
@@ -79,6 +81,7 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "NetworkSimulation.hpp"
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
+#include "StaleInfo.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"

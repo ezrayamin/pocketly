@@ -242,10 +242,10 @@
             "name": "Joko Susilo",
             "phone": "+15550000010"
           },
+          "note": "Groceries",
           "status": "SUCCESS",
           "createdAt": 1790484300000,
-          "updatedAt": 1790484300000,
-          "note": "Groceries"
+          "updatedAt": 1790484300000
         },
         {
           "id": "tx-000086",

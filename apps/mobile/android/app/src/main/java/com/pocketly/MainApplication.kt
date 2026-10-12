@@ -13,10 +13,11 @@ class MainApplication : Application(), ReactApplication {
     getDefaultReactHost(
       context = applicationContext,
       packageList =
-        PackageList(this).packages.apply {
-          // Flavor-specific (src/jsCore | src/kmpCore): the KMP core is linked only into kmpCore.
-          addAll(CorePackages.packages)
-        },
+        PackageList(this).packages
+          // Flavor-specific (src/jsCore | src/kmpCore): each core's own packages in, the other's out.
+          .filterNot { it.javaClass.name in CorePackages.excludedPackageClasses }
+          .toMutableList()
+          .apply { addAll(CorePackages.packages) },
     )
   }
 

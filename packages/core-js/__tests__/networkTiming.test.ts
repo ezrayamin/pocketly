@@ -1,5 +1,5 @@
 import { READ_TIMEOUT_MS, SLOW_LATENCY_MAX_MS, SLOW_LATENCY_MIN_MS } from '@pocketly/core-contract';
-import { JsCore } from '../src/jsCore';
+import { testCore } from '../testing/testCore';
 
 /** Timing behaviour, on fake timers (the Kotlin mirror uses runTest virtual time). */
 describe('network timing (FR-DEV-02, NFR-REL-01)', () => {
@@ -7,7 +7,7 @@ describe('network timing (FR-DEV-02, NFR-REL-01)', () => {
   afterEach(() => jest.useRealTimers());
 
   it('SLOW answers after 2–5 s', async () => {
-    const core = new JsCore();
+    const core = testCore();
     core.setNetworkSimulation({ mode: 'SLOW', failureRatePercent: 0 });
     let done = false;
     const call = core.getWallet().then(() => (done = true));
@@ -19,7 +19,7 @@ describe('network timing (FR-DEV-02, NFR-REL-01)', () => {
   });
 
   it('TIMEOUT gives up with NETWORK_TIMEOUT after READ_TIMEOUT_MS', async () => {
-    const core = new JsCore();
+    const core = testCore();
     core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0 });
     const call = core.getWallet();
     const assertion = expect(call).rejects.toMatchObject({ code: 'NETWORK_TIMEOUT' });
@@ -28,7 +28,7 @@ describe('network timing (FR-DEV-02, NFR-REL-01)', () => {
   });
 
   it('NORMAL with latency waits exactly normalLatencyMs (BM-07 uses 300)', async () => {
-    const core = new JsCore();
+    const core = testCore();
     core.setNetworkSimulation({ mode: 'NORMAL', failureRatePercent: 0, normalLatencyMs: 300 });
     let done = false;
     const call = core.getWallet().then(() => (done = true));

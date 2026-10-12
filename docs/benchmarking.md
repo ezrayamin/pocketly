@@ -1,6 +1,6 @@
 # Pocketly — Benchmarking Plan
 
-**Status:** Draft v0.1 · **Related:** `product.md`, `requirements.md` · **Last updated:** 2026-10-03
+**Status:** Draft v0.2 · **Related:** `product.md`, `requirements.md`, ADR-0009 · **Last updated:** 2026-10-04
 **Primary platform:** Android (most target users). iOS results are optional and reported separately.
 
 ---
@@ -107,6 +107,14 @@ export const core: Core =
 | BM-PAR-04 | Same fixtures, same random seed, same fake API latency |
 | BM-PAR-05 | Same React Native version, Hermes on, minification on, release signing |
 
+> **BM-PAR-03 in practice (ADR-0009):** both cores store data in SQLite, but through different
+> libraries: `jsCore` uses op-sqlite (its own bundled SQLite, over JSI), `kmpCore` uses
+> SQLDelight on the platform's SQLite. Same schema (generated from the same `.sq` files),
+> different engine builds. So every scenario that touches storage reports it separately:
+> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2). Bulk writes follow the same
+> pattern in both: one transaction, one prepared statement bound and stepped per row (from
+> 2026-10-11; before that, `jsCore` re-prepared the statement for every row).
+
 ## 4. Environment & Test Rules
 
 ### 4.1 Devices
@@ -121,14 +129,15 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 
 ### 4.2 Pre-run checklist
 
-- [ ] **Release** builds of both flavors (never debug), freshly installed
+- [ ] **Release-optimized** builds of both flavors, freshly installed: `release`, or `perf` when the scenario needs launch arguments (§5.3). Never debug
 - [ ] Device restarted at the start of the session
 - [ ] Airplane mode on (the fake API is local), Wi-Fi/Bluetooth off
 - [ ] Battery > 50%, same charging state for every run
 - [ ] Fixed screen brightness, screen timeout disabled
+- [ ] Refresh rate **pinned** in display settings (not adaptive), and recorded: run `device-info.sh` with `EXPECTED_HZ=<rate>`, which fails if the setting differs. The ROM can still run the app at a lower rate (the vivo V2538 runs Pocketly at 60 Hz with the setting at 120); BM-02 records the in-app rate per iteration
 - [ ] Developer-option animation scales at **1x**
 - [ ] No other apps open, and battery-saver / performance modes off
-- [ ] Device temperature checked (`adb shell dumpsys battery` → temperature); 2 min cooldown between scenario batches
+- [ ] Device temperature checked (`adb shell dumpsys battery` → temperature); 2 min cooldown between scenario batches. Record the temperature at the start of every block or run (BM-01: per launch; BM-02: `temperatures.csv`). Temperatures depend on the scenario (BM-01 sessions ran at ~35 °C; BM-02's continuous flinging needs a 40 °C gate), so compare builds within a scenario, never temperatures across scenarios
 - [ ] Builds run **alternately** (js, kmp, js, kmp…) rather than all-js then all-kmp, so device drift affects both equally
 
 ### 4.3 Iterations & statistics
@@ -141,6 +150,22 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 
 - Report **median, p90 and IQR**, plus the number of runs. Don't report averages alone.
 - Report the **coefficient of variation** (CV). If CV is > 10%, the environment is too noisy: fix it and rerun.
+  **For timings, the CV rule applies only to metrics with a median above 2 ms.** Below that, the
+  spread is set by timer precision and scheduling jitter rather than by the environment: a
+  0.1–0.3 ms wobble (a thread wake-up, a GC tick, clock granularity) is already more than 10% of
+  a 1 ms median, and derived timings (bridge overhead = end-to-end − compute − storage) add up
+  the jitter of three clocks. Sub-2 ms timings are still reported with their CV, IQR and CI;
+  they just don't trigger a rerun. Non-time metrics (frame rate, CPU %, memory) keep the plain
+  10% rule. (Added 2026-10-11, before the 2026-10-11 session; earlier summaries flag all rows.)
+  **For rate metrics under 5% (e.g. janky frames), judge differences in absolute percentage
+  points, not by CV.** A few frames move a 0.8% rate by a third, so its CV says nothing about
+  the environment. `collect.ts` doesn't flag their CV; the shift and its CI are in points.
+  (Added 2026-10-11, during that session's write-up.)
+- **Keep every iteration that completed; exclude only failed ones**, and report how many were
+  excluded. Flashlight: status `SUCCESS` is kept even if its trace lost events (that affects
+  the frame-time trace of that iteration, not whether it ran). Harness: a cold start whose
+  result was logged. Never drop an iteration because its numbers look odd. (`collect.ts` has
+  worked this way since the first BM-02 session; written down 2026-10-11.)
 - Treat a difference as meaningful only if it's **> 5%** *and* the IQRs don't overlap. Optional: a Mann-Whitney U test.
 
 ## 5. Tools
@@ -170,6 +195,16 @@ Record each device's **model, chipset, RAM, Android version and build number** i
 > contains `<FullyDrawnMarker />` (rendered once Home has data). Calling `reportFullyDrawn()`
 > from a JS effect is too early: it runs before Fabric mounts the native views, so Android
 > stamps an earlier, sometimes empty, frame.
+>
+> **Change (2026-10-05): BM-02 drives flings with `adb shell input`, not Maestro.** On the same
+> device, Maestro 2.11's driver hangs or fails on the view-hierarchy call (120 s timeouts), while
+> `uiautomator dump` takes ~3 s. `benchmarks/scripts/bm-02-scroll.sh` makes a fixed number of
+> flings per pass (no screen reads while scrolling), and `bm-02-run.sh` runs it under Flashlight
+> as three steps so that only the scrolling is measured: the cold start with launch arguments is
+> `--beforeEachCommand`, the end-of-list check `--afterEachCommand` (with `--skipRestart`).
+> Blocks of 2 iterations alternate builds and each waits until the battery is ≤ 40 °C: a first
+> run without the gate drifted from 39 to 45 °C and skewed one build. The Maestro flow
+> (`bm-02-scroll.yaml`) stays for devices where Maestro works.
 >
 > **Live feeds stay out of other scenarios.** Home has no price feed (Invest/F10 is hidden
 > until it ships). When a live feed returns, it must not run during BM-01/BM-02: start it only
@@ -204,6 +239,55 @@ It records **two timings** for every `kmpCore` operation:
 
 **Bridge overhead = end-to-end − compute only.** For `jsCore`, end-to-end and compute are the same thing.
 
+Operations that also touch SQLite record a third timing, **storage** (`core.lastStorageMs()`),
+which is kept out of compute in both cores:
+
+| Operation | `lastComputeMs()` | `lastStorageMs()` |
+|---|---|---|
+| `computeSpendingSummary` (BM-03) | the calculation | reading the month's ledger from the replica |
+| `ingestTransactions` (BM-04) | parse + validate | writing the accepted rows to the replica |
+| `formatMoneyBatch` (BM-06) | formatting | 0 |
+
+For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
+
+**Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
+build started with `pocketly.bench=BM-03|BM-04|BM-04b|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders
+only the harness screen, runs the scenario in-process and logs the result to logcat, where the
+runner collects it. Inputs are built through the `Core` API rather than bundled files, so both
+builds get byte-identical inputs (each result carries input and output checksums, compared by
+`collect.ts`) and neither bundle grows (BM-08):
+
+| Scenario | Setup (not timed) | Timed per run |
+|---|---|---|
+| BM-03 | `resetData({ seed: 7, transactionCount: 10000 })` (syncs the replica) | `computeSpendingSummary('2026-09')` |
+| BM-04 | payload: the seed-2026 × 5,000 dataset paged out of the core, ids `in-…`, canonical JSON; before every run `resetData(DEFAULT_DATASET)` | `ingestTransactions(payload)` |
+| BM-04b | as BM-04, plus `stageIngestPayload(payload)` before every run: the payload is already on the core's side, as a network response would be in a core that owns the network | `ingestStaged()` |
+| BM-06 | 10,000 deterministic amounts | 10,000 × `formatMoney`, then 1 × `formatMoneyBatch`, then 10,000 × `echo` (call cost with no work: `echoEndToEndMs`) |
+
+Each cold start runs the warm-up and measured iterations; rounds alternate builds and wait for
+the battery to cool (`temperatures.csv`), as BM-02 does.
+
+**Memory rounds** (`MEMORY=1 bm-harness.sh …`, BM-04's peak memory) are separate from the
+timing rounds and go to `<scenario>/memory/`; their timings are not used. The app gets
+`pocketly.benchMemory=true`, idles 1 s after the warm-up and logs `bench-mark` lines:
+`measure-start`, `op-start <i>`/`op-end <i>` around each measured call (outside the timed
+span), `measure-end`. Meanwhile `rss-sampler.sh`, running on the device, appends VmRSS and
+VmSwap from `/proc/<pid>/status` every ~2–4 ms, timestamped with the shell's `$EPOCHREALTIME`,
+the clock `logcat -v epoch` uses. After the run the runner saves `/proc/<pid>/status` (VmHWM)
+and `dumpsys meminfo`. `collect.ts` reports, in MB:
+
+| Metric | Per | Meaning |
+|---|---|---|
+| `rssStart` | cold start | median RSS over the first second of samples (~0.5 s after launch, before setup and warm-up) |
+| `rssBaseline` | cold start | median RSS over the idle second before `measure-start`, i.e. **after** setup and the warm-up runs: it includes whatever the warm-up left behind |
+| `rssPeak`, `rssPeakOverBaseline` | cold start | max RSS from `measure-start` to `measure-end`, and minus the baseline |
+| `rssOpDelta` | measured call | max RSS during the call − the last sample before it |
+| `vmHwm` | cold start | kernel peak RSS since process start (includes startup and setup) |
+| `meminfoTotalPss`, `meminfoTotalRss`, `meminfoJavaHeapPss`, `meminfoNativeHeapPss` | cold start | `dumpsys meminfo` App Summary after the run |
+
+RSS leaves out swapped pages, and this phone swaps to zram, so the verdict line counts rounds in
+which VmSwap moved more than 1 MB. A peak shorter than the sampling interval can be missed.
+
 ```json
 {
   "scenario": "BM-03",
@@ -216,14 +300,43 @@ It records **two timings** for every `kmpCore` operation:
 }
 ```
 
+### 5.3 The `perf` build and launch arguments
+
+Benchmarks install the **`perf`** build type (`assembleJsCorePerf`, `assembleKmpCorePerf`).
+It is `release` in every respect (R8, bundled JS, Hermes, profileable, release signing, the
+same package ids, so it installs over a release build) with one addition: it reads
+**launch arguments**. A `release` build ignores them.
+
+Launch arguments are `pocketly.*` intent extras. They are applied **before the first screen
+loads**, so a cold start measures exactly the requested setup. (Dev links can't do that:
+they arrive after the first load has started.) Unknown keys and bad values stop the app with a
+visible error (`launch-args-error`) rather than letting it run on defaults.
+
+| Extra | Values | Effect |
+|---|---|---|
+| `pocketly.tab` | `home`, `history`, `profile` | Start tab |
+| `pocketly.seed`, `pocketly.transactionCount`, `pocketly.nowMillis` | integers | `resetData()` with this dataset before anything loads (unset fields: `LIVE_DATASET`'s) |
+| `pocketly.network.mode`, `pocketly.network.normalLatencyMs`, `pocketly.network.failureRatePercent`, `pocketly.network.readTimeoutMs`, `pocketly.network.seed` | as `setNetworkSimulation` | Fake backend, same rules as the dev link |
+
+```bash
+adb shell am start -W -n com.pocketly.kmp/com.pocketly.MainActivity \
+  -e pocketly.tab history --ei pocketly.transactionCount 1000
+```
+
+Maestro's `launchApp: arguments:` sends the same extras (see `bm-02-scroll.yaml`). Arguments
+are read at cold start only. A dataset argument resets the databases on **every** launch, so
+leave it out of startup scenarios (BM-01/BM-09) unless the reset is part of what is measured.
+iOS has no equivalent yet.
+
 ## 6. Scenarios
 
 | ID | Scenario | Metrics | Tool | Tests |
 |---|---|---|---|---|
 | **BM-01** | **Cold start → Home rendered** with 200 cached transactions | Time to initial display, time to fully drawn | Platform startup logs (§5 note) | H6 |
-| **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, JS FPS, frame overrun, CPU | Flashlight + Maestro | H4 (control) |
+| **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, CPU per thread (JS, UI, Render), RAM. Flashlight has no JS FPS or frame overrun on Android | Flashlight + adb input (§5 note) | H4 (control) |
 | **BM-03** | **Spending summary from 10,000 ledger entries** (group by category and day, totals, balance check) | End-to-end ms, compute ms | In-app harness | H1 |
 | **BM-04** | **Ingest 5,000 transactions** from JSON → validate → write to SQLite cache | End-to-end ms, peak memory | In-app harness + `dumpsys meminfo` | H1 |
+| **BM-04b** | BM-04 with the payload **already in the core** (staged before the timed call), as if the core had fetched it | End-to-end ms | In-app harness | H1 |
 | **BM-05** | **Live price stream**: 20 assets × 10 ticks/s for 15 s, with throttled UI updates | JS-thread CPU, JS FPS, UI FPS, RAM | Flashlight + Maestro | H2 |
 | **BM-06** | **Bridge stress**: 10,000 sequential tiny calls (e.g. `formatMoney`) and 1 batched call with 10,000 items | Total ms, ms per call | In-app harness | H3 |
 | **BM-07** | **Full transfer flow** (Home → Send → amount → review → PIN → result), fake latency fixed at 300 ms | Flow duration, FPS during transitions, CPU | Flashlight + Maestro | H4 |
@@ -233,7 +346,10 @@ It records **two timings** for every `kmpCore` operation:
 ### Scenario notes
 
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
-- **BM-04 must follow BM-PAR-03.** If the storage libraries differ, report "parse + validate" and "write to DB" as separate numbers.
+- **BM-04 vs BM-04b** (added 2026-10-11): BM-04 passes the 1.3 MB payload from JS into the core inside the timed call, which is the path when data starts in JS. In a KMP app whose core owns the network, the response arrives in Kotlin and never crosses the bridge; BM-04b measures that path. Report both.
+- **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
+- **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
+- **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
