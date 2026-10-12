@@ -1,5 +1,6 @@
 package com.pocketly.shared.security
 
+import android.util.Log
 import java.security.NoSuchAlgorithmException
 import java.security.SecureRandom
 import javax.crypto.Mac
@@ -19,8 +20,10 @@ internal object JavaPinCrypto : PinCrypto {
         val factory = try {
             SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         } catch (_: NoSuchAlgorithmException) {
+            logProviderOnce { "PBKDF2WithHmacSHA256 unavailable: HmacSHA256 loop, Mac provider ${Mac.getInstance("HmacSHA256").provider.describe()}" }
             return pbkdf2WithMac(password, salt, iterations, keyLength) // Android 7.x (API 24–25)
         }
+        logProviderOnce { "PBKDF2WithHmacSHA256 provider ${factory.provider.describe()}" }
         // PBEKeySpec takes chars; the PIN is ASCII, so each byte is one char.
         val chars = CharArray(password.size) { (password[it].toInt() and 0xff).toChar() }
         val spec = PBEKeySpec(chars, salt, iterations, keyLength * 8)
@@ -31,6 +34,18 @@ internal object JavaPinCrypto : PinCrypto {
             chars.fill('\u0000')
         }
     }
+
+    @Volatile
+    private var providerLogged = false
+
+    /** BM-11 / ADR-0010: which implementation hashes the PIN. Once per process; no secrets. */
+    private inline fun logProviderOnce(message: () -> String) {
+        if (providerLogged) return
+        providerLogged = true
+        Log.i("PocketlyCrypto", message())
+    }
+
+    private fun java.security.Provider.describe() = "$name (${javaClass.name})"
 
     /** RFC 8018 §5.2 over HmacSHA256, for platforms without the PBKDF2 factory. */
     private fun pbkdf2WithMac(password: ByteArray, salt: ByteArray, iterations: Int, keyLength: Int): ByteArray {

@@ -58,8 +58,14 @@ The attempt counter and the lockout end live **in secure storage**, not in memor
 |---|---|---|
 | Android | `AndroidSecureStore`: AES-256-GCM under its own non-exportable AndroidKeyStore key; ciphertext in SharedPreferences `pocketly.secure`; key name as AAD; written with `commit()` | react-native-sensitive-info 6.1.5, `accessControl: 'none'`: AES-256-GCM under an AndroidKeyStore key per service; ciphertext in SharedPreferences; written with `commit()` (patched) |
 | iOS | `IosSecureStore`: generic-password Keychain items, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, updated in place | react-native-sensitive-info: generic-password Keychain items, `WhenUnlockedThisDeviceOnly` (patched) |
-| PBKDF2 / random | javax.crypto `PBKDF2WithHmacSHA256` (whichever provider Android registers; see BM-11) · CommonCrypto + `SecRandomCopyBytes` | react-native-quick-crypto 1.1.7 (OpenSSL) |
+| PBKDF2 / random | javax.crypto `PBKDF2WithHmacSHA256`, which Android serves from BouncyCastle (Java on ART, logged once as `PocketlyCrypto`) · CommonCrypto + `SecRandomCopyBytes` | react-native-quick-crypto 1.1.7 (OpenSSL) |
 | Service / namespace | `com.pocketly.secure` | `com.pocketly.secure` |
+
+**Measured (quick check, 2026-10-12, vivo V2538, BM-11, 2 × 10 runs per build):** unlock takes
+201 ms in jsCore and 554 ms in kmpCore (median), and the JS thread never stalls more than ~18 ms
+in either. 600,000 iterations is acceptable on this phone for both. The gap is the PBKDF2
+implementation, not KMP: Android's platform PBKDF2 is BouncyCastle in Java, quick-crypto's is
+OpenSSL in C.
 
 The PIN record isn't behind a biometric or passcode prompt in either build: the app has to read
 it to check a PIN. Biometrics (step 4 of slice 5) protect a separate secret.
