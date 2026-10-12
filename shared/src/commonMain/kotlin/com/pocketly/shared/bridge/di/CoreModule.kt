@@ -9,6 +9,8 @@ import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
 import com.pocketly.shared.data.fake.ServerStore
 import com.pocketly.shared.domain.DatasetConfig
+import com.pocketly.shared.security.InstallMarker
+import com.pocketly.shared.security.PinAuthenticator
 import kotlinx.coroutines.CoroutineDispatcher
 import org.koin.dsl.module
 
@@ -19,7 +21,12 @@ import org.koin.dsl.module
  * A function, not a `val`: Koin keeps `single` instances on the Module object, so a
  * shared module would leak one store across every "isolated" PocketlyCore.
  */
-internal fun coreModule(drivers: DatabaseDrivers, initialDataset: DatasetConfig, db: CoroutineDispatcher) = module {
+internal fun coreModule(
+    drivers: DatabaseDrivers,
+    initialDataset: DatasetConfig,
+    db: CoroutineDispatcher,
+    pin: (InstallMarker) -> PinAuthenticator,
+) = module {
     single { TimeZoneHolder() }
     // ADR-0009: two databases, two files. Only the fake backend touches the server's.
     single { FakeWalletApi(ServerStore(drivers.server()), get()) }
@@ -30,6 +37,6 @@ internal fun coreModule(drivers: DatabaseDrivers, initialDataset: DatasetConfig,
         TimeoutWalletApi(backend) { backend.networkSimulation.readTimeoutMs.toLong() }
     }
     single {
-        PocketlyCore(api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db)
+        PocketlyCore(api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db, pin = pin)
     }
 }

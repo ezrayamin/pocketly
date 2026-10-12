@@ -9,7 +9,16 @@
  *
  * Uses Jest globals; never import this from app code.
  */
-import { DEFAULT_DATASET, NETWORK_NORMAL } from '../constants';
+import {
+  DEFAULT_DATASET,
+  NETWORK_NORMAL,
+  PIN_HASH_BYTES,
+  PIN_LOCKOUT_MS,
+  PIN_MAX_ATTEMPTS,
+  PIN_PBKDF2_ITERATIONS,
+  PIN_RECORD_VERSION,
+  PIN_SALT_BYTES,
+} from '../constants';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
 import type { NetworkSimulation, PriceTick, Transaction, Wallet } from '../types';
@@ -17,6 +26,7 @@ import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
 import network from '../../fixtures/network.json';
+import pin from '../../fixtures/pin.json';
 import timeZones from '../../fixtures/time-zones.json';
 
 type CoreFactory = () => Core | Promise<Core>;
@@ -356,6 +366,83 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       it('emits the golden deterministic tick sequence', async () => {
         const { symbols, seed, batches } = golden.prices;
         expect(await collectPriceBatches(core, symbols, batches.length, seed)).toEqual(batches);
+      });
+    });
+
+    describe('PIN and lockout (FR-AUTH-03/05, FR-LOCK-01/04, ADR-0010)', () => {
+      const GOOD = '482915';
+      const OTHER = '731048';
+
+      beforeEach(async () => {
+        await core.resetAuth();
+      });
+
+      it('uses the parameters in fixtures/pin.json', () => {
+        expect({
+          iterations: PIN_PBKDF2_ITERATIONS,
+          saltBytes: PIN_SALT_BYTES,
+          hashBytes: PIN_HASH_BYTES,
+          recordVersion: PIN_RECORD_VERSION,
+          maxAttempts: PIN_MAX_ATTEMPTS,
+          lockoutMs: PIN_LOCKOUT_MS,
+        }).toEqual({ ...pin.params, algorithm: undefined });
+      });
+
+      it.each(pin.check)('checkPin($pin)', ({ pin: candidate, ok, reason }) => {
+        expect(core.checkPin(candidate)).toEqual(ok ? { ok } : { ok, reason });
+      });
+
+      it('starts with no PIN, and verifying one is NOT_FOUND', async () => {
+        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+        await expectCoreError(core.verifyPin(GOOD), 'NOT_FOUND');
+      });
+
+      it.each(['123456', '000000', '12345', '12a456'])('setPin(%p) is INVALID_ARGUMENT', async (bad) => {
+        await expectCoreError(core.setPin(bad), 'INVALID_ARGUMENT');
+        expect((await core.getAuthState()).pinSet).toBe(false);
+      });
+
+      it('unlocks with the right PIN only, counting wrong attempts until an unlock', async () => {
+        await core.setPin(GOOD);
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+        expect(await core.verifyPin(OTHER)).toEqual({ outcome: 'WRONG_PIN', attemptsLeft: PIN_MAX_ATTEMPTS - 1 });
+        expect(await core.verifyPin(OTHER)).toEqual({ outcome: 'WRONG_PIN', attemptsLeft: PIN_MAX_ATTEMPTS - 2 });
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 2 });
+        expect(await core.verifyPin(GOOD)).toEqual({ outcome: 'UNLOCKED', attemptsLeft: PIN_MAX_ATTEMPTS });
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+      });
+
+      it(`${PIN_MAX_ATTEMPTS} wrong PINs lock out for ${PIN_LOCKOUT_MS / 60_000} min, even for the right PIN`, async () => {
+        await core.setPin(GOOD);
+        for (let i = 1; i < PIN_MAX_ATTEMPTS; i++) {
+          expect((await core.verifyPin(OTHER)).outcome).toBe('WRONG_PIN');
+        }
+        const before = Date.now();
+        const locked = await core.verifyPin(OTHER);
+        expect(locked).toMatchObject({ outcome: 'LOCKED_OUT', attemptsLeft: 0 });
+        expect(locked.lockedUntil).toBeGreaterThanOrEqual(before + PIN_LOCKOUT_MS);
+        expect(locked.lockedUntil).toBeLessThanOrEqual(Date.now() + PIN_LOCKOUT_MS);
+
+        expect(await core.verifyPin(GOOD)).toEqual(locked);
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0, lockedUntil: locked.lockedUntil });
+      });
+
+      it('setPin replaces the PIN and clears the counter', async () => {
+        await core.setPin(GOOD);
+        await core.verifyPin(GOOD.split('').reverse().join(''));
+        await core.setPin(OTHER);
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+        expect((await core.verifyPin(GOOD)).outcome).toBe('WRONG_PIN');
+        expect((await core.verifyPin(OTHER)).outcome).toBe('UNLOCKED');
+      });
+
+      it('resetAuth deletes the PIN and the counter; resetData leaves them alone', async () => {
+        await core.setPin(GOOD);
+        await core.verifyPin(OTHER);
+        await core.resetData(DEFAULT_DATASET);
+        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 1 });
+        await core.resetAuth();
+        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
       });
     });
   });

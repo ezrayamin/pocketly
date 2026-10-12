@@ -25,6 +25,11 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func ingestTransactions(json: String) throws -> Promise<IngestResult>
   func stageIngestPayload(json: String) throws -> Promise<Void>
   func ingestStaged() throws -> Promise<IngestResult>
+  func checkPin(pin: String) throws -> PinCheck
+  func setPin(pin: String) throws -> Promise<Void>
+  func verifyPin(pin: String) throws -> Promise<UnlockResult>
+  func getAuthState() throws -> Promise<AuthState>
+  func resetAuth() throws -> Promise<Void>
   func echo(value: Double) throws -> Double
   func formatMoney(minor: Double) throws -> String
   func formatMoneyBatch(minors: [Double]) throws -> [String]

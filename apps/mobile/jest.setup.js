@@ -67,3 +67,19 @@ jest.mock('@op-engineering/op-sqlite', () => {
     },
   };
 });
+// jsCore's PIN crypto (ADR-0010) on Node's crypto, which is OpenSSL too.
+jest.mock('react-native-quick-crypto', () => require('node:crypto'));
+// jsCore's secure storage (ADR-0010) in memory. Only what core-js/src/security/sensitiveInfoStore.ts uses.
+jest.mock('react-native-sensitive-info', () => {
+  const items = new Map();
+  return {
+    getItem: async (key) => (items.has(key) ? { key, value: items.get(key) } : null),
+    setItem: async (key, value) => {
+      items.set(key, value);
+    },
+    deleteItem: async (key) => items.delete(key),
+    clearService: async () => items.clear(),
+    isKeyInvalidatedError: () => false,
+    isIntegrityViolationError: () => false,
+  };
+});

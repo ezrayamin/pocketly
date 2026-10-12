@@ -1,5 +1,6 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.security.MemorySecureStore
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.JvmDatabaseDrivers
 import com.pocketly.shared.domain.DatasetConfig
@@ -18,12 +19,12 @@ class PersistenceTest {
         val dir = Files.createTempDirectory("pocketly-").toFile().apply { deleteOnExit() }
         val drivers = { JvmDatabaseDrivers(dir.resolve("server.db").path, dir.resolve("cache.db").path) }
 
-        val first = PocketlyCore.create(drivers(), DatasetConfig.DEFAULT)
+        val first = PocketlyCore.create(drivers(), MemorySecureStore(), DatasetConfig.DEFAULT)
         first.resetData(DatasetConfig.DEFAULT)
         first.simulateIncomingTransfer()
         assertEquals("sim-000001", first.getTransactions(null, 20, null).items.first().id)
 
-        val second = PocketlyCore.create(drivers(), DatasetConfig.DEFAULT.copy(seed = 999)) // ignored: not empty
+        val second = PocketlyCore.create(drivers(), MemorySecureStore(), DatasetConfig.DEFAULT.copy(seed = 999)) // ignored: not empty
         second.setNetworkSimulation(NetworkSimulation(NetworkMode.OFFLINE, failureRatePercent = 0))
         val offline = second.getTransactions(null, 20, null)
         assertEquals(ErrorCode.NETWORK_UNAVAILABLE, offline.stale?.reason)

@@ -337,6 +337,94 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func checkPin(pin: std.string) -> bridge.Result_PinCheck_ {
+    do {
+      let __result = try self.__implementation.checkPin(pin: String(pin))
+      let __resultCpp = __result
+      return bridge.create_Result_PinCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_PinCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func setPin(pin: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.setPin(pin: String(pin))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func verifyPin(pin: std.string) -> bridge.Result_std__shared_ptr_Promise_UnlockResult___ {
+    do {
+      let __result = try self.__implementation.verifyPin(pin: String(pin))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_UnlockResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_UnlockResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_UnlockResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_UnlockResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_UnlockResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getAuthState() -> bridge.Result_std__shared_ptr_Promise_AuthState___ {
+    do {
+      let __result = try self.__implementation.getAuthState()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_AuthState__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_AuthState__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_AuthState__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_AuthState___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_AuthState___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func resetAuth() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.resetAuth()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func echo(value: Double) -> bridge.Result_double_ {
     do {
       let __result = try self.__implementation.echo(value: value)

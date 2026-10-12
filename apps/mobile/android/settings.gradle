@@ -14,6 +14,13 @@ project(':pocketly_core-kmp').projectDir = new File(rootDir, '../../../packages/
 // The KMP module, as a composite build: "com.pocketly:pocketly-shared" resolves to it.
 includeBuild('../../../shared')
 
+// ── jsCore only (ADR-0010) ──────────────────────────────────────────────────
+// jsCore's secure storage and PIN crypto, linked by hand for the same reason, the other way round.
+include ':react-native-sensitive-info'
+project(':react-native-sensitive-info').projectDir = new File(rootDir, '../../../node_modules/react-native-sensitive-info/android')
+include ':react-native-quick-crypto'
+project(':react-native-quick-crypto').projectDir = new File(rootDir, '../../../node_modules/react-native-quick-crypto/android')
+
 // ── Benchmarks ──────────────────────────────────────────────────────────────
 include ':macrobenchmark'
 project(':macrobenchmark').projectDir = new File(rootDir, '../../../benchmarks/macrobenchmark')

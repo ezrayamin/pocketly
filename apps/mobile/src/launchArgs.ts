@@ -15,7 +15,7 @@ import { applyNetworkParams } from './features/devmenu/devLinks';
  *                                                            (unset fields: LIVE_DATASET's)
  *   network.mode, network.failureRatePercent, network.normalLatencyMs,
  *   network.readTimeoutMs, network.seed                      fake backend, as the dev link
- *   bench                  BM-03 | BM-04 | BM-04b | BM-06     run the in-app harness instead
+ *   bench                  BM-03 | BM-04 | BM-04b | BM-06 | BM-11   run the in-app harness instead
  *   benchRuns, benchWarmup integers (default 10, 5)           of the app (bench/harness.ts)
  *   benchMemory            true | false (default false)       memory round: log phase markers
  *

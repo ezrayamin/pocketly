@@ -1,0 +1,63 @@
+diff -ruN a/android/src/main/java/com/sensitiveinfo/internal/storage/SecureStorage.kt b/android/src/main/java/com/sensitiveinfo/internal/storage/SecureStorage.kt
+--- a/android/src/main/java/com/sensitiveinfo/internal/storage/SecureStorage.kt
++++ b/android/src/main/java/com/sensitiveinfo/internal/storage/SecureStorage.kt
+@@ -14,7 +14,7 @@
+ 
+   fun save(service: String, key: String, entry: PersistedEntry) {
+     val preferences = preferencesFor(service)
+-    preferences.edit().putString(key, entry.toJson().toString()).apply()
++    preferences.edit().putString(key, entry.toJson().toString()).commit() // pocketly patch (ADR-0010): on disk before returning
+   }
+ 
+   fun read(service: String, key: String): PersistedEntry? {
+@@ -28,7 +28,7 @@
+     if (!preferences.contains(key)) {
+       return false
+     }
+-    preferences.edit().remove(key).apply()
++    preferences.edit().remove(key).commit() // pocketly patch (ADR-0010): on disk before returning
+     return true
+   }
+ 
+@@ -53,7 +53,7 @@
+ 
+   fun clear(service: String) {
+     val preferences = preferencesFor(service)
+-    preferences.edit().clear().apply()
++    preferences.edit().clear().commit() // pocketly patch (ADR-0010): on disk before returning
+   }
+ 
+   private fun preferencesFor(service: String): SharedPreferences {
+diff -ruN a/ios/HybridSensitiveInfo.swift b/ios/HybridSensitiveInfo.swift
+--- a/ios/HybridSensitiveInfo.swift
++++ b/ios/HybridSensitiveInfo.swift
+@@ -124,7 +124,7 @@
+ 
+         var fallbackAttributes = query
+         fallbackAttributes[kSecValueData as String] = valueData
+-        fallbackAttributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
++        fallbackAttributes[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly // pocketly patch (ADR-0010)
+         fallbackAttributes[kSecAttrGeneric as String] = try encoder.encode(
+           PersistedMetadata(metadata: fallbackMetadata, integrityTag: fallbackTag)
+         )
+diff -ruN a/ios/Internal/Security/AccessControlResolver.swift b/ios/Internal/Security/AccessControlResolver.swift
+--- a/ios/Internal/Security/AccessControlResolver.swift
++++ b/ios/Internal/Security/AccessControlResolver.swift
+@@ -57,7 +57,7 @@
+     return AccessControlContext(
+       policy: .none,
+       securityLevel: .software,
+-      accessible: kSecAttrAccessibleAfterFirstUnlock,
++      accessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly, // pocketly patch (ADR-0010)
+       accessControlRef: nil
+     )
+   }
+@@ -119,7 +119,7 @@
+       return AccessControlContext(
+         policy: .none,
+         securityLevel: .software,
+-        accessible: kSecAttrAccessibleAfterFirstUnlock,
++        accessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly, // pocketly patch (ADR-0010)
+         accessControlRef: nil
+       )
+     }

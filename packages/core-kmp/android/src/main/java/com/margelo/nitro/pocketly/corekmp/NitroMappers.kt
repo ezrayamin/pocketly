@@ -12,6 +12,9 @@ import com.pocketly.shared.domain.ErrorCode as KErrorCode
 import com.pocketly.shared.domain.IngestResult as KIngestResult
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyParseResult as KMoneyParseResult
+import com.pocketly.shared.domain.AuthState as KAuthState
+import com.pocketly.shared.domain.PinCheck as KPinCheck
+import com.pocketly.shared.domain.UnlockResult as KUnlockResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
 import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
@@ -143,5 +146,12 @@ internal fun KMoneyParseResult.toNitro() = MoneyParseResult(
     minor = minor?.minor?.toDouble(),
     error = error?.let { MoneyParseError.valueOf(it.name) },
 )
+
+internal fun KPinCheck.toNitro() = PinCheck(ok, reason?.let { PinRejectReason.valueOf(it.name) })
+
+internal fun KUnlockResult.toNitro() =
+    UnlockResult(UnlockOutcome.valueOf(outcome.name), attemptsLeft.toDouble(), lockedUntil?.toDouble())
+
+internal fun KAuthState.toNitro() = AuthState(pinSet, failedAttempts.toDouble(), lockedUntil?.toDouble())
 
 internal fun KPriceTick.toNitro() = PriceTick(symbol, price.minor.toDouble(), changeBps.toDouble(), seq.toDouble())

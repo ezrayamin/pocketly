@@ -1,9 +1,11 @@
 import type {
+  AuthState,
   DatasetConfig,
   IngestResult,
   MinorUnits,
   MoneyParseResult,
   NetworkSimulation,
+  PinCheck,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -11,6 +13,7 @@ import type {
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from './types';
 
@@ -87,6 +90,24 @@ export interface Core {
    * the call. The payload stays staged. Throws INVALID_ARGUMENT if nothing is staged.
    */
   ingestStaged(): Promise<IngestResult>;
+
+  // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
+  /** FR-AUTH-03: six ASCII digits, not all the same, not a straight run (123456, 987654). */
+  checkPin(pin: string): PinCheck;
+  /**
+   * FR-AUTH-03/05: stores a salted PBKDF2 record of the PIN in secure storage, replacing any
+   * previous one, and clears the attempt counter. Throws INVALID_ARGUMENT if checkPin refuses it.
+   */
+  setPin(pin: string): Promise<void>;
+  /**
+   * FR-LOCK-01/04. The attempt is counted in secure storage *before* hashing, so force-closing
+   * the app mid-check can't undo it. Hashing runs off the JS thread. Throws NOT_FOUND if no PIN
+   * is set.
+   */
+  verifyPin(pin: string): Promise<UnlockResult>;
+  getAuthState(): Promise<AuthState>;
+  /** Logout / "reset onboarding": deletes every secret the core holds. */
+  resetAuth(): Promise<void>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
   /**

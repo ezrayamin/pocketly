@@ -6,11 +6,13 @@ import {
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
+  AuthState,
   Core,
   DatasetConfig,
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  PinCheck,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -18,6 +20,7 @@ import type {
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from '@pocketly/core-contract';
 import type { PocketlyCore } from './specs/PocketlyCore.nitro';
@@ -88,6 +91,29 @@ export class KmpCore implements Core {
 
   ingestStaged(): Promise<IngestResult> {
     return this.native.ingestStaged().catch(rethrow);
+  }
+
+  checkPin(pin: string): PinCheck {
+    const check = this.native.checkPin(pin);
+    return check.ok ? { ok: true } : { ok: false, reason: check.reason };
+  }
+
+  setPin(pin: string): Promise<void> {
+    return this.native.setPin(pin).catch(rethrow);
+  }
+
+  async verifyPin(pin: string): Promise<UnlockResult> {
+    const r = await this.native.verifyPin(pin).catch(rethrow);
+    return r.lockedUntil === undefined ? { outcome: r.outcome, attemptsLeft: r.attemptsLeft } : r;
+  }
+
+  async getAuthState(): Promise<AuthState> {
+    const s = await this.native.getAuthState().catch(rethrow);
+    return s.lockedUntil === undefined ? { pinSet: s.pinSet, failedAttempts: s.failedAttempts } : s;
+  }
+
+  resetAuth(): Promise<void> {
+    return this.native.resetAuth().catch(rethrow);
   }
 
   // Straight through: it can't throw, and BM-06 times exactly this path.

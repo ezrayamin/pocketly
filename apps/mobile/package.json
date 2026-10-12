@@ -32,8 +32,11 @@
     "react": "19.2.3",
     "react-native": "0.87.1",
     "react-native-nitro-modules": "0.37.1",
+    "react-native-quick-base64": "3.0.1",
+    "react-native-quick-crypto": "1.1.7",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "4.28.0",
+    "react-native-sensitive-info": "6.1.5",
     "react-native-svg": "15.15.5"
   },
   "devDependencies": {

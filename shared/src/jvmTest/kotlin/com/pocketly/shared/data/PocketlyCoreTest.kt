@@ -1,5 +1,6 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.security.MemorySecureStore
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.JvmDatabaseDrivers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,10 +26,10 @@ import kotlin.test.assertTrue
 
 /** Behaviour checks on in-memory SQLite. Exact-value parity is in contract/ContractFixturesTest. */
 class PocketlyCoreTest {
-    private val core = PocketlyCore.create(JvmDatabaseDrivers())
+    private val core = PocketlyCore.create(JvmDatabaseDrivers(), MemorySecureStore())
 
     /** On the test scheduler, so latencies and timeouts run on virtual time. */
-    private fun TestScope.virtualTimeCore() = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, StandardTestDispatcher(testScheduler))
+    private fun TestScope.virtualTimeCore() = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, StandardTestDispatcher(testScheduler), MemorySecureStore())
 
     @Test
     fun walletBalanceMatchesLedger() = runTest {

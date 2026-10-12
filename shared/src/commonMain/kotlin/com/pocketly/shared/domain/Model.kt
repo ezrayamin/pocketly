@@ -148,3 +148,19 @@ data class NetworkSimulation(
         val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
     }
 }
+
+// ── Auth & App Lock (F1, F2; ADR-0010) ───────────────────────────────────
+
+/** FR-AUTH-03. */
+enum class PinRejectReason { NOT_DIGITS, WRONG_LENGTH, TOO_SIMPLE }
+
+data class PinCheck(val reason: PinRejectReason?) {
+    val ok: Boolean get() = reason == null
+}
+
+/** FR-LOCK-04. */
+enum class UnlockOutcome { UNLOCKED, WRONG_PIN, LOCKED_OUT }
+
+data class UnlockResult(val outcome: UnlockOutcome, val attemptsLeft: Int, val lockedUntil: EpochMillis? = null)
+
+data class AuthState(val pinSet: Boolean, val failedAttempts: Int, val lockedUntil: EpochMillis? = null)

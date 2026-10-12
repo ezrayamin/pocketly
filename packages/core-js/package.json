@@ -21,9 +21,13 @@
     "tsx": "^4.20.0",
     "@babel/preset-env": "^7.25.3",
     "@babel/preset-typescript": "^7.27.0",
-    "@op-engineering/op-sqlite": "18.2.5"
+    "@op-engineering/op-sqlite": "18.2.5",
+    "react-native-quick-crypto": "1.1.7",
+    "react-native-sensitive-info": "6.1.5"
   },
   "peerDependencies": {
-    "@op-engineering/op-sqlite": "*"
+    "@op-engineering/op-sqlite": "*",
+    "react-native-quick-crypto": "*",
+    "react-native-sensitive-info": "*"
   }
 }

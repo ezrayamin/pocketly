@@ -90,5 +90,6 @@ SELECT value FROM cache_meta WHERE key = ?;
 setMeta:
 INSERT OR REPLACE INTO cache_meta(key, value) VALUES (?, ?);
 
-deleteAllMeta:
-DELETE FROM cache_meta;
+-- resetData and logout clear the replica, but the install id (ADR-0010) belongs to the install.
+deleteSyncMeta:
+DELETE FROM cache_meta WHERE key <> 'installId';

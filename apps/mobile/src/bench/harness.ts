@@ -13,7 +13,7 @@ import { core } from '../core';
  * neither bundle carries the other core's code (BM-08). Each result includes a checksum of its
  * input and of its output so collect.ts can confirm both builds did the same work.
  */
-export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-04b', 'BM-06'] as const;
+export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-11'] as const;
 export type BenchScenario = (typeof BENCH_SCENARIOS)[number];
 
 /** One measured run. Keys depend on the scenario; all values are milliseconds. */
@@ -50,6 +50,10 @@ const BM03_MONTH = '2026-09';
 const BM04_SOURCE: DatasetConfig = { seed: 2026, transactionCount: 5_000, nowMillis: DEFAULT_NOW_MILLIS };
 /** BM-06: amounts to format. */
 const BM06_COUNT = 10_000;
+/** BM-11: the PIN unlocked in every run (ADR-0010: PBKDF2-HMAC-SHA256, 600,000 iterations). */
+const BM11_PIN = '482915';
+/** BM-11: how often the JS-thread probe ticks while a PIN is checked. */
+const BM11_PROBE_MS = 4;
 
 // Hermes provides the High Resolution Time API; the app's TS lib config doesn't declare it.
 declare const performance: { now(): number };
@@ -240,6 +244,43 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         runs,
         input: { description: `${minors.length} amounts, LCG seed 12345`, checksum: checksum(minors.join(',')) },
         output: { description: 'formatted amounts (chatty and batch must match; echo must return its inputs)', checksum: checksum(last) },
+        setupMs,
+      };
+    }
+    case 'BM-11': {
+      // Replaces whatever PIN this install had: run it on benchmark installs only.
+      await core.resetAuth();
+      await core.setPin(BM11_PIN);
+      const setupMs = now() - setupStart;
+      const outcomes: string[] = [];
+      const runs = await repeat(options, async (mark) => {
+        // ADR-0010: hashing must not block the JS thread. A timer ticks every BM11_PROBE_MS while
+        // the PIN is checked; the longest gap between ticks is how long JS was stuck.
+        let lastTick = now();
+        let jsMaxGapMs = 0;
+        const probe = setInterval(() => {
+          const t = now();
+          jsMaxGapMs = Math.max(jsMaxGapMs, t - lastTick);
+          lastTick = t;
+        }, BM11_PROBE_MS);
+        mark('op-start');
+        const t0 = now();
+        const result = await core.verifyPin(BM11_PIN);
+        const unlockMs = now() - t0;
+        mark('op-end');
+        clearInterval(probe);
+        jsMaxGapMs = Math.max(jsMaxGapMs, now() - lastTick);
+        outcomes.push(result.outcome);
+        return { unlockMs, jsMaxGapMs };
+      });
+      await core.resetAuth();
+      return {
+        scenario,
+        build,
+        warmup: options.warmup,
+        runs,
+        input: { description: `verifyPin with the right PIN, ${BM11_PROBE_MS} ms JS-thread probe`, checksum: checksum(BM11_PIN) },
+        output: { description: 'outcome of every measured run', checksum: checksum([...new Set(outcomes)].join(',')) },
         setupMs,
       };
     }

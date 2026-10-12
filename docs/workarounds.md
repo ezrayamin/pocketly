@@ -11,6 +11,7 @@ react-native-svg, Nitro, Xcode or the test device.
 | 3 | BM-01: `am start` + platform startup logs instead of Macrobenchmark (vivo) | `benchmarks/scripts/bm-01-startup.sh` | Macrobenchmark stops hanging on this ROM |
 | 4 | BM-02: `adb` swipes instead of Maestro (vivo) | `benchmarks/scripts/bm-02-scroll.sh` | Maestro's driver works on this device |
 | 5 | Nitro `resetData(DatasetSeed, Transaction[])` instead of `resetData(DatasetConfig)` | `packages/core-kmp/src/specs/PocketlyCore.nitro.ts`, `src/index.ts` | Swift's C++ interop handles an optional array of structs inside a struct |
+| 6 | react-native-sensitive-info patched: iOS `WhenUnlockedThisDeviceOnly`, Android `commit()` | `patches/react-native-sensitive-info+6.1.5.patch`, applied by `scripts/apply-patches.js` (root `postinstall`) | The library offers both itself (an accessibility option for unprompted items, synchronous writes) |
 
 ## 1. `androidx.collection` 1.4.4 (Android, both builds)
 
@@ -75,6 +76,25 @@ See ADR-0009.
 **Check before removing.** After a Nitro or Xcode upgrade, change the spec back to
 `resetData(config: DatasetConfig)`, run `yarn nitrogen`, update both adapters, and build iOS. It's
 fixed when the generated Swift compiles.
+
+## 6. react-native-sensitive-info 6.1.5: two patched defaults
+
+**Why.** jsCore's secure storage must match kmpCore's (ADR-0010 §4). Stock 6.1.5 stores items
+that need no prompt (our PIN record and attempt counter) as `kSecAttrAccessibleAfterFirstUnlock`:
+readable while the phone is locked, and allowed to travel in an encrypted backup to another
+device. The patch makes those, and the simulator fallback, `WhenUnlockedThisDeviceOnly`. On
+Android it writes with `SharedPreferences.commit()` instead of `apply()`, so the attempt counter
+is on disk before the PIN is hashed (`apply()` writes in the background; killing the app at the
+right moment could lose the count).
+
+**How it's applied.** `scripts/apply-patches.js` runs after every `yarn install` and applies
+`patches/<package>+<version>.patch` with the system `patch`. It skips a patch that's already in,
+and fails the install if the installed version differs from the file name.
+
+**Check before removing.** On a library upgrade, read the new version's
+`ios/Internal/Security/AccessControlResolver.swift` (the `.none` policy's `accessible`) and
+`android/.../internal/storage/SecureStorage.kt` (`apply` vs `commit`). Drop each change once the
+library does the same, delete the patch, and re-check ADR-0010 §4.
 
 ## Not a workaround: the Hermes engine swap (local only)
 

@@ -87,6 +87,22 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const UnlockResult& /* result */)>
+  Func_void_UnlockResult create_Func_void_UnlockResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_UnlockResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UnlockResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const AuthState& /* result */)>
+  Func_void_AuthState create_Func_void_AuthState(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_AuthState::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const AuthState& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::function<void(const std::vector<PriceTick>& /* ticks */)>
   Func_void_std__vector_PriceTick_ create_Func_void_std__vector_PriceTick_(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_PriceTick_::fromUnsafe(swiftClosureWrapper);

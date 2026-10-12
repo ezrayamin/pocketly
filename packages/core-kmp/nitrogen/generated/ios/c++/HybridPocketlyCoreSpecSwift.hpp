@@ -54,6 +54,16 @@ namespace margelo::nitro::pocketly { struct IngestResult; }
 namespace margelo::nitro::pocketly { struct IngestError; }
 // Forward declaration of `IngestRejectReason` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class IngestRejectReason; }
+// Forward declaration of `PinCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PinCheck; }
+// Forward declaration of `PinRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PinRejectReason; }
+// Forward declaration of `UnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct UnlockResult; }
+// Forward declaration of `UnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
+// Forward declaration of `AuthState` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -88,6 +98,11 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "IngestResult.hpp"
 #include "IngestError.hpp"
 #include "IngestRejectReason.hpp"
+#include "PinCheck.hpp"
+#include "PinRejectReason.hpp"
+#include "UnlockResult.hpp"
+#include "UnlockOutcome.hpp"
+#include "AuthState.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -231,6 +246,46 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<IngestResult>> ingestStaged() override {
       auto __result = _swiftPart.ingestStaged();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline PinCheck checkPin(const std::string& pin) override {
+      auto __result = _swiftPart.checkPin(pin);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> setPin(const std::string& pin) override {
+      auto __result = _swiftPart.setPin(pin);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override {
+      auto __result = _swiftPart.verifyPin(pin);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<AuthState>> getAuthState() override {
+      auto __result = _swiftPart.getAuthState();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> resetAuth() override {
+      auto __result = _swiftPart.resetAuth();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

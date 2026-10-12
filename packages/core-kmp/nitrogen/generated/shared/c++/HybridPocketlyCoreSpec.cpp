@@ -26,6 +26,11 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("ingestTransactions", &HybridPocketlyCoreSpec::ingestTransactions);
       prototype.registerHybridMethod("stageIngestPayload", &HybridPocketlyCoreSpec::stageIngestPayload);
       prototype.registerHybridMethod("ingestStaged", &HybridPocketlyCoreSpec::ingestStaged);
+      prototype.registerHybridMethod("checkPin", &HybridPocketlyCoreSpec::checkPin);
+      prototype.registerHybridMethod("setPin", &HybridPocketlyCoreSpec::setPin);
+      prototype.registerHybridMethod("verifyPin", &HybridPocketlyCoreSpec::verifyPin);
+      prototype.registerHybridMethod("getAuthState", &HybridPocketlyCoreSpec::getAuthState);
+      prototype.registerHybridMethod("resetAuth", &HybridPocketlyCoreSpec::resetAuth);
       prototype.registerHybridMethod("echo", &HybridPocketlyCoreSpec::echo);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("formatMoneyBatch", &HybridPocketlyCoreSpec::formatMoneyBatch);

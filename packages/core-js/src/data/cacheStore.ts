@@ -7,6 +7,7 @@ import { bind, migrate, type SqlDriver } from './db/sqlDriver';
 const CURSOR = /^(\d+):(.+)$/;
 const META_SYNC_TOKEN = 'syncToken';
 const META_LAST_SYNCED_AT = 'lastSyncedAt';
+const META_INSTALL_ID = 'installId';
 
 /** ",A,B," for the shared SQL's instr() filter; '' = no filter. */
 function filterList(values: readonly string[] | undefined): string {
@@ -27,7 +28,7 @@ export class CacheStore {
   async clear(): Promise<void> {
     await this.db.run(CACHE_SQL.deleteAllTransactions.sql, []);
     await this.db.run(CACHE_SQL.deleteWallet.sql, []);
-    await this.db.run(CACHE_SQL.deleteAllMeta.sql, []);
+    await this.db.run(CACHE_SQL.deleteSyncMeta.sql, []);
   }
 
   async upsertMany(transactions: readonly Transaction[]): Promise<void> {
@@ -112,6 +113,15 @@ export class CacheStore {
   async markSynced(token: string | undefined, at: number): Promise<void> {
     if (token !== undefined) await this.setMeta(META_SYNC_TOKEN, token);
     await this.setMeta(META_LAST_SYNCED_AT, String(at));
+  }
+
+  /** ADR-0010: identifies this install. clear() keeps it; only uninstalling the app removes it. */
+  installId(): Promise<string | undefined> {
+    return this.getMeta(META_INSTALL_ID);
+  }
+
+  setInstallId(id: string): Promise<void> {
+    return this.setMeta(META_INSTALL_ID, id);
   }
 
   private async getMeta(key: string): Promise<string | undefined> {

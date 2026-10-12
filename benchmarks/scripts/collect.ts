@@ -214,7 +214,7 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
 }
 
 /**
- * In-app harness (BM-03, BM-04, BM-06): <scenario>/<round>-<build>.json, each holding the
+ * In-app harness (BM-03, BM-04, BM-06, BM-11): <scenario>/<round>-<build>.json, each holding the
  * measured runs of one cold start. Adds the bridge overhead per run: end-to-end − compute −
  * storage (BM-03/04), batch end-to-end − batch compute (BM-06). Checks that both builds
  * saw the same input and produced the same output (checksums).
@@ -515,7 +515,7 @@ function main() {
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
-  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06']) {
+  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
   }

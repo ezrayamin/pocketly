@@ -165,6 +165,9 @@ dependencies {
 
     // jsCore ships with no Kotlin core code (H5 / BM-08).
     kmpCoreImplementation project(":pocketly_core-kmp")
+    // ...and kmpCore with none of jsCore's native helpers (ADR-0010).
+    jsCoreImplementation project(":react-native-sensitive-info")
+    jsCoreImplementation project(":react-native-quick-crypto")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

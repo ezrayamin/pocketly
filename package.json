@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/apply-patches.js",
     "typecheck": "tsc -p packages/core-contract && tsc -p packages/core-js && tsc -p packages/core-kmp && tsc -p apps/mobile --noEmit && tsc -p benchmarks/scripts",
     "test": "yarn workspace @pocketly/core-js test && yarn workspace @pocketly/mobile test",
     "test:shared": "cd shared && ./gradlew allTests",

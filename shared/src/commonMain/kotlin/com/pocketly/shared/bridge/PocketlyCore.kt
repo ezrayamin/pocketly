@@ -10,6 +10,7 @@ import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
+import com.pocketly.shared.domain.AuthState
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -18,6 +19,7 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.PinCheck
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.SpendingCalculator
 import com.pocketly.shared.domain.SpendingSummary
@@ -25,7 +27,14 @@ import com.pocketly.shared.domain.StaleInfo
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
+import com.pocketly.shared.domain.UnlockResult
 import com.pocketly.shared.domain.Wallet
+import com.pocketly.shared.security.InstallMarker
+import com.pocketly.shared.security.PinAuthenticator
+import com.pocketly.shared.security.PinCrypto
+import com.pocketly.shared.security.PinPolicy
+import com.pocketly.shared.security.SecureStore
+import com.pocketly.shared.security.platformPinCrypto
 import com.pocketly.shared.sync.LedgerSync
 import com.pocketly.shared.sync.PriceFeed
 import kotlinx.coroutines.CancellationException
@@ -58,12 +67,21 @@ class PocketlyCore internal constructor(
     initialDataset: DatasetConfig,
     /** All database work runs here (one thread: SQLDelight drivers aren't shared). Tests inject a test dispatcher. */
     private val db: CoroutineDispatcher,
+    /** Builds the PIN logic (ADR-0010) around this core's install marker (the replica's cache_meta). */
+    pin: (InstallMarker) -> PinAuthenticator,
 ) {
     private val streamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ledgerSync = LedgerSync(api, cache)
 
     /** Databases open lazily, off the caller's thread; every data call awaits this first. */
     private val ready = streamScope.async(db) { backend.open(initialDataset) }
+
+    private val pin = pin(object : InstallMarker {
+        override suspend fun get(): String? = onDb { cache.installId() }
+        override suspend fun set(id: String) {
+            onDb { cache.setInstallId(id) }
+        }
+    })
 
     @Volatile
     private var computeMs = 0.0
@@ -174,6 +192,23 @@ class PocketlyCore internal constructor(
         IngestResult(inserted, parsed.rejected, parsed.valid.size - inserted, parsed.errors)
     }
 
+    // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
+
+    /** FR-AUTH-03. */
+    fun checkPin(pin: String): PinCheck = PinPolicy.check(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun setPin(pin: String) = this.pin.setPin(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun verifyPin(pin: String): UnlockResult = this.pin.verifyPin(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getAuthState(): AuthState = pin.getAuthState()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun resetAuth() = pin.resetAuth()
+
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
     /** BM-06: the pure cost of a call. No conversion, so only the crossing is timed. */
@@ -232,15 +267,27 @@ class PocketlyCore internal constructor(
         private val STALEABLE = setOf(ErrorCode.NETWORK_UNAVAILABLE, ErrorCode.NETWORK_TIMEOUT, ErrorCode.SERVER_ERROR)
 
         /**
-         * Builds a fully wired core on [drivers] (two databases, ADR-0009). Each call gets its own
-         * isolated Koin graph. The server is seeded with [dataset] only if its database is empty.
-         * Native adapters pass [DatasetConfig.LIVE] and the platform drivers.
+         * Builds a fully wired core on [drivers] (two databases, ADR-0009) and [secureStore]
+         * (ADR-0010). Each call gets its own isolated Koin graph. The server is seeded with
+         * [dataset] only if its database is empty. Native adapters pass the platform drivers and
+         * store, and [DatasetConfig.LIVE].
          */
-        fun create(drivers: DatabaseDrivers, dataset: DatasetConfig = DatasetConfig.DEFAULT): PocketlyCore =
-            create(drivers, dataset, singleThread())
+        fun create(drivers: DatabaseDrivers, secureStore: SecureStore, dataset: DatasetConfig = DatasetConfig.DEFAULT): PocketlyCore =
+            create(drivers, dataset, singleThread(), secureStore)
 
-        internal fun create(drivers: DatabaseDrivers, dataset: DatasetConfig, db: CoroutineDispatcher): PocketlyCore =
-            koinApplication { modules(coreModule(drivers, dataset, db)) }.koin.get()
+        internal fun create(
+            drivers: DatabaseDrivers,
+            dataset: DatasetConfig,
+            db: CoroutineDispatcher,
+            secureStore: SecureStore,
+            crypto: PinCrypto = platformPinCrypto(),
+            clock: () -> Long = ::currentTimeMillis,
+            pinIterations: Int = PinPolicy.ITERATIONS,
+        ): PocketlyCore {
+            // PBKDF2 blocks for hundreds of ms: off the database thread, which other calls share.
+            val pin = { marker: InstallMarker -> PinAuthenticator(secureStore, crypto, marker, Dispatchers.Default, clock, pinIterations) }
+            return koinApplication { modules(coreModule(drivers, dataset, db, pin)) }.koin.get()
+        }
 
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
         private fun singleThread(): CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)

@@ -8,6 +8,7 @@ import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.Cancellable
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.AndroidDatabaseDrivers
+import com.pocketly.shared.security.AndroidSecureStore
 
 /**
  * Nitro adapter over the KMP facade. No business logic lives here: it only converts
@@ -20,6 +21,7 @@ import com.pocketly.shared.data.db.AndroidDatabaseDrivers
 class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     private val core: PocketlyCore = PocketlyCore.create(
         AndroidDatabaseDrivers(NitroModules.applicationContext!!),
+        AndroidSecureStore(NitroModules.applicationContext!!),
         com.pocketly.shared.domain.DatasetConfig.LIVE,
     )
 
@@ -56,6 +58,16 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun ingestStaged(): Promise<IngestResult> =
         Promise.async { core.ingestStaged().toNitro() }
+
+    override fun checkPin(pin: String): PinCheck = core.checkPin(pin).toNitro()
+
+    override fun setPin(pin: String): Promise<Unit> = Promise.async { core.setPin(pin) }
+
+    override fun verifyPin(pin: String): Promise<UnlockResult> = Promise.async { core.verifyPin(pin).toNitro() }
+
+    override fun getAuthState(): Promise<AuthState> = Promise.async { core.getAuthState().toNitro() }
+
+    override fun resetAuth(): Promise<Unit> = Promise.async { core.resetAuth() }
 
     override fun echo(value: Double): Double = core.echo(value)
 

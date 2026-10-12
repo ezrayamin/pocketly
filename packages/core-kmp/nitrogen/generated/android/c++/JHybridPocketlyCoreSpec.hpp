@@ -66,6 +66,11 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override;
     std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override;
     std::shared_ptr<Promise<IngestResult>> ingestStaged() override;
+    PinCheck checkPin(const std::string& pin) override;
+    std::shared_ptr<Promise<void>> setPin(const std::string& pin) override;
+    std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override;
+    std::shared_ptr<Promise<AuthState>> getAuthState() override;
+    std::shared_ptr<Promise<void>> resetAuth() override;
     double echo(double value) override;
     std::string formatMoney(double minor) override;
     std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;

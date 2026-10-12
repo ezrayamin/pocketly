@@ -7,12 +7,14 @@ import {
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
+  AuthState,
   Core,
   DatasetConfig,
   ErrorCode,
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  PinCheck,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -21,6 +23,7 @@ import type {
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from '@pocketly/core-contract';
 import { CacheStore } from './data/cacheStore';
@@ -31,6 +34,10 @@ import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { parseAndValidate } from './data/transactionIngestor';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { PinAuth } from './security/pinAuth';
+import type { PinCrypto } from './security/pinCrypto';
+import { checkPin } from './security/pinPolicy';
+import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
@@ -50,6 +57,13 @@ export interface JsCoreOptions {
   cache: SqlDriver;
   /** Seeds the server only if its database is empty. Default: DEFAULT_DATASET (frozen clock). */
   dataset?: DatasetConfig;
+  /** Secrets (ADR-0010): Keystore / Keychain in the app. */
+  secure: SecureStore;
+  crypto: PinCrypto;
+  /** Device clock for PIN lockouts. Tests only. */
+  clock?: () => number;
+  /** PBKDF2 work factor for new PIN records. Tests only; default PIN_PBKDF2_ITERATIONS. */
+  pinIterations?: number;
 }
 
 /** Composition root for the TypeScript core. Counterpart of shared/.../bridge/PocketlyCore.kt. */
@@ -68,6 +82,7 @@ export class JsCore implements Core {
   private storageMs = 0;
   /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
   private stagedPayload: string | undefined;
+  private readonly pin: PinAuth;
 
   constructor(options: JsCoreOptions) {
     const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
@@ -80,6 +95,22 @@ export class JsCore implements Core {
       await backend.open(options.dataset ?? DEFAULT_DATASET);
       await cache.init();
     })();
+    this.pin = new PinAuth({
+      store: options.secure,
+      crypto: options.crypto,
+      marker: {
+        get: async () => {
+          await this.ready;
+          return cache.installId();
+        },
+        set: async (id) => {
+          await this.ready;
+          await cache.setInstallId(id);
+        },
+      },
+      clock: options.clock,
+      iterations: options.pinIterations,
+    });
   }
 
   async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -189,6 +220,26 @@ export class JsCore implements Core {
     if (zoneId !== this.zone.zoneId) {
       this.zone = new UserTimeZone(zoneId);
     }
+  }
+
+  checkPin(pin: string): PinCheck {
+    return checkPin(pin);
+  }
+
+  setPin(pin: string): Promise<void> {
+    return this.pin.setPin(pin);
+  }
+
+  verifyPin(pin: string): Promise<UnlockResult> {
+    return this.pin.verifyPin(pin);
+  }
+
+  getAuthState(): Promise<AuthState> {
+    return this.pin.getAuthState();
+  }
+
+  resetAuth(): Promise<void> {
+    return this.pin.resetAuth();
   }
 
   echo(value: number): number {

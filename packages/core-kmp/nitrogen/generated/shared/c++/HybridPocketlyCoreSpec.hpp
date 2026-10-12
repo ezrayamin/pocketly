@@ -29,6 +29,12 @@ namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `IngestResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct IngestResult; }
+// Forward declaration of `PinCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PinCheck; }
+// Forward declaration of `UnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct UnlockResult; }
+// Forward declaration of `AuthState` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -48,6 +54,9 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "NetworkSimulation.hpp"
 #include "SpendingSummary.hpp"
 #include "IngestResult.hpp"
+#include "PinCheck.hpp"
+#include "UnlockResult.hpp"
+#include "AuthState.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -97,6 +106,11 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) = 0;
       virtual std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) = 0;
       virtual std::shared_ptr<Promise<IngestResult>> ingestStaged() = 0;
+      virtual PinCheck checkPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<void>> setPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<AuthState>> getAuthState() = 0;
+      virtual std::shared_ptr<Promise<void>> resetAuth() = 0;
       virtual double echo(double value) = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) = 0;

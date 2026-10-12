@@ -249,3 +249,37 @@ export interface DatasetConfig extends DatasetSeed {
    */
   extraTransactions?: Transaction[];
 }
+
+// ── Auth & App Lock (F1, F2; ADR-0010) ──────────────────────────────────
+
+/** FR-AUTH-03: why a candidate PIN is refused. */
+export type PinRejectReason = 'NOT_DIGITS' | 'WRONG_LENGTH' | 'TOO_SIMPLE';
+
+export interface PinCheck {
+  ok: boolean;
+  /** Set when `ok` is false. */
+  reason?: PinRejectReason;
+}
+
+/**
+ * FR-LOCK-04. LOCKED_OUT also covers the attempt that triggers the lockout; while locked out
+ * the PIN isn't checked at all.
+ */
+export type UnlockOutcome = 'UNLOCKED' | 'WRONG_PIN' | 'LOCKED_OUT';
+
+export interface UnlockResult {
+  outcome: UnlockOutcome;
+  /** Wrong attempts left before a lockout. PIN_MAX_ATTEMPTS after UNLOCKED, 0 when LOCKED_OUT. */
+  attemptsLeft: number;
+  /** Device-clock end of the lockout; set only when LOCKED_OUT. */
+  lockedUntil?: EpochMillis;
+}
+
+/** What the lock screen needs on start. Read from secure storage, so it survives force-closing. */
+export interface AuthState {
+  pinSet: boolean;
+  /** Wrong attempts since the last unlock or lockout (0..PIN_MAX_ATTEMPTS-1). */
+  failedAttempts: number;
+  /** Set while a lockout is running. */
+  lockedUntil?: EpochMillis;
+}

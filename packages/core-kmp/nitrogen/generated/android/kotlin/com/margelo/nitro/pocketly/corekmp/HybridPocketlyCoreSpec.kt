@@ -80,6 +80,26 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun checkPin(pin: String): PinCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setPin(pin: String): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun verifyPin(pin: String): Promise<UnlockResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getAuthState(): Promise<AuthState>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun resetAuth(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun echo(value: Double): Double
   
   @DoNotStrip

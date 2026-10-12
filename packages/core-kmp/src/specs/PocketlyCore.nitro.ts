@@ -2,15 +2,18 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // NFR-ARCH-05: struct/enum types are NOT redeclared here. Nitrogen resolves them from
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
+  AuthState,
   DatasetSeed,
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  PinCheck,
   PriceTick,
   SpendingSummary,
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from '@pocketly/core-contract';
 
@@ -48,6 +51,12 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   ingestTransactions(json: string): Promise<IngestResult>;
   stageIngestPayload(json: string): Promise<void>;
   ingestStaged(): Promise<IngestResult>;
+
+  checkPin(pin: string): PinCheck;
+  setPin(pin: string): Promise<void>;
+  verifyPin(pin: string): Promise<UnlockResult>;
+  getAuthState(): Promise<AuthState>;
+  resetAuth(): Promise<void>;
 
   echo(value: number): number;
   formatMoney(minor: number): string;

@@ -3,6 +3,7 @@
  */
 
 import { checksum, logResult, runBench, type BenchResult } from '../src/bench/harness';
+import { core } from '../src/core';
 import { parseLaunchArgs } from '../src/launchArgs';
 
 const opts = { runs: 2, warmup: 1, scale: 0.02 };
@@ -32,6 +33,13 @@ describe('bench harness (benchmarking.md §5.2)', () => {
     const r = await runBench('BM-06', opts);
     expect(Object.keys(r.runs[0]).sort()).toEqual(['batchComputeMs', 'batchEndToEndMs', 'chattyEndToEndMs', 'echoEndToEndMs']);
     expect(r.output.checksum).not.toBe(checksum('MISMATCH'));
+  });
+
+  it('BM-11 unlocks with the PIN it set, probes the JS thread, and leaves no PIN behind', async () => {
+    const r = await runBench('BM-11', opts);
+    expect(Object.keys(r.runs[0]).sort()).toEqual(['jsMaxGapMs', 'unlockMs']);
+    expect(r.output.checksum).toBe(checksum('UNLOCKED'));
+    expect((await core.getAuthState()).pinSet).toBe(false);
   });
 
   it('BM-04b ingests the same payload, staged in the core before each timed call', async () => {

@@ -342,6 +342,7 @@ iOS has no equivalent yet.
 | **BM-07** | **Full transfer flow** (Home → Send → amount → review → PIN → result), fake latency fixed at 300 ms | Flow duration, FPS during transitions, CPU | Flashlight + Maestro | H4 |
 | **BM-08** | **App size** | APK size per ABI, download size, JS bundle size | APK Analyzer, bundletool | H5 |
 | **BM-09** | **Startup with Baseline Profile** (BM-01 rerun with `CompilationMode.Partial(BaselineProfileMode.Require)`) | Same as BM-01 | Macrobenchmark | H7 |
+| **BM-11** | **PIN unlock** (added 2026-10-12): `verifyPin` with the right PIN, PBKDF2-HMAC-SHA256 × 600,000 (ADR-0010) | Unlock ms; longest JS-thread stall while hashing (4 ms timer probe) | In-app harness | — (platform crypto in both builds: a cost check, not a hypothesis test) |
 
 ### Scenario notes
 
@@ -351,6 +352,7 @@ iOS has no equivalent yet.
 - **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
 - **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.
+- **BM-11** times the shipped design: library or platform crypto in both builds (quick-crypto/OpenSSL vs javax.crypto on Android, CommonCrypto on iOS), so it answers "is 600,000 iterations fast enough on the slowest phone?" and "does the lock screen stay responsive?", not "JS vs Kotlin". BM-10 (planned, optional) is that what-if: pure-JS PBKDF2 (@noble/hashes) vs pure-Kotlin PBKDF2. BM-11 replaces the install's PIN; run it on benchmark installs only.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
 ## 7. Results Storage

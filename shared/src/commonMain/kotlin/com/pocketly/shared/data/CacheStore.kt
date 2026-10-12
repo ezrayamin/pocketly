@@ -22,7 +22,7 @@ internal class CacheStore(driver: SqlDriver) {
     fun clear() = db.transaction {
         q.deleteAllTransactions()
         q.deleteWallet()
-        q.deleteAllMeta()
+        q.deleteSyncMeta()
     }
 
     fun upsertMany(transactions: List<Transaction>) = db.transaction {
@@ -74,6 +74,13 @@ internal class CacheStore(driver: SqlDriver) {
         q.setMeta(META_LAST_SYNCED_AT, at.toString())
     }
 
+    /** ADR-0010: identifies this install. [clear] keeps it; only uninstalling the app removes it. */
+    fun installId(): String? = q.getMeta(META_INSTALL_ID).executeAsOneOrNull()
+
+    fun setInstallId(id: String) {
+        q.setMeta(META_INSTALL_ID, id)
+    }
+
     private fun write(tx: Transaction, ifAbsent: Boolean): Long {
         val cp = tx.counterparty
         return if (ifAbsent) {
@@ -95,6 +102,7 @@ internal class CacheStore(driver: SqlDriver) {
         val CURSOR = Regex("""^(\d+):(.+)$""")
         const val META_SYNC_TOKEN = "syncToken"
         const val META_LAST_SYNCED_AT = "lastSyncedAt"
+        const val META_INSTALL_ID = "installId"
 
         /** ",A,B," for the shared SQL's instr() filter; "" = no filter. */
         fun filterList(values: List<String>?) = if (values.isNullOrEmpty()) "" else values.joinToString(",", ",", ",")

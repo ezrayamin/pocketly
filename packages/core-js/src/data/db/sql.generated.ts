@@ -134,8 +134,8 @@ export const CACHE_SQL = {
     "sql": "INSERT OR REPLACE INTO cache_meta(key, value) VALUES (?, ?)",
     "params": 2
   },
-  "deleteAllMeta": {
-    "sql": "DELETE FROM cache_meta",
+  "deleteSyncMeta": {
+    "sql": "DELETE FROM cache_meta WHERE key <> 'installId'",
     "params": 0
   }
 } as const satisfies Record<string, SqlQuery>;

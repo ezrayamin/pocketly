@@ -16,6 +16,7 @@ import PocketlyShared
 final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   private let core = PocketlyShared.PocketlyCore.companion.create(
     drivers: PocketlyShared.IosDatabaseDrivers(),
+    secureStore: PocketlyShared.IosSecureStore(service: PocketlyShared.IosSecureStore.companion.SERVICE),
     dataset: PocketlyShared.DatasetConfig.companion.LIVE
   )
   private let convert = PocketlyShared.BridgeConversions.shared
@@ -116,6 +117,41 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       array.set(index: Int32(i), value: try convert.toLongExact(value: value, field: "amount"))
     }
     return core.formatMoneyBatch(minors: array)
+  }
+
+  func checkPin(pin: String) throws -> PinCheck {
+    let r = core.checkPin(pin: pin)
+    return PinCheck(ok: r.ok, reason: r.reason.map { PinRejectReason(fromString: $0.name)! })
+  }
+
+  func setPin(pin: String) throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.setPin(pin: pin) }
+  }
+
+  func verifyPin(pin: String) throws -> Promise<UnlockResult> {
+    return Promise.async { [core] in
+      let r = try await core.verifyPin(pin: pin)
+      return UnlockResult(
+        outcome: UnlockOutcome(fromString: r.outcome.name)!,
+        attemptsLeft: Double(r.attemptsLeft),
+        lockedUntil: r.lockedUntil.map { Double($0.int64Value) }
+      )
+    }
+  }
+
+  func getAuthState() throws -> Promise<AuthState> {
+    return Promise.async { [core] in
+      let r = try await core.getAuthState()
+      return AuthState(
+        pinSet: r.pinSet,
+        failedAttempts: Double(r.failedAttempts),
+        lockedUntil: r.lockedUntil.map { Double($0.int64Value) }
+      )
+    }
+  }
+
+  func resetAuth() throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.resetAuth() }
   }
 
   func parseMoney(input: String) throws -> MoneyParseResult {

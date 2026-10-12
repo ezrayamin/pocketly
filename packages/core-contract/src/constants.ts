@@ -36,3 +36,20 @@ export const NETWORK_NORMAL: NetworkSimulation = { mode: 'NORMAL', failureRatePe
 
 /** Default zone for "today" and month boundaries until the app calls setTimeZone. */
 export const DEFAULT_TIME_ZONE = 'UTC';
+
+// ── PIN (FR-AUTH-03/05, FR-LOCK-04; ADR-0010). Kotlin: shared/.../security/PinPolicy.kt ──
+
+export const PIN_LENGTH = 6;
+/**
+ * PBKDF2-HMAC-SHA256 work factor, OWASP's 2023 figure. Identical in both cores
+ * (fixtures/pin.json). Raising it later is safe: records carry their own count and are
+ * re-hashed on the next successful unlock.
+ */
+export const PIN_PBKDF2_ITERATIONS = 600_000;
+export const PIN_SALT_BYTES = 16;
+export const PIN_HASH_BYTES = 32;
+/** Format version of the stored PIN record. */
+export const PIN_RECORD_VERSION = 1;
+/** FR-LOCK-04: this many wrong PINs in a row start a lockout. */
+export const PIN_MAX_ATTEMPTS = 5;
+export const PIN_LOCKOUT_MS = 5 * 60_000;
