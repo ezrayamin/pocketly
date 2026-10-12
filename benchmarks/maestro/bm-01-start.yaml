@@ -7,5 +7,8 @@ appId: ${APP_ID}
 - stopApp
 - launchApp:
     clearState: false
+    # perf build: skip the PIN gate (FR-LOCK-01) so Home draws
+    arguments:
+      pocketly.skipLock: true
 - assertVisible:
     id: "balance"

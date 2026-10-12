@@ -100,6 +100,27 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - PocketlySecureScreen (0.1.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RCT-Folly (2024.11.18.00):
     - RCT-Folly/Default (= 2024.11.18.00)
     - ReactNativeDependencies
@@ -2025,6 +2046,7 @@ DEPENDENCIES:
   - "PocketlyBuildInfo (from `../../../node_modules/@pocketly/native-build-info`)"
   - "PocketlyCoreKmp (from `../../../node_modules/@pocketly/core-kmp`)"
   - "PocketlyPreferences (from `../../../node_modules/@pocketly/native-preferences`)"
+  - "PocketlySecureScreen (from `../../../node_modules/@pocketly/native-secure-screen`)"
   - RCT-Folly (from `build/rndeps-facades/RCT-Folly`)
   - RCTDeprecation (from `../../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../../../node_modules/react-native/Libraries/Required`)
@@ -2131,6 +2153,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/@pocketly/core-kmp"
   PocketlyPreferences:
     :path: "../../../node_modules/@pocketly/native-preferences"
+  PocketlySecureScreen:
+    :path: "../../../node_modules/@pocketly/native-secure-screen"
   RCT-Folly:
     :path: build/rndeps-facades/RCT-Folly
   RCTDeprecation:
@@ -2304,6 +2328,7 @@ SPEC CHECKSUMS:
   PocketlyBuildInfo: 90cc192e47b3e85a0ca3778be56dbd7078060644
   PocketlyCoreKmp: 55cd399ea211ec03cb010ac4da6adb8f77a50274
   PocketlyPreferences: ebf9f81ada6190d6d5ce332a078b21230395badd
+  PocketlySecureScreen: 28d900db621a26f89768dd7a070209d33e06cd22
   RCT-Folly: 82921e585c0400eda46fac1068297aa9dfb035e4
   RCTDeprecation: 057ea6e16ea6d380a2d7806715a200bdbea820db
   RCTRequired: eea08534f94489887bbc67e2fee917096bdc9820

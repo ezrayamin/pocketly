@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BenchScreen } from './src/bench/BenchScreen';
 import { TabBar, type TabKey } from './src/components/TabBar';
 import { DEV_TOOLS_ENABLED } from './src/devtools';
+import { AuthGate } from './src/features/auth/AuthGate';
 import { DevMenu } from './src/features/devmenu/DevMenu';
 import { applyDevLink } from './src/features/devmenu/devLinks';
 import { HistoryScreen } from './src/features/history/HistoryScreen';
@@ -30,7 +31,7 @@ const NAV_THEME: Theme = {
   },
 };
 
-function MainApp({ initialTab }: { initialTab: TabKey }) {
+function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lockSkipped?: boolean }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   // History mounts on first visit, then stays mounted (keeps its list and scroll) like Home.
   const [historyVisited, setHistoryVisited] = useState(initialTab === 'history');
@@ -100,6 +101,7 @@ function MainApp({ initialTab }: { initialTab: TabKey }) {
       {DEV_TOOLS_ENABLED && (
         <DevMenu
           visible={devMenuOpen}
+          lockSkipped={lockSkipped}
           onClose={() => {
             setDevMenuOpen(false);
             setHomeRefresh((n) => n + 1);
@@ -162,7 +164,12 @@ function App({ launchArgs }: { launchArgs?: Record<string, string> }) {
       </SafeAreaProvider>
     );
   }
-  return <MainApp initialTab={launch.args.tab ?? 'home'} />;
+  const app = <MainApp initialTab={launch.args.tab ?? 'home'} lockSkipped={launch.args.skipLock === true} />;
+  if (launch.args.skipLock) {
+    console.info('[Pocketly] skipLock: PIN gate off (benchmark launch argument)');
+    return app;
+  }
+  return <AuthGate>{app}</AuthGate>;
 }
 
 export default App;

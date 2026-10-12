@@ -9,10 +9,11 @@ import App from '../App';
 import { core } from '../src/core';
 import { parseLaunchArgs } from '../src/launchArgs';
 
-async function render(launchArgs?: Record<string, string>) {
+/** As the benchmark scripts launch it: with skipLock, so Home is reachable. */
+async function render(launchArgs: Record<string, string>) {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    tree = ReactTestRenderer.create(<App launchArgs={launchArgs} />);
+    tree = ReactTestRenderer.create(<App launchArgs={{ skipLock: 'true', ...launchArgs }} />);
   });
   return tree;
 }
@@ -35,6 +36,12 @@ describe('parseLaunchArgs (benchmarking.md §5.3)', () => {
     expect(() => parseLaunchArgs({ transactionCont: '1000' })).toThrow(/unknown launch argument/);
     expect(() => parseLaunchArgs({ transactionCount: '1e3x' })).toThrow(/not an integer/);
     expect(() => parseLaunchArgs({ tab: 'pay' })).toThrow(/tab="pay"/);
+    expect(() => parseLaunchArgs({ skipLock: 'yes' })).toThrow(/skipLock="yes"/);
+  });
+
+  it('reads skipLock (benchmarks reach Home without the PIN gate)', () => {
+    expect(parseLaunchArgs({ skipLock: 'true' })).toEqual({ skipLock: true });
+    expect(parseLaunchArgs({ skipLock: 'false' })).toEqual({ skipLock: false });
   });
 });
 

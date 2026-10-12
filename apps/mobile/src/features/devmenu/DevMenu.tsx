@@ -7,6 +7,7 @@ import { X } from '../../components/icons';
 import { Slider } from '../../components/Slider';
 import { core, deviceTimeZone } from '../../core';
 import { colors, radius, spacing, type } from '../../theme/tokens';
+import { useAuthControls } from '../auth/AuthGate';
 import { toUserError } from '../errors';
 
 /**
@@ -23,7 +24,7 @@ const MODES: { mode: NetworkMode; label: string; hint: string }[] = [
   { mode: 'OFFLINE', label: 'Offline', hint: 'No connection' },
 ];
 
-export function DevMenu({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; onClose: () => void; lockSkipped: boolean }) {
   const [sim, setSim] = useState(() => core.getNetworkSimulation());
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -159,6 +160,8 @@ export function DevMenu({ visible, onClose }: { visible: boolean; onClose: () =>
             </Text>
           )}
 
+          {!lockSkipped && <OnboardingSection onClose={onClose} />}
+
           <Text style={styles.section}>BUILD</Text>
           <View style={styles.card}>
             <Text style={styles.info}>Core: {core.impl}</Text>
@@ -167,6 +170,31 @@ export function DevMenu({ visible, onClose }: { visible: boolean; onClose: () =>
         </ScrollView>
       </SafeAreaView>
     </Modal>
+  );
+}
+
+/** Slice 5: start auth over (deletes the PIN and every secret), to retest the flow quickly. */
+function OnboardingSection({ onClose }: { onClose: () => void }) {
+  const auth = useAuthControls();
+  const resetOnboarding = () =>
+    Alert.alert('Reset onboarding?', 'Deletes the PIN and every secret. The wallet data stays.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: async () => {
+          onClose();
+          await auth.resetOnboarding();
+        },
+      },
+    ]);
+  return (
+    <>
+      <Text style={styles.section}>ONBOARDING</Text>
+      <Pressable style={styles.button} onPress={resetOnboarding} accessibilityRole="button" testID="devmenu-reset-onboarding">
+        <Text style={styles.buttonText}>Reset onboarding</Text>
+      </Pressable>
+    </>
   );
 }
 

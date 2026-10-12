@@ -10,8 +10,10 @@
 #
 #   benchmarks/scripts/bm-01-startup.sh <results-dir> [measured=20] [warmup=2] [compilation=none]
 #
-# - Fresh-installs both arm64 release APKs (build first:
-#   ./gradlew assembleJsCoreRelease assembleKmpCoreRelease -PsplitApksByAbi)
+# - Fresh-installs both arm64 perf APKs (build first:
+#   ./gradlew assembleJsCorePerf assembleKmpCorePerf -PsplitApksByAbi). perf = release plus
+#   launch arguments (benchmarking.md §5.3); since slice 5 every launch passes
+#   pocketly.skipLock=true, or the PIN gate (FR-LOCK-01) would keep Home from drawing.
 # - compilation=none: `cmd package compile -f -m verify` (no AOT, = Macrobenchmark CompilationMode.None)
 #   compilation=baselineProfile: speed-profile from the APK's baseline profile → BM-09
 # - Alternates js, kmp, js, kmp… (§4.2). Warm-up runs are recorded; collect.ts drops them.
@@ -62,7 +64,7 @@ echo "▸ fresh install + compilation=$COMPILATION"
 for build in jsCore kmpCore; do
   pkg=$(pkg_of $build)
   adb uninstall "$pkg" >/dev/null 2>&1 || true
-  install_apk "$APK_DIR/$build/release/app-$build-arm64-v8a-release.apk"
+  install_apk "$APK_DIR/$build/perf/app-$build-arm64-v8a-perf.apk"
   case "$COMPILATION" in
     none) adb shell cmd package compile -f -m verify "$pkg" >/dev/null ;;
     baselineProfile)
@@ -89,7 +91,7 @@ run_one() { # <round> <build>
   adb logcat -c
 
   local am launch_state am_total
-  am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
+  am=$(adb shell am start -W -n "$pkg/$ACTIVITY" -e pocketly.skipLock true | tr -d '\r')
   launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
   if [ -z "$launch_state" ]; then
     # No output at all is an adb hiccup, not a slow launch: stop the app and launch it again.
@@ -97,7 +99,7 @@ run_one() { # <round> <build>
     adb shell am force-stop "$pkg"
     sleep "$SETTLE_SECONDS"
     adb logcat -c
-    am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
+    am=$(adb shell am start -W -n "$pkg/$ACTIVITY" -e pocketly.skipLock true | tr -d '\r')
     launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
   fi
   am_total=$(awk -F': ' '/TotalTime/ {print $2}' <<<"$am")
@@ -141,6 +143,7 @@ cat > "$RAW/meta.json" <<JSON
 { "scenario": "$(tr a-z A-Z <<<"$SCENARIO")", "warmup": $WARMUP, "measured": $MEASURED,
   "compilation": "$COMPILATION", "order": "alternating js,kmp per round",
   "tool": "am start -W + ActivityTaskManager Displayed/Fully drawn (platform startup logs)",
-  "settleSecondsBeforeLaunch": $SETTLE_SECONDS, "pageCacheDropped": false }
+  "settleSecondsBeforeLaunch": $SETTLE_SECONDS, "pageCacheDropped": false,
+  "build": "perf", "launchArgs": { "pocketly.skipLock": "true" } }
 JSON
 echo "▸ raw results in $RAW"

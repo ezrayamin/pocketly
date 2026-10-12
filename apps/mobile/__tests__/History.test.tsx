@@ -15,7 +15,7 @@ import { toRows } from '../src/features/history/rows';
 async function renderHistory() {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    tree = ReactTestRenderer.create(<App />);
+    tree = ReactTestRenderer.create(<App launchArgs={{ skipLock: 'true' }} />);
   });
   await ReactTestRenderer.act(async () => {
     tree.root.findByProps({ testID: 'tab-history' }).props.onPress();

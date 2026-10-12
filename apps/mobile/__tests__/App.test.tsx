@@ -12,7 +12,7 @@ import { core } from '../src/core';
 async function renderApp() {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    tree = ReactTestRenderer.create(<App />);
+    tree = ReactTestRenderer.create(<App launchArgs={{ skipLock: 'true' }} />);
   });
   return tree;
 }

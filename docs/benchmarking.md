@@ -317,6 +317,7 @@ visible error (`launch-args-error`) rather than letting it run on defaults.
 | `pocketly.tab` | `home`, `history`, `profile` | Start tab |
 | `pocketly.seed`, `pocketly.transactionCount`, `pocketly.nowMillis` | integers | `resetData()` with this dataset before anything loads (unset fields: `LIVE_DATASET`'s) |
 | `pocketly.network.mode`, `pocketly.network.normalLatencyMs`, `pocketly.network.failureRatePercent`, `pocketly.network.readTimeoutMs`, `pocketly.network.seed` | as `setNetworkSimulation` | Fake backend, same rules as the dev link |
+| `pocketly.skipLock` | `true`, `false` | No PIN gate (FR-LOCK-01): the app opens straight to its tabs. BM-01/BM-09 and BM-02 always pass `true`; each session's NOTES says so. The harness (`pocketly.bench`) never shows the gate |
 
 ```bash
 adb shell am start -W -n com.pocketly.kmp/com.pocketly.MainActivity \
@@ -327,6 +328,13 @@ Maestro's `launchApp: arguments:` sends the same extras (see `bm-02-scroll.yaml`
 are read at cold start only. A dataset argument resets the databases on **every** launch, so
 leave it out of startup scenarios (BM-01/BM-09) unless the reset is part of what is measured.
 iOS has no equivalent yet.
+
+> **Change (2026-10-12, slice 5): BM-01/BM-09 run on `perf` builds with `pocketly.skipLock=true`.**
+> With the PIN gate, a cold start on a release build stops at the lock screen, so Home's "fully
+> drawn" never fires. `perf` differs from `release` only in reading launch arguments, so BM-01
+> numbers stay comparable with earlier `release` sessions; the NOTES of the first session after
+> the change should still say so. A later metric could time "cold start → lock screen", which is
+> what users see first.
 
 ## 6. Scenarios
 
