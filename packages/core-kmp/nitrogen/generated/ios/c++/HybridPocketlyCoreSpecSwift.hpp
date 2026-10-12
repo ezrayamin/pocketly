@@ -292,6 +292,22 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<Promise<double>> getAutoLockTimeout() override {
+      auto __result = _swiftPart.getAutoLockTimeout();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override {
+      auto __result = _swiftPart.setAutoLockTimeout(std::forward<decltype(ms)>(ms));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline double echo(double value) override {
       auto __result = _swiftPart.echo(std::forward<decltype(value)>(value));
       if (__result.hasError()) [[unlikely]] {

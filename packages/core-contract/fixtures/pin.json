@@ -48,5 +48,12 @@
     { "pin": "456789", "ok": false, "reason": "TOO_SIMPLE" },
     { "pin": "987654", "ok": false, "reason": "TOO_SIMPLE" },
     { "pin": "543210", "ok": false, "reason": "TOO_SIMPLE" }
-  ]
+  ],
+  "autoLock": {
+    "_comment": "FR-LOCK-02. Stored in secure storage as the decimal string of the milliseconds.",
+    "defaultMs": 60000,
+    "maxMs": 3600000,
+    "valid": [0, 5000, 60000, 3600000],
+    "invalid": [-1, 0.5, 3600001]
+  }
 }

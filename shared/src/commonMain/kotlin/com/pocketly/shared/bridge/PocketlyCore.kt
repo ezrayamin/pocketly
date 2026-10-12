@@ -209,6 +209,12 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun resetAuth() = pin.resetAuth()
 
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getAutoLockTimeout(): Long = pin.getAutoLockTimeout()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun setAutoLockTimeout(ms: Long) = pin.setAutoLockTimeout(ms)
+
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
     /** BM-06: the pure cost of a call. No conversion, so only the crossing is timed. */

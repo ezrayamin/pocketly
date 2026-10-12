@@ -3,14 +3,18 @@
  */
 
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState, type AppStateStatus } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { PIN_LOCKOUT_MS, PIN_MAX_ATTEMPTS } from '@pocketly/core-contract';
 import { useSecureScreen } from '@pocketly/native-secure-screen';
 import App from '../App';
 import { core } from '../src/core';
 
-/** Slice 5 step 2: PIN creation and unlock through the real jsCore (FR-AUTH-03, FR-LOCK-01/04). */
+/** Slice 5 steps 2–3: PIN creation, unlock and the app-lock lifecycle through the real jsCore. */
+
+// Jest runs on Node; the app's TS config declares neither.
+declare const performance: { now(): number };
+declare const process: { hrtime: { bigint(): bigint } };
 
 const GOOD = '482915';
 const WRONG = '731048';
@@ -170,6 +174,109 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
     });
     await until(tree, () => has(tree, 'unlock'));
     expect((await core.getAuthState()).pinSet).toBe(true);
+    tree.unmount();
+  });
+});
+
+describe('app lock lifecycle (FR-LOCK-02/03)', () => {
+  let listeners: ((state: AppStateStatus) => void)[];
+  let offsetMs: number;
+
+  /** Moves both clocks the gate reads (appLock.ts) forward. */
+  const advance = (ms: number) => {
+    offsetMs += ms;
+  };
+
+  async function appState(tree: Tree, state: AppStateStatus) {
+    await ReactTestRenderer.act(async () => {
+      for (const listener of [...listeners]) listener(state);
+    });
+    await until(tree, () => true);
+  }
+
+  /** The app behind the gate: mounted, and whether it can be touched. */
+  function appLayer(tree: Tree) {
+    const balance = tree.root.findAll((n) => n.props.testID === 'balance');
+    const blocked = tree.root.findAll((n) => n.props.pointerEvents === 'none' && n.props.importantForAccessibility === 'no-hide-descendants');
+    return { mounted: balance.length > 0, interactive: balance.length > 0 && blocked.length === 0 };
+  }
+
+  async function openApp(): Promise<Tree> {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await until(tree, () => true);
+    return tree;
+  }
+
+  beforeEach(async () => {
+    listeners = [];
+    offsetMs = 0;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void);
+      return { remove: () => listeners.splice(listeners.indexOf(listener as (state: AppStateStatus) => void), 1) };
+    });
+    const realNow = Date.now.bind(Date);
+    // A monotonic clock of our own: the preset's performance.now goes through the mocked Date.now.
+    const monoNow = () => Number(process.hrtime.bigint() / 1_000_000n);
+    jest.spyOn(Date, 'now').mockImplementation(() => realNow() + offsetMs);
+    jest.spyOn(performance, 'now').mockImplementation(() => monoNow() + offsetMs);
+    await core.setPin(GOOD);
+    await core.setAutoLockTimeout(5_000);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('covers the app as soon as it leaves the foreground, and uncovers it on a quick return', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    expect(has(tree, 'privacy-cover')).toBe(true);
+    expect(appLayer(tree).interactive).toBe(false);
+    advance(4_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'privacy-cover')).toBe(false);
+    expect(has(tree, 'unlock')).toBe(false);
+    expect(appLayer(tree).interactive).toBe(true);
+    tree.unmount();
+  });
+
+  it('locks again after the timeout, over the still-mounted app, and the PIN opens it', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    advance(5_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
+    expect(has(tree, 'privacy-cover')).toBe(false);
+    expect(appLayer(tree)).toEqual({ mounted: true, interactive: false });
+    await enter(tree, GOOD);
+    await until(tree, () => !has(tree, 'unlock'));
+    expect(appLayer(tree)).toEqual({ mounted: true, interactive: true });
+    tree.unmount();
+  });
+
+  it('counts the larger of the two clocks: moving the wall clock back doesn\'t skip the lock', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    const perfNow = performance.now as jest.Mock;
+    const base = perfNow();
+    perfNow.mockImplementation(() => base + 6_000); // 6 s awake in the background…
+    offsetMs = -60 * 60_000; // …while the wall clock was set back an hour
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
+    tree.unmount();
+  });
+
+  it('timeout 0 locks on every return; "inactive" alone (iOS app switcher) only covers', async () => {
+    await core.setAutoLockTimeout(0);
+    const tree = await openApp();
+    await appState(tree, 'inactive');
+    expect(has(tree, 'privacy-cover')).toBe(true);
+    advance(60 * 60_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(false);
+    await appState(tree, 'background');
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
     tree.unmount();
   });
 });

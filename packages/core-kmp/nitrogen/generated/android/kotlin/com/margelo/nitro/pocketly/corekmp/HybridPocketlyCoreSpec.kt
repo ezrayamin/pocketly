@@ -100,6 +100,14 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun getAutoLockTimeout(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setAutoLockTimeout(ms: Double): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun echo(value: Double): Double
   
   @DoNotStrip

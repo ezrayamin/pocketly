@@ -154,6 +154,17 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.resetAuth() }
   }
 
+  func getAutoLockTimeout() throws -> Promise<Double> {
+    return Promise.async { [core] in Double(try await core.getAutoLockTimeout().int64Value) }
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func setAutoLockTimeout(ms: Double) throws -> Promise<Void> {
+    return Promise.async { [core, convert] in
+      try await core.setAutoLockTimeout(ms: try convert.toLongExact(value: ms, field: "ms"))
+    }
+  }
+
   func parseMoney(input: String) throws -> MoneyParseResult {
     let r = core.parseMoney(input: input)
     return MoneyParseResult(

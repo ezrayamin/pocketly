@@ -1,6 +1,5 @@
 package com.pocketly.securescreen
 
-import android.view.WindowManager
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
@@ -12,8 +11,8 @@ import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
 /**
- * NFR-SEC-03 on Android: FLAG_SECURE on the activity's window. Screenshots and recordings come
- * out black, and the app-switcher thumbnail is blank, while it's set.
+ * NFR-SEC-03 on Android: FLAG_SECURE on the activity's window (via [SecureWindow]). Screenshots
+ * and recordings come out black, and the app-switcher thumbnail is blank, while it's set.
  */
 @ReactModule(name = PocketlySecureScreenModule.NAME)
 class PocketlySecureScreenModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
@@ -22,12 +21,8 @@ class PocketlySecureScreenModule(private val context: ReactApplicationContext) :
   @ReactMethod
   fun setEnabled(enabled: Boolean) {
     UiThreadUtil.runOnUiThread {
-      val window = context.currentActivity?.window ?: return@runOnUiThread
-      if (enabled) {
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-      } else {
-        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-      }
+      SecureWindow.sensitiveScreen = enabled
+      context.currentActivity?.let(SecureWindow::apply)
     }
   }
 

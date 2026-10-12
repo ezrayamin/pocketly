@@ -110,6 +110,13 @@ export interface Core {
   getAuthState(): Promise<AuthState>;
   /** Logout / "reset onboarding": deletes every secret the core holds. */
   resetAuth(): Promise<void>;
+  /**
+   * FR-LOCK-02: how long the app may stay in the background before it locks again. Kept in
+   * secure storage with the PIN (ADR-0005); DEFAULT_AUTO_LOCK_MS until set, and after resetAuth.
+   */
+  getAutoLockTimeout(): Promise<number>;
+  /** 0..MAX_AUTO_LOCK_MS, whole milliseconds; anything else is INVALID_ARGUMENT. */
+  setAutoLockTimeout(ms: number): Promise<void>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
   /**

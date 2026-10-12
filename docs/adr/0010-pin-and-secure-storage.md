@@ -166,10 +166,9 @@ Nitro runtime. BM-08 lists its size separately.
   transfer: a biometric-protected key **signs the transfer itself** (amount, recipient,
   idempotency key), so "the user approved this exact transfer" is a signature, not a `true`
   that any code could return.
-- **Benchmarks vs the lock screen.** Once FR-LOCK-01 shows the lock screen before Home, BM-01's
-  "fully drawn" marker and BM-02's scroll script would wait forever. `pocketly.skipLock=true`
-  (a launch argument that works in `perf` builds only, ignored in release) skips it, and each
-  session's NOTES records it. Optional new metric: cold start to lock screen.
+- **Benchmarks vs the lock screen:** done in step 2. `pocketly.skipLock=true` (perf builds only)
+  skips the gate; BM-01 moved to perf builds (benchmarking.md §5.3). Re-lock and the app-switcher
+  cover: ADR-0011.
 - **BM-10 (optional what-if, clearly labelled):** "the cost of keeping crypto in JS".
   @noble/hashes in jsCore against a pure-Kotlin PBKDF2 in kmpCore (not platform crypto), the
   same iteration count, identical hashes checked first. The shipped design stays as above.

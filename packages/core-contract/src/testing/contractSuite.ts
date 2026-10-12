@@ -10,7 +10,9 @@
  * Uses Jest globals; never import this from app code.
  */
 import {
+  DEFAULT_AUTO_LOCK_MS,
   DEFAULT_DATASET,
+  MAX_AUTO_LOCK_MS,
   NETWORK_NORMAL,
   PIN_HASH_BYTES,
   PIN_LOCKOUT_MS,
@@ -434,6 +436,23 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
         expect((await core.verifyPin(GOOD)).outcome).toBe('WRONG_PIN');
         expect((await core.verifyPin(OTHER)).outcome).toBe('UNLOCKED');
+      });
+
+      it('auto-lock timeout (FR-LOCK-02): default, valid range, kept by resetData, reset by resetAuth', async () => {
+        expect([DEFAULT_AUTO_LOCK_MS, MAX_AUTO_LOCK_MS]).toEqual([pin.autoLock.defaultMs, pin.autoLock.maxMs]);
+        expect(await core.getAutoLockTimeout()).toBe(DEFAULT_AUTO_LOCK_MS);
+        for (const ms of pin.autoLock.valid) {
+          await core.setAutoLockTimeout(ms);
+          expect(await core.getAutoLockTimeout()).toBe(ms);
+        }
+        for (const ms of pin.autoLock.invalid) {
+          await expectCoreError(core.setAutoLockTimeout(ms), 'INVALID_ARGUMENT');
+        }
+        await core.setAutoLockTimeout(5000);
+        await core.resetData(DEFAULT_DATASET);
+        expect(await core.getAutoLockTimeout()).toBe(5000);
+        await core.resetAuth();
+        expect(await core.getAutoLockTimeout()).toBe(DEFAULT_AUTO_LOCK_MS);
       });
 
       it('resetAuth deletes the PIN and the counter; resetData leaves them alone', async () => {

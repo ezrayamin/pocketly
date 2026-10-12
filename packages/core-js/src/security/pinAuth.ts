@@ -1,5 +1,7 @@
 import {
   CoreError,
+  DEFAULT_AUTO_LOCK_MS,
+  MAX_AUTO_LOCK_MS,
   PIN_HASH_BYTES,
   PIN_LOCKOUT_MS,
   PIN_MAX_ATTEMPTS,
@@ -24,6 +26,7 @@ export const SECURE_KEYS = {
   pin: 'pin',
   lockout: 'lockout',
   installId: 'installId',
+  autoLockMs: 'autoLockMs',
 } as const;
 
 /**
@@ -145,6 +148,22 @@ export class PinAuth {
       const { failedAttempts, lockedUntil } = await this.readLockout(now, pinSet);
       return lockedUntil > now ? { pinSet, failedAttempts, lockedUntil } : { pinSet, failedAttempts };
     });
+  }
+
+  /** FR-LOCK-02. A stored value this version can't read counts as the default. */
+  getAutoLockTimeout(): Promise<number> {
+    return this.serial(async () => {
+      const stored = await this.store.get(SECURE_KEYS.autoLockMs);
+      const ms = stored !== undefined && /^\d+$/.test(stored) ? Number(stored) : NaN;
+      return ms <= MAX_AUTO_LOCK_MS ? ms : DEFAULT_AUTO_LOCK_MS;
+    });
+  }
+
+  setAutoLockTimeout(ms: number): Promise<void> {
+    if (!Number.isInteger(ms) || ms < 0 || ms > MAX_AUTO_LOCK_MS) {
+      return Promise.reject(new CoreError('INVALID_ARGUMENT', `auto-lock timeout must be 0..${MAX_AUTO_LOCK_MS} ms, got ${ms}`));
+    }
+    return this.serial(() => this.store.set(SECURE_KEYS.autoLockMs, String(ms)));
   }
 
   resetAuth(): Promise<void> {

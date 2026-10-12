@@ -6,7 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BenchScreen } from './src/bench/BenchScreen';
 import { TabBar, type TabKey } from './src/components/TabBar';
 import { DEV_TOOLS_ENABLED } from './src/devtools';
-import { AuthGate } from './src/features/auth/AuthGate';
+import { AuthGate, useAppLocked } from './src/features/auth/AuthGate';
 import { DevMenu } from './src/features/devmenu/DevMenu';
 import { applyDevLink } from './src/features/devmenu/devLinks';
 import { HistoryScreen } from './src/features/history/HistoryScreen';
@@ -37,6 +37,8 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
   const [historyVisited, setHistoryVisited] = useState(initialTab === 'history');
   const [historyScrollToTop, setHistoryScrollToTop] = useState(0);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
+  // A Modal is its own window, above the lock screen: keep it hidden while locked.
+  const locked = useAppLocked();
   // Bumped when the developer menu closes or a dev link changes the backend, so Home and
   // History reload from it.
   const [homeRefresh, setHomeRefresh] = useState(0);
@@ -100,7 +102,7 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (
         <DevMenu
-          visible={devMenuOpen}
+          visible={devMenuOpen && !locked}
           lockSkipped={lockSkipped}
           onClose={() => {
             setDevMenuOpen(false);

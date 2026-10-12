@@ -160,7 +160,7 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
             </Text>
           )}
 
-          {!lockSkipped && <OnboardingSection onClose={onClose} />}
+          {!lockSkipped && <AppLockSection onClose={onClose} />}
 
           <Text style={styles.section}>BUILD</Text>
           <View style={styles.card}>
@@ -173,9 +173,26 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
   );
 }
 
-/** Slice 5: start auth over (deletes the PIN and every secret), to retest the flow quickly. */
-function OnboardingSection({ onClose }: { onClose: () => void }) {
+const AUTO_LOCK_OPTIONS: { ms: number; label: string }[] = [
+  { ms: 0, label: 'Immediately' },
+  { ms: 5_000, label: '5 s' },
+  { ms: 30_000, label: '30 s' },
+  { ms: 60_000, label: '1 min' },
+  { ms: 5 * 60_000, label: '5 min' },
+];
+
+/**
+ * Slice 5: the auto-lock timeout (FR-LOCK-02, saved in the core) and starting auth over
+ * (deletes the PIN and every secret), to retest the flows quickly.
+ */
+function AppLockSection({ onClose }: { onClose: () => void }) {
   const auth = useAuthControls();
+  const [error, setError] = useState<string | null>(null);
+  const choose = (ms: number) =>
+    auth.setAutoLockTimeout(ms).then(
+      () => setError(null),
+      (e: unknown) => setError(toUserError(e).message),
+    );
   const resetOnboarding = () =>
     Alert.alert('Reset onboarding?', 'Deletes the PIN and every secret. The wallet data stays.', [
       { text: 'Cancel', style: 'cancel' },
@@ -190,6 +207,28 @@ function OnboardingSection({ onClose }: { onClose: () => void }) {
     ]);
   return (
     <>
+      <Text style={styles.section}>AUTO-LOCK (FR-LOCK-02)</Text>
+      <View style={styles.card}>
+        <Text style={styles.optionHint}>Lock again after this long in the background.</Text>
+        <View style={styles.chips}>
+          {AUTO_LOCK_OPTIONS.map(({ ms, label }) => {
+            const selected = auth.autoLockMs === ms;
+            return (
+              <Pressable
+                key={ms}
+                style={[styles.chip, selected && styles.chipOn]}
+                onPress={() => choose(ms)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                testID={`devmenu-autolock-${ms}`}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {error && <Text style={styles.optionHint}>{error}</Text>}
+      </View>
       <Text style={styles.section}>ONBOARDING</Text>
       <Pressable style={styles.button} onPress={resetOnboarding} accessibilityRole="button" testID="devmenu-reset-onboarding">
         <Text style={styles.buttonText}>Reset onboarding</Text>
@@ -240,4 +279,14 @@ const styles = StyleSheet.create({
   buttonPrimaryText: { ...type.body, color: colors.onPrimary },
   status: { ...type.caption, color: colors.primary, textAlign: 'center', marginTop: spacing.xs },
   info: { ...type.caption, color: colors.textSecondary },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceRaised,
+  },
+  chipOn: { backgroundColor: colors.primary },
+  chipText: { ...type.caption, color: colors.textPrimary },
+  chipTextOn: { color: colors.onPrimary },
 });

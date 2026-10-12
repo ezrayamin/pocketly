@@ -242,6 +242,14 @@ export class JsCore implements Core {
     return this.pin.resetAuth();
   }
 
+  getAutoLockTimeout(): Promise<number> {
+    return this.pin.getAutoLockTimeout();
+  }
+
+  setAutoLockTimeout(ms: number): Promise<void> {
+    return this.pin.setAutoLockTimeout(ms);
+  }
+
   echo(value: number): number {
     return value;
   }

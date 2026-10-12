@@ -53,3 +53,8 @@ export const PIN_RECORD_VERSION = 1;
 /** FR-LOCK-04: this many wrong PINs in a row start a lockout. */
 export const PIN_MAX_ATTEMPTS = 5;
 export const PIN_LOCKOUT_MS = 5 * 60_000;
+
+/** FR-LOCK-02: re-lock after this long in the background, unless changed (developer menu). */
+export const DEFAULT_AUTO_LOCK_MS = 60_000;
+/** Longest auto-lock timeout either core accepts. 0 = lock every time the app leaves the foreground. */
+export const MAX_AUTO_LOCK_MS = 60 * 60_000;

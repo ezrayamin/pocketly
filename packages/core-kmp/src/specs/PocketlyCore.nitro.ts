@@ -57,6 +57,8 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   verifyPin(pin: string): Promise<UnlockResult>;
   getAuthState(): Promise<AuthState>;
   resetAuth(): Promise<void>;
+  getAutoLockTimeout(): Promise<number>;
+  setAutoLockTimeout(ms: number): Promise<void>;
 
   echo(value: number): number;
   formatMoney(minor: number): string;

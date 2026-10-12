@@ -32,6 +32,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     return true
   }
 
+  // FR-LOCK-03: iOS takes the app-switcher snapshot after the app resigns active, before JS can
+  // draw anything. Cover the window natively (colors.background) until it's active again.
+  private var privacyCover: UIView?
+
+  func applicationWillResignActive(_ application: UIApplication) {
+    guard let window = window, privacyCover == nil else { return }
+    let cover = UIView(frame: window.bounds)
+    cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    cover.backgroundColor = UIColor(red: 0x09 / 255.0, green: 0x0D / 255.0, blue: 0x16 / 255.0, alpha: 1)
+    window.addSubview(cover)
+    privacyCover = cover
+  }
+
+  func applicationDidBecomeActive(_ application: UIApplication) {
+    privacyCover?.removeFromSuperview()
+    privacyCover = nil
+  }
+
   // pocketly://dev/... developer links (ADR-0008) → React Native's Linking.
   func application(
     _ app: UIApplication,

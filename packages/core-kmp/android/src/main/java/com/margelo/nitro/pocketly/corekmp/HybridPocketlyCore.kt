@@ -69,6 +69,12 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun resetAuth(): Promise<Unit> = Promise.async { core.resetAuth() }
 
+    override fun getAutoLockTimeout(): Promise<Double> = Promise.async { core.getAutoLockTimeout().toDouble() }
+
+    // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+    override fun setAutoLockTimeout(ms: Double): Promise<Unit> =
+        Promise.async { core.setAutoLockTimeout(BridgeConversions.toLongExact(ms, "ms")) }
+
     override fun echo(value: Double): Double = core.echo(value)
 
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))

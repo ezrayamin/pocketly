@@ -161,6 +161,27 @@ class PinFixturesTest {
     }
 
     @Test
+    fun autoLockTimeout() = runTest {
+        val autoLock = pin["autoLock"]!!.jsonObject
+        assertEquals(autoLock["defaultMs"]!!.jsonPrimitive.long, PinPolicy.DEFAULT_AUTO_LOCK_MS)
+        assertEquals(autoLock["maxMs"]!!.jsonPrimitive.long, PinPolicy.MAX_AUTO_LOCK_MS)
+        assertEquals(PinPolicy.DEFAULT_AUTO_LOCK_MS, core.getAutoLockTimeout())
+        for (ms in autoLock["valid"]!!.jsonArray.map { it.jsonPrimitive.long }) {
+            core.setAutoLockTimeout(ms)
+            assertEquals(ms, core.getAutoLockTimeout())
+        }
+        // Fractions are refused at the bridge (BridgeConversions); the facade takes whole Longs.
+        for (ms in autoLock["invalid"]!!.jsonArray.map { it.jsonPrimitive.content.toDouble() }.filter { it == kotlin.math.floor(it) }) {
+            assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.setAutoLockTimeout(ms.toLong()) }.code)
+        }
+        core.setAutoLockTimeout(5000)
+        core.resetData(DatasetConfig.DEFAULT)
+        assertEquals(5000, core.getAutoLockTimeout())
+        core.resetAuth()
+        assertEquals(PinPolicy.DEFAULT_AUTO_LOCK_MS, core.getAutoLockTimeout())
+    }
+
+    @Test
     fun resetAuthDeletesSecretsAndResetDataKeepsThem() = runTest {
         core.setPin(GOOD)
         core.verifyPin(OTHER)

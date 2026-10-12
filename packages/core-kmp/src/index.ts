@@ -116,6 +116,14 @@ export class KmpCore implements Core {
     return this.native.resetAuth().catch(rethrow);
   }
 
+  getAutoLockTimeout(): Promise<number> {
+    return this.native.getAutoLockTimeout().catch(rethrow);
+  }
+
+  setAutoLockTimeout(ms: number): Promise<void> {
+    return this.native.setAutoLockTimeout(ms).catch(rethrow);
+  }
+
   // Straight through: it can't throw, and BM-06 times exactly this path.
   echo(value: number): number {
     return this.native.echo(value);

@@ -71,6 +71,8 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override;
     std::shared_ptr<Promise<AuthState>> getAuthState() override;
     std::shared_ptr<Promise<void>> resetAuth() override;
+    std::shared_ptr<Promise<double>> getAutoLockTimeout() override;
+    std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override;
     double echo(double value) override;
     std::string formatMoney(double minor) override;
     std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;

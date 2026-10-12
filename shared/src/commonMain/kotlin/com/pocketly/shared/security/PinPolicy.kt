@@ -25,6 +25,11 @@ object PinPolicy {
     const val MAX_ATTEMPTS = 5
     const val LOCKOUT_MS = 5 * 60_000L
 
+    /** FR-LOCK-02: re-lock after this long in the background unless changed. */
+    const val DEFAULT_AUTO_LOCK_MS = 60_000L
+    /** 0 = lock every time the app leaves the foreground. */
+    const val MAX_AUTO_LOCK_MS = 60 * 60_000L
+
     /** ASCII digits only, exactly [LENGTH], not all one digit, not a straight run up or down. */
     fun check(pin: String): PinCheck {
         if (pin.any { it !in '0'..'9' }) return PinCheck(PinRejectReason.NOT_DIGITS)

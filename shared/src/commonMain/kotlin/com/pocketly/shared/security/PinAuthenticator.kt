@@ -87,6 +87,22 @@ class PinAuthenticator(
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
     suspend fun resetAuth() = serial { wipe() }
 
+    /** FR-LOCK-02. A stored value this version can't read counts as the default. */
+    @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
+    suspend fun getAutoLockTimeout(): Long = serial {
+        val stored = store.get(KEY_AUTO_LOCK_MS)
+        val ms = stored?.takeIf { s -> s.isNotEmpty() && s.all { it in '0'..'9' } }?.toLongOrNull()
+        if (ms != null && ms <= PinPolicy.MAX_AUTO_LOCK_MS) ms else PinPolicy.DEFAULT_AUTO_LOCK_MS
+    }
+
+    @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
+    suspend fun setAutoLockTimeout(ms: Long) {
+        if (ms !in 0..PinPolicy.MAX_AUTO_LOCK_MS) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "auto-lock timeout must be 0..${PinPolicy.MAX_AUTO_LOCK_MS} ms, got $ms")
+        }
+        serial { store.put(KEY_AUTO_LOCK_MS, ms.toString()) }
+    }
+
     /** Runs [block] on [work] after every earlier call has finished, bound to this install. */
     private suspend fun <T> serial(block: suspend () -> T): T = withContext(work) {
         mutex.withLock {
@@ -161,5 +177,6 @@ class PinAuthenticator(
         const val KEY_PIN = "pin"
         const val KEY_LOCKOUT = "lockout"
         const val KEY_INSTALL_ID = "installId"
+        const val KEY_AUTO_LOCK_MS = "autoLockMs"
     }
 }
