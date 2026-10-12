@@ -21,6 +21,16 @@ const OPTIONS: SensitiveInfoOptions = {
   iosSynchronizable: false,
 };
 
+/**
+ * The key behind this entry is gone, or the entry was tampered with: it can never be read again.
+ * On Android 6.1.5 reports a lost key only as a plain error saying "Item must be recreated"
+ * (CryptoManager.initCipher, which has already deleted the key), never as E_KEY_INVALIDATED.
+ */
+function permanentlyUnreadable(e: unknown): boolean {
+  if (isKeyInvalidatedError(e) || isIntegrityViolationError(e)) return true;
+  return e instanceof Error && e.message.includes('Item must be recreated');
+}
+
 export function sensitiveInfoStore(): SecureStore {
   return {
     async get(key) {
@@ -28,12 +38,11 @@ export function sensitiveInfoStore(): SecureStore {
         const item = await getItem(key, OPTIONS);
         return item?.value ?? undefined;
       } catch (e) {
-        // The key behind this entry is gone or the entry was tampered with: it's unreadable for good.
-        if (isKeyInvalidatedError(e) || isIntegrityViolationError(e)) {
+        if (permanentlyUnreadable(e)) {
           await deleteItem(key, OPTIONS);
           return undefined;
         }
-        throw e;
+        throw e; // temporarily unavailable, e.g. the device is locked: keep everything
       }
     },
     async set(key, value) {

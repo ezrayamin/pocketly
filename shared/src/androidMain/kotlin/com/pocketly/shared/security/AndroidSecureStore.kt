@@ -33,16 +33,20 @@ class AndroidSecureStore(context: Context) : SecureStore {
         return try {
             val (iv, sealed) = stored.split(':').map { Base64.decode(it, Base64.NO_WRAP) }
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, existingKey() ?: return dropUnreadable(key), GCMParameterSpec(128, iv))
+            val secretKey = existingKey() ?: return if (deviceLocked()) error("device locked") else dropUnreadable(key)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
             cipher.updateAAD(key.encodeToByteArray())
             cipher.doFinal(sealed).decodeToString()
         } catch (e: Exception) {
+            // While the device is locked the key refuses to work by design (unlocked device
+            // required): whatever the exception says, that's temporary. Never drop anything then.
+            if (deviceLocked()) throw e
             if (e is AEADBadTagException || e is KeyPermanentlyInvalidatedException ||
                 e is UnrecoverableKeyException || e is IllegalArgumentException || e is IndexOutOfBoundsException
             ) {
                 dropUnreadable(key) // tampered with, or the key is gone: unreadable for good
             } else {
-                throw e
+                throw e // temporarily unavailable (Keystore busy, …)
             }
         }
     }
@@ -68,6 +72,8 @@ class AndroidSecureStore(context: Context) : SecureStore {
         check(prefs.edit().clear().commit()) { "secure store write failed" }
         keyStore().deleteEntry(ALIAS)
     }
+
+    private fun deviceLocked(): Boolean = app.getSystemService(KeyguardManager::class.java).isDeviceLocked
 
     private fun dropUnreadable(key: String): String? {
         remove(key)

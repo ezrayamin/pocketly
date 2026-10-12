@@ -47,6 +47,30 @@ export interface PinAuthOptions {
 }
 
 const NO_LOCKOUT: LockoutState = { failedAttempts: 0, lockedUntil: 0 };
+
+/**
+ * Any store failure is "temporarily unavailable" (ADR-0010 §2.7): it becomes
+ * SECURE_STORAGE_UNAVAILABLE and nothing is wiped. Wipes need positive evidence: a value the
+ * store reports as gone, or a record that's present but can't be parsed.
+ */
+function guarded(store: SecureStore): SecureStore {
+  const wrap =
+    <A extends unknown[], R>(op: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      try {
+        return await op(...args);
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        throw new CoreError('SECURE_STORAGE_UNAVAILABLE', `secure storage unavailable: ${reason}`);
+      }
+    };
+  return {
+    get: wrap((key: string) => store.get(key)),
+    set: wrap((key: string, value: string) => store.set(key, value)),
+    delete: wrap((key: string) => store.delete(key)),
+    clear: wrap(() => store.clear()),
+  };
+}
 const encoder = new TextEncoder();
 
 /** PBKDF2-HMAC-SHA256 over the PIN's ASCII bytes. Both cores must agree byte for byte (fixtures/pin.json). */
@@ -68,7 +92,7 @@ export class PinAuth {
   private bound = false;
 
   constructor(options: PinAuthOptions) {
-    this.store = options.store;
+    this.store = guarded(options.store);
     this.crypto = options.crypto;
     this.marker = options.marker;
     this.clock = options.clock ?? Date.now;

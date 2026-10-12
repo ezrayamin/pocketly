@@ -26,7 +26,7 @@ interface InstallMarker {
  * hundreds of milliseconds by design. Mirrors packages/core-js/src/security/pinAuth.ts.
  */
 class PinAuthenticator(
-    private val store: SecureStore,
+    store: SecureStore,
     private val crypto: PinCrypto,
     private val marker: InstallMarker,
     private val work: CoroutineDispatcher,
@@ -35,6 +35,7 @@ class PinAuthenticator(
     /** Work factor for new records. Tests lower it; the app always uses [PinPolicy.ITERATIONS]. */
     private val iterations: Int = PinPolicy.ITERATIONS,
 ) {
+    private val store: SecureStore = GuardedStore(store)
     private val mutex = Mutex()
     private var bound = false
 
@@ -135,6 +136,25 @@ class PinAuthenticator(
     private fun newRecord(pin: String): PinRecord {
         val salt = crypto.randomBytes(PinPolicy.SALT_BYTES)
         return PinRecord(iterations, salt, PinPolicy.hash(crypto, pin, salt, iterations))
+    }
+
+    /**
+     * Any store failure is "temporarily unavailable" (ADR-0010 §2.7): it becomes
+     * SECURE_STORAGE_UNAVAILABLE and nothing is wiped. Wipes need positive evidence: a value the
+     * store reports as gone, or a record that's present but can't be parsed.
+     */
+    private class GuardedStore(private val store: SecureStore) : SecureStore {
+        override fun get(key: String) = guard { store.get(key) }
+        override fun put(key: String, value: String) = guard { store.put(key, value) }
+        override fun remove(key: String) = guard { store.remove(key) }
+        override fun clear() = guard { store.clear() }
+
+        private inline fun <T> guard(op: () -> T): T =
+            try {
+                op()
+            } catch (e: Exception) {
+                throw CoreException(ErrorCode.SECURE_STORAGE_UNAVAILABLE, "secure storage unavailable: ${e.message}")
+            }
     }
 
     companion object {

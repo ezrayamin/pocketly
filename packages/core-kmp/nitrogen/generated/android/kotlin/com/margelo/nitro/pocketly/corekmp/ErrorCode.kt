@@ -25,7 +25,8 @@ enum class ErrorCode(@DoNotStrip @Keep val value: Int) {
   SERVER_ERROR(6),
   IDEMPOTENCY_CONFLICT(7),
   NOT_FOUND(8),
-  INVALID_ARGUMENT(9);
+  INVALID_ARGUMENT(9),
+  SECURE_STORAGE_UNAVAILABLE(10);
 
   companion object
 }

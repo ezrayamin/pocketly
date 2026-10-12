@@ -92,6 +92,8 @@ export interface Core {
   ingestStaged(): Promise<IngestResult>;
 
   // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
+  // Every async auth call rejects with SECURE_STORAGE_UNAVAILABLE when secure storage can't be
+  // used right now (device locked, Keystore busy). Nothing was wiped: stay locked, retry later.
   /** FR-AUTH-03: six ASCII digits, not all the same, not a straight run (123456, 987654). */
   checkPin(pin: string): PinCheck;
   /**

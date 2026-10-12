@@ -1,6 +1,6 @@
 import type { DatasetConfig } from '@pocketly/core-contract';
 import { JsCore } from '../src/jsCore';
-import { MemorySecureStore } from '../src/security/secureStore';
+import { MemorySecureStore, type SecureStore } from '../src/security/secureStore';
 import { nodePinCrypto } from './nodePinCrypto';
 import { nodeSqliteDriver } from './nodeSqliteDriver';
 
@@ -10,7 +10,7 @@ export function testCore(
     dataset?: DatasetConfig;
     serverPath?: string;
     cachePath?: string;
-    secure?: MemorySecureStore;
+    secure?: SecureStore;
     clock?: () => number;
     pinIterations?: number;
   } = {},

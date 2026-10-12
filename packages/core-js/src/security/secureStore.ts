@@ -1,12 +1,20 @@
 /**
  * Secrets storage (NFR-SEC-01, ADR-0010): the PIN record, the attempt counter, the install id.
- * Never holds financial data. Implementations:
+ * Never holds financial data.
+ *
+ * Two kinds of failure, kept apart because only one may lead to a wipe (ADR-0010 §2.7):
+ *  - permanently unreadable (key invalidated or deleted, value tampered with): `get` deletes the
+ *    value and returns undefined, exactly as if it had never been written;
+ *  - temporarily unavailable (device locked, Keystore busy, anything else): the call throws.
+ *    Nothing is lost; callers stay locked and try again later.
+ *
+ * Implementations:
  *  - sensitiveInfoStore (the app: react-native-sensitive-info v6, Keystore / Keychain)
  *  - MemorySecureStore (Jest and scripts)
  * Kotlin: shared/.../security/SecureStore.kt.
  */
 export interface SecureStore {
-  /** undefined when the key is absent, or its value can no longer be decrypted (then it's deleted). */
+  /** undefined when the key is absent or permanently unreadable (then it's deleted). Throws when temporarily unavailable. */
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;

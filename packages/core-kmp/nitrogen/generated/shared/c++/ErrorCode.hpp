@@ -39,6 +39,7 @@ namespace margelo::nitro::pocketly {
     IDEMPOTENCY_CONFLICT      SWIFT_NAME(idempotencyConflict) = 7,
     NOT_FOUND      SWIFT_NAME(notFound) = 8,
     INVALID_ARGUMENT      SWIFT_NAME(invalidArgument) = 9,
+    SECURE_STORAGE_UNAVAILABLE      SWIFT_NAME(secureStorageUnavailable) = 10,
   } CLOSED_ENUM;
 
 } // namespace margelo::nitro::pocketly
@@ -61,6 +62,7 @@ namespace margelo::nitro {
         case hashString("IDEMPOTENCY_CONFLICT"): return margelo::nitro::pocketly::ErrorCode::IDEMPOTENCY_CONFLICT;
         case hashString("NOT_FOUND"): return margelo::nitro::pocketly::ErrorCode::NOT_FOUND;
         case hashString("INVALID_ARGUMENT"): return margelo::nitro::pocketly::ErrorCode::INVALID_ARGUMENT;
+        case hashString("SECURE_STORAGE_UNAVAILABLE"): return margelo::nitro::pocketly::ErrorCode::SECURE_STORAGE_UNAVAILABLE;
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert \"" + unionValue + "\" to enum ErrorCode - invalid value!");
       }
@@ -77,6 +79,7 @@ namespace margelo::nitro {
         case margelo::nitro::pocketly::ErrorCode::IDEMPOTENCY_CONFLICT: return JSIConverter<std::string>::toJSI(runtime, "IDEMPOTENCY_CONFLICT");
         case margelo::nitro::pocketly::ErrorCode::NOT_FOUND: return JSIConverter<std::string>::toJSI(runtime, "NOT_FOUND");
         case margelo::nitro::pocketly::ErrorCode::INVALID_ARGUMENT: return JSIConverter<std::string>::toJSI(runtime, "INVALID_ARGUMENT");
+        case margelo::nitro::pocketly::ErrorCode::SECURE_STORAGE_UNAVAILABLE: return JSIConverter<std::string>::toJSI(runtime, "SECURE_STORAGE_UNAVAILABLE");
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert ErrorCode to JS - invalid value: "
                                     + std::to_string(static_cast<int>(arg)) + "!");
@@ -98,6 +101,7 @@ namespace margelo::nitro {
         case hashString("IDEMPOTENCY_CONFLICT"):
         case hashString("NOT_FOUND"):
         case hashString("INVALID_ARGUMENT"):
+        case hashString("SECURE_STORAGE_UNAVAILABLE"):
           return true;
         default:
           return false;

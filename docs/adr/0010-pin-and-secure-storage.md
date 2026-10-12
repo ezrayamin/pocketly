@@ -46,9 +46,25 @@ digit, and straight runs up or down (`123456`, `987654`).
    pool, and kmpCore works on `Dispatchers.Default` (not the database thread other calls share).
 6. A record with fewer iterations than the current figure is **re-hashed** with a new salt after
    a successful unlock, so the figure can go up later without breaking anyone's PIN.
-7. **Fail closed.** A counter that can't be read, or is missing while a PIN is set (`setPin`
-   always writes one), reads as a lockout starting now. A PIN record that can't be read can't be
-   checked, so every secret is wiped and onboarding starts again.
+7. **Fail closed, but wipe only on proof.** "Can't read" isn't "corrupt": both stores refuse
+   access while the device is locked by design, and the app can run then (a notification, or iOS
+   pre-launching it in the background before the user unlocks). So read failures come in two kinds:
+
+   | Failure | Examples | Response |
+   |---|---|---|
+   | Temporarily unavailable | Device locked (`errSecInteractionNotAllowed`; Keystore "user not authenticated"), Keystore busy, any error a store throws | Reject with `SECURE_STORAGE_UNAVAILABLE`. Nothing is wiped and no attempt is counted; the lock screen stays locked and retries |
+   | Permanently unreadable | Key invalidated or deleted, value tampered with, record present but unparsable | Wipe every secret; onboarding starts again |
+
+   The store decides the first column: for a permanently unreadable value it deletes it and
+   reports it absent; for anything else it throws, and the core turns every store exception into
+   `SECURE_STORAGE_UNAVAILABLE` (`guarded` / `GuardedStore`). kmpCore's Android store also treats
+   every failure as temporary while `KeyguardManager.isDeviceLocked`. The core wipes only on
+   proof: a missing install id, or a PIN record that's present but can't be parsed.
+   Tests (both cores, same cases): `secureStoreFailures.test.ts` / `SecureStoreFailuresTest.kt`,
+   on a fake store that can be unavailable, fail chosen writes, or lose chosen keys.
+
+   A counter that's unreadable, or missing while a PIN is set (`setPin` always writes one), reads
+   as a lockout starting now.
 
 The attempt counter and the lockout end live **in secure storage**, not in memory.
 
@@ -65,7 +81,17 @@ The attempt counter and the lockout end live **in secure storage**, not in memor
 201 ms in jsCore and 554 ms in kmpCore (median), and the JS thread never stalls more than ~18 ms
 in either. 600,000 iterations is acceptable on this phone for both. The gap is the PBKDF2
 implementation, not KMP: Android's platform PBKDF2 is BouncyCastle in Java, quick-crypto's is
-OpenSSL in C.
+OpenSSL in C. Same pattern as SQLite in ADR-0009: the platform library, not the architecture.
+
+**kmpCore keeps the platform PBKDF2.** It meets the rule (well under a second on the slowest
+phone measured, lock screen responsive). The alternative, PBKDF2 as a loop over Android's native
+`Mac("HmacSHA256")`, is unlikely to be clearly faster (BouncyCastle spends ~0.9 µs per iteration;
+the loop would cross from Kotlin into native code several times per iteration) and would mean
+writing PBKDF2 ourselves, which is hand-rolled crypto.
+
+**Revisit if the median unlock exceeds 1 s on the low-end test phone** (the vivo is mid-range;
+554 ms could become 1.5–2 s on a low-end one). In this order: (1) lower the iteration count in
+both cores (records re-hash themselves, §2.6); (2) only then consider other approaches.
 
 The PIN record isn't behind a biometric or passcode prompt in either build: the app has to read
 it to check a PIN. Biometrics (step 4 of slice 5) protect a separate secret.
@@ -91,7 +117,11 @@ installed version, so upgrading the library means re-checking this table.
 ### 5. Reinstalls and backups
 
 - **Install marker.** The first auth call stores a random install id in the replica's
-  `cache_meta` (deleted with the app) and in secure storage. If they differ, or the replica has
+  `cache_meta` (deleted with the app) and in secure storage. The replica is in durable app
+  storage, never a cache directory, so "Clear cache" can't remove the marker and trigger a wipe:
+  Android `databases/` in both builds (`getDatabasePath`: SQLDelight's Android driver, op-sqlite);
+  iOS `Library/Application Support/databases/` (kmpCore, SQLiter) and `Library/` (jsCore,
+  op-sqlite), neither of which iOS purges. (Read from the libraries' sources, 2026-10-12.) If they differ, or the replica has
   none, everything in secure storage is from an earlier install and is wiped. `resetData`
   and logout clear the replica but keep the install id (`deleteSyncMeta`).
 - **Android backups:** `allowBackup="false"` and `dataExtractionRules` that exclude everything
@@ -120,6 +150,13 @@ Nitro runtime. BM-08 lists its size separately.
   can't stop one (10⁶ candidates). The real protection is that the record never leaves secure
   storage, and the lockout.
 - **Rooted or jailbroken devices** are out of scope (no attestation).
+- **sensitive-info deletes its key on `UnrecoverableKeyException`** (Android, before throwing
+  "… Item must be recreated"), and jsCore can't intercept that. If an OEM keystore ever raised it
+  for a locked device, jsCore would lose its secrets where kmpCore (which checks the lock state
+  first) wouldn't. Not seen so far; the lock screen will offer "Forgot PIN" (re-onboarding) for
+  any state the user can't get out of.
+- **A permanent failure the store doesn't recognise looks temporary**, so the app stays locked
+  instead of wiping. That's the safe direction; "Forgot PIN" is the way out.
 
 ## Later in slice 5 (planned, not built yet)
 

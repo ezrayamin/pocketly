@@ -64,6 +64,8 @@ class IosSecureStore(private val service: String = SERVICE) : SecureStore {
         when (val status = SecItemCopyMatching(query, result.ptr)) {
             errSecSuccess -> (CFBridgingRelease(result.value) as NSData).toByteArray().decodeToString()
             errSecItemNotFound -> null
+            // errSecInteractionNotAllowed (-25308): the device is locked (WhenUnlocked…). That and
+            // anything else is temporary: throw, never delete (ADR-0010 §2.7).
             else -> error("Keychain read failed: $status")
         }
     }

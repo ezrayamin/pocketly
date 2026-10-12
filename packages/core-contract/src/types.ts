@@ -51,7 +51,11 @@ export type Category =
   | 'TRANSFER'
   | 'TOP_UP';
 
-/** requirements §4.3, plus two contract-level codes (NOT_FOUND, INVALID_ARGUMENT). */
+/**
+ * requirements §4.3, plus contract-level codes: NOT_FOUND, INVALID_ARGUMENT, and
+ * SECURE_STORAGE_UNAVAILABLE (ADR-0010: secure storage can't be used right now, e.g. the device
+ * is locked; nothing was wiped, stay locked and retry).
+ */
 export type ErrorCode =
   | 'INSUFFICIENT_FUNDS'
   | 'DAILY_LIMIT_EXCEEDED'
@@ -62,7 +66,8 @@ export type ErrorCode =
   | 'SERVER_ERROR'
   | 'IDEMPOTENCY_CONFLICT'
   | 'NOT_FOUND'
-  | 'INVALID_ARGUMENT';
+  | 'INVALID_ARGUMENT'
+  | 'SECURE_STORAGE_UNAVAILABLE';
 
 export type CounterpartyKind = 'USER' | 'MERCHANT' | 'PAYMENT_METHOD';
 
