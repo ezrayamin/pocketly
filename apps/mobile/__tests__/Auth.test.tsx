@@ -389,4 +389,31 @@ describe('biometric unlock (FR-AUTH-04)', () => {
     expect((await core.getBiometricStatus()).enabled).toBe(false);
     tree.unmount();
   });
+
+  it('a re-lock prompts for biometrics turned on since the last unlock', async () => {
+    await core.setPin(GOOD);
+    await core.setAutoLockTimeout(0);
+    const listeners: ((state: string) => void)[] = [];
+    const appState = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: string) => void);
+      return { remove: () => listeners.splice(listeners.indexOf(listener as (state: string) => void), 1) };
+    });
+    const tree = await launch();
+    await enter(tree, GOOD); // biometrics are off at this unlock
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.enableBiometrics(GOOD, { title: 't', cancel: 'c' })).outcome).toBe('ENABLED');
+    biometrics.__scans.push('CANCEL'); // so the re-lock screen stays up to look at
+    const emit = async (state: string) => {
+      await ReactTestRenderer.act(async () => {
+        for (const listener of [...listeners]) listener(state);
+      });
+      await until(tree, () => true);
+    };
+    await emit('background');
+    await emit('active');
+    await until(tree, () => has(tree, 'pin-use-biometrics'));
+    expect(biometrics.__scans).toEqual([]); // the CANCEL scan was used: the prompt was shown
+    appState.mockRestore();
+    tree.unmount();
+  });
 });

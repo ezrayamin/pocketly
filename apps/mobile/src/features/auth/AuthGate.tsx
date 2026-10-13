@@ -165,7 +165,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') {
         setCovered(true);
-        if (next === 'background' && leftAt.current === null) leftAt.current = leftNow();
+        if (next === 'background' && leftAt.current === null) {
+          leftAt.current = leftNow();
+          // Biometrics may have been turned on or off since the last unlock (Profile): a re-lock
+          // must prompt (or not) by what's true now. Read while away, so the return stays sync.
+          usableBiometric();
+        }
         return;
       }
       const since = leftAt.current;
@@ -178,7 +183,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setCovered(false);
     });
     return () => sub.remove();
-  }, [gate.kind]);
+  }, [gate.kind, usableBiometric]);
 
   const controls = useMemo<AuthControls>(
     () => ({
