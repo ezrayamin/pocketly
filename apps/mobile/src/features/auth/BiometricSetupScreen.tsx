@@ -4,7 +4,7 @@ import type { BiometricKind } from '@pocketly/core-contract';
 import { core } from '../../core';
 import { toUserError } from '../errors';
 import { biometricNoun, capitalized, enablePrompt } from './biometricCopy';
-import { formatCountdown, wrongPinMessage } from './pinCopy';
+import { lockoutNotice, wrongPinNotice } from './pinCopy';
 import { PinScreen, type PinMessage } from './PinScreen';
 import { usePinEntry } from './usePinEntry';
 
@@ -37,22 +37,19 @@ export function BiometricSetupScreen() {
             return;
           case 'WRONG_PIN':
             setShakeToken((n) => n + 1);
-            setMessage({ tone: 'error', text: wrongPinMessage(result.attemptsLeft ?? 0) });
+            setMessage({ tone: 'warning', ...wrongPinNotice(result.attemptsLeft ?? 0) });
             break;
           case 'PIN_LOCKED_OUT':
-            setMessage({
-              tone: 'error',
-              text: `Too many wrong PINs. Try again in ${formatCountdown((result.lockedUntil ?? Date.now()) - Date.now())}.`,
-            });
+            setMessage({ tone: 'error', ...lockoutNotice((result.lockedUntil ?? Date.now()) - Date.now()) });
             break;
           case 'CANCELLED':
             setMessage({ tone: 'info', text: 'Enter your PIN to try again.' });
             break;
           default:
-            setMessage({ tone: 'error', text: `${capitalized(biometricNoun(kind))} unlock couldn't be turned on right now.` });
+            setMessage({ tone: 'warning', text: `${capitalized(biometricNoun(kind))} unlock couldn't be turned on right now.` });
         }
       } catch (e) {
-        setMessage({ tone: 'error', text: toUserError(e).message });
+        setMessage({ tone: 'warning', text: toUserError(e).message });
       }
       setBusy(false);
       clearRef.current();
@@ -73,7 +70,7 @@ export function BiometricSetupScreen() {
       busy={busy}
       shakeToken={shakeToken}
       onDigit={(d) => {
-        if (message?.tone === 'error') setMessage(null);
+        if (message && message.tone !== 'info') setMessage(null);
         entry.press(d);
       }}
       onErase={entry.erase}

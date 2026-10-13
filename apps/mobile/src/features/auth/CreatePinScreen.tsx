@@ -22,7 +22,7 @@ export function CreatePinScreen({ onCreated }: { onCreated: (pin: string) => voi
   const refuse = (text: string) => {
     first.current = null;
     setStage('choose');
-    setMessage({ tone: 'error', text });
+    setMessage({ tone: 'warning', text });
     setShakeToken((n) => n + 1);
     clearRef.current();
   };
@@ -72,7 +72,7 @@ export function CreatePinScreen({ onCreated }: { onCreated: (pin: string) => voi
       busy={busy}
       shakeToken={shakeToken}
       onDigit={(d) => {
-        if (message?.tone === 'error') setMessage(null);
+        if (message && message.tone !== 'info') setMessage(null);
         entry.press(d);
       }}
       onErase={entry.erase}

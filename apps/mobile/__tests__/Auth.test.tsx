@@ -134,7 +134,9 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
     expect(has(tree, 'unlock')).toBe(true);
     expect(has(tree, 'balance')).toBe(false);
     await enter(tree, WRONG);
-    expect(text(tree, 'pin-message')).toBe(`Wrong PIN. ${PIN_MAX_ATTEMPTS - 1} attempts left.`);
+    expect(text(tree, 'pin-message')).toBe(`Wrong PIN entered (1/${PIN_MAX_ATTEMPTS})`);
+    expect(text(tree, 'pin-message-detail')).toBe(`${PIN_MAX_ATTEMPTS - 1} attempts left before a 5-minute security lockout.`);
+    expect(has(tree, 'pin-message-badge')).toBe(false);
     await enter(tree, GOOD);
     await until(tree, () => has(tree, 'balance'));
     tree.unmount();
@@ -142,13 +144,18 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
 
   it('locks out after 5 wrong PINs with a live countdown, which a restart doesn\'t end', async () => {
     const tree = await launch();
-    for (let i = 0; i < PIN_MAX_ATTEMPTS; i++) await enter(tree, WRONG);
-    expect(text(tree, 'pin-message')).toMatch(/^Too many wrong PINs\. Try again in [45]:\d\d\.$/);
+    for (let i = 0; i < PIN_MAX_ATTEMPTS - 1; i++) await enter(tree, WRONG);
+    expect(text(tree, 'pin-message-detail')).toBe('1 attempt left before a 5-minute security lockout.');
+    expect(text(tree, 'pin-message-badge')).toBe('Final attempt');
+    await enter(tree, WRONG);
+    expect(text(tree, 'pin-message')).toBe('Too many wrong PINs');
+    expect(text(tree, 'pin-message-detail')).toMatch(/^Try again in [45]:\d\d\.$/);
+    expect(text(tree, 'pin-message-badge')).toBe('Locked');
     expect(tree.root.findByProps({ testID: 'pin-key-1' }).props.disabled).toBe(true);
     tree.unmount();
 
     const again = await launch();
-    expect(text(again, 'pin-message')).toMatch(/Try again in [45]:\d\d/);
+    expect(text(again, 'pin-message-detail')).toMatch(/Try again in [45]:\d\d/);
     expect((await core.getAuthState()).lockedUntil).toBeGreaterThan(Date.now() + PIN_LOCKOUT_MS - 60_000);
     again.unmount();
   });
@@ -333,13 +340,14 @@ describe('biometric unlock (FR-AUTH-04)', () => {
     tree.unmount();
   });
 
-  it('cancelling the prompt shows the keypad and a "Use fingerprint" link that tries again', async () => {
+  it('cancelling the prompt shows the keypad and an "Unlock with fingerprint" button that tries again', async () => {
     await setUpWithBiometrics();
     biometrics.__scans.push('CANCEL');
     const tree = await launch();
     await until(tree, () => has(tree, 'pin-use-biometrics'));
     expect(has(tree, 'unlock')).toBe(true);
-    expect(text(tree, 'pin-message').trim()).toBe('');
+    expect(has(tree, 'pin-message')).toBe(false);
+    expect(tree.root.findAll((n) => n.props.children === 'Unlock with fingerprint').length).toBeGreaterThan(0);
     await press(tree, 'pin-use-biometrics');
     await until(tree, () => has(tree, 'balance'));
     tree.unmount();

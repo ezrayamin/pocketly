@@ -5,7 +5,7 @@ import type { BiometricKind } from '@pocketly/core-contract';
 import { core } from '../../core';
 import { toUserError } from '../errors';
 import { biometricNoun, biometricUnlockMessage, unlockPrompt } from './biometricCopy';
-import { formatCountdown, wrongPinMessage } from './pinCopy';
+import { lockoutNotice, wrongPinNotice } from './pinCopy';
 import { PinScreen, type PinMessage } from './PinScreen';
 import { useCountdown } from './useCountdown';
 import { usePinEntry } from './usePinEntry';
@@ -63,9 +63,9 @@ export function UnlockScreen({
         if (result.outcome === 'KEY_INVALIDATED' || !(await core.getBiometricStatus()).enabled) setBiometricOn(false);
       }
       const text = biometricUnlockMessage(result.outcome, biometric?.kind);
-      setMessage(text === null ? null : { tone: 'error', text });
+      setMessage(text === null ? null : { tone: 'warning', text });
     } catch (e) {
-      setMessage({ tone: 'error', text: toUserError(e).message });
+      setMessage({ tone: 'warning', text: toUserError(e).message });
     }
     setScanning(false);
   }, [biometric?.kind, onUnlocked]);
@@ -99,14 +99,14 @@ export function UnlockScreen({
         if (result.outcome === 'LOCKED_OUT') {
           setLockedUntil(result.lockedUntil);
         } else {
-          setMessage({ tone: 'error', text: wrongPinMessage(result.attemptsLeft) });
+          setMessage({ tone: 'warning', ...wrongPinNotice(result.attemptsLeft) });
         }
       } catch (e) {
         if (toCoreError(e).code === 'NOT_FOUND') {
           onReset();
           return;
         }
-        setMessage({ tone: 'error', text: toUserError(e).message });
+        setMessage({ tone: 'warning', text: toUserError(e).message });
       }
       setBusy(false);
       clearRef.current();
@@ -131,7 +131,7 @@ export function UnlockScreen({
               await core.resetAuth();
               onReset();
             } catch (e) {
-              setMessage({ tone: 'error', text: toUserError(e).message });
+              setMessage({ tone: 'warning', text: toUserError(e).message });
             }
           },
         },
@@ -142,10 +142,11 @@ export function UnlockScreen({
     <PinScreen
       testID="unlock"
       title="Enter your PIN"
-      subtitle="Unlock Pocketly to see your wallet."
+      subtitle="Pocketly is locked for your security"
+      shield
       message={
         locked
-          ? { tone: 'error', text: `Too many wrong PINs. Try again in ${formatCountdown(remaining)}.` }
+          ? { tone: 'error', ...lockoutNotice(remaining) }
           : busy
             ? { tone: 'info', text: 'Checking…' }
             : message
@@ -153,14 +154,14 @@ export function UnlockScreen({
       count={locked ? 0 : entry.count}
       busy={busy}
       locked={locked || scanning}
-      secondaryAction={
+      biometricAction={
         biometricOn && !busy && !scanning
-          ? { label: `Use ${biometricNoun(biometric?.kind)}`, onPress: scanBiometrics, testID: 'pin-use-biometrics' }
+          ? { label: `Unlock with ${biometricNoun(biometric?.kind)}`, onPress: scanBiometrics, testID: 'pin-use-biometrics' }
           : undefined
       }
       shakeToken={shakeToken}
       onDigit={(d) => {
-        if (message?.tone === 'error') setMessage(null);
+        if (message && message.tone !== 'info') setMessage(null);
         entry.press(d);
       }}
       onErase={entry.erase}

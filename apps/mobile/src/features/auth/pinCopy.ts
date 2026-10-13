@@ -1,4 +1,4 @@
-import { PIN_LENGTH } from '@pocketly/core-contract';
+import { PIN_LENGTH, PIN_LOCKOUT_MS, PIN_MAX_ATTEMPTS } from '@pocketly/core-contract';
 import type { PinRejectReason } from '@pocketly/core-contract';
 
 /** FR-AUTH-03: why a new PIN was refused, in words. Never repeats the PIN. */
@@ -10,9 +10,19 @@ export const PIN_REJECTED: Record<PinRejectReason, string> = {
 
 export const PIN_MISMATCH = "The PINs didn't match. Choose your PIN again.";
 
-/** FR-LOCK-04. */
-export function wrongPinMessage(attemptsLeft: number): string {
-  return `Wrong PIN. ${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left.`;
+/** FR-LOCK-04: the card after a wrong PIN. "Final attempt" when one is left. */
+export function wrongPinNotice(attemptsLeft: number): { text: string; detail: string; badge?: string } {
+  const minutes = PIN_LOCKOUT_MS / 60_000;
+  return {
+    text: `Wrong PIN entered (${PIN_MAX_ATTEMPTS - attemptsLeft}/${PIN_MAX_ATTEMPTS})`,
+    detail: `${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left before a ${minutes}-minute security lockout.`,
+    badge: attemptsLeft === 1 ? 'Final attempt' : undefined,
+  };
+}
+
+/** FR-LOCK-04: the card during a lockout, with the live countdown. */
+export function lockoutNotice(remainingMs: number): { text: string; detail: string; badge: string } {
+  return { text: 'Too many wrong PINs', detail: `Try again in ${formatCountdown(remainingMs)}.`, badge: 'Locked' };
 }
 
 /** 4:05, for the lockout countdown. Rounds up, so it never shows 0:00 while still locked. */

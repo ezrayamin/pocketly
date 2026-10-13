@@ -8,9 +8,10 @@ import { digitsEnteredLabel } from './pinCopy';
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 
 /**
- * Six dots for the digits entered so far. Screen readers hear "3 of 6 digits entered", never the
- * digits. While the PIN is being checked (`busy`) the dots stay full and a spinner shows below
- * them; each new `shakeToken` shakes them (a wrong or refused PIN).
+ * Six dots in a pill, for the digits entered so far, with a caption under them. Screen readers
+ * hear "3 of 6 digits entered", never the digits. While the PIN is being checked (`busy`) the
+ * dots stay full and a spinner replaces the caption; each new `shakeToken` shakes them (a wrong
+ * or refused PIN).
  */
 export function PinDots({ count, busy, shakeToken }: { count: number; busy: boolean; shakeToken: number }) {
   const shake = useRef(new Animated.Value(0)).current;
@@ -40,7 +41,13 @@ export function PinDots({ count, busy, shakeToken }: { count: number; busy: bool
           <View key={i} style={[styles.dot, i < count && styles.dotFilled]} />
         ))}
       </Animated.View>
-      <View style={styles.spinner}>{busy && <ActivityIndicator color={colors.primary} testID="pin-busy" />}</View>
+      <View style={styles.caption}>
+        {busy ? (
+          <ActivityIndicator color={colors.primary} size="small" testID="pin-busy" />
+        ) : (
+          <Text style={styles.captionText}>ENTER {PIN_LENGTH}-DIGIT PIN</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -71,7 +78,7 @@ export function PinPad({
   const key = (digit: string) => (
     <Pressable
       key={digit}
-      style={({ pressed }) => [styles.key, pressed && styles.keyPressed, disabled && styles.keyDisabled]}
+      style={({ pressed }) => [styles.key, styles.digitKey, pressed && styles.keyPressed, disabled && styles.keyDisabled]}
       onPress={() => onDigit(digit)}
       disabled={disabled}
       accessibilityRole="button"
@@ -93,7 +100,7 @@ export function PinPad({
       <View style={styles.row}>
         {action ? (
           <Pressable
-            style={styles.key}
+            style={({ pressed }) => [styles.key, styles.sideKey, pressed && styles.keyPressed]}
             onPress={action.onPress}
             accessibilityRole="button"
             testID={action.testID}
@@ -105,7 +112,7 @@ export function PinPad({
         )}
         {key('0')}
         <Pressable
-          style={({ pressed }) => [styles.key, pressed && styles.keyPressed, disabled && styles.keyDisabled]}
+          style={({ pressed }) => [styles.key, styles.sideKey, pressed && styles.keyPressed, disabled && styles.keyDisabled]}
           onPress={onErase}
           disabled={disabled}
           accessibilityRole="button"
@@ -113,32 +120,42 @@ export function PinPad({
           accessibilityState={{ disabled }}
           testID="pin-key-erase"
         >
-          <Delete color={colors.textPrimary} size={26} />
+          <Delete color={colors.textPrimary} size={24} />
         </Pressable>
       </View>
     </View>
   );
 }
 
-const KEY_SIZE = 76;
+const KEY_HEIGHT = 64;
 
 const styles = StyleSheet.create({
-  dotsRow: { alignItems: 'center', gap: spacing.md },
-  dots: { flexDirection: 'row', gap: spacing.lg, paddingVertical: spacing.sm },
-  dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colors.textMuted },
-  dotFilled: { backgroundColor: colors.primary, borderColor: colors.primary },
-  spinner: { height: 24, justifyContent: 'center' },
-  pad: { gap: spacing.md, alignItems: 'center' },
-  row: { flexDirection: 'row', gap: spacing.xxl },
-  key: {
-    width: KEY_SIZE,
-    height: KEY_SIZE,
+  dotsRow: { alignItems: 'center', gap: spacing.sm },
+  dots: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+  },
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.border },
+  dotFilled: { backgroundColor: colors.primary },
+  caption: { height: 20, justifyContent: 'center' },
+  captionText: { ...type.overline, color: colors.textMuted },
+  pad: { gap: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.md },
+  key: {
+    flex: 1,
+    height: KEY_HEIGHT,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  digitKey: { backgroundColor: colors.surface },
+  sideKey: { backgroundColor: 'transparent' },
   keyPressed: { backgroundColor: colors.surfaceRaised },
   keyDisabled: { opacity: 0.35 },
-  keyText: { fontSize: 30, fontWeight: '500', color: colors.textPrimary },
-  actionText: { ...type.caption, color: colors.primary, textAlign: 'center' },
+  keyText: { fontSize: 28, fontWeight: '500', color: colors.textPrimary },
+  actionText: { ...type.caption, fontWeight: '600', color: colors.textPrimary, textAlign: 'center' },
 });
