@@ -60,6 +60,18 @@ namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 namespace margelo::nitro::pocketly { enum class NetworkMode; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
 // Forward declaration of `PinCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PinCheck; }
 // Forward declaration of `PinRejectReason` to properly resolve imports.
@@ -114,6 +126,12 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "MoneyParseResult.hpp"
 #include "NetworkMode.hpp"
 #include "NetworkSimulation.hpp"
+#include "OtpSendOutcome.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpVerifyOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "PhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
 #include "PriceTick.hpp"

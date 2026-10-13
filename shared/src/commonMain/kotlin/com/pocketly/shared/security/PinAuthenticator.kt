@@ -6,6 +6,12 @@ import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.UnlockOutcome
 import com.pocketly.shared.domain.UnlockResult
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -43,6 +49,9 @@ class PinAuthenticator(
     suspend fun setPin(pin: String) {
         PinPolicy.check(pin).reason?.let { throw CoreException(ErrorCode.INVALID_ARGUMENT, "PIN refused: $it") }
         serial {
+            // ADR-0013: no PIN before the phone is verified, so "Forgot PIN" can't skip the OTP.
+            val session = readSession() ?: throw CoreException(ErrorCode.NOT_FOUND, "verify the phone number first")
+            store.put(KEY_SESSION, session.copy(pinCreated = true).encode())
             store.put(KEY_PIN, newRecord(pin).encode())
             store.put(KEY_LOCKOUT, LockoutState.NONE.encode())
         }
@@ -79,9 +88,10 @@ class PinAuthenticator(
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
     suspend fun getAuthState(): AuthState = serial {
         val pinSet = readRecord() != null
+        val phone = readSession()?.phone
         val now = clock()
         val state = readLockout(now, pinSet)
-        AuthState(pinSet, state.failedAttempts, state.lockedUntil.takeIf { it > now })
+        AuthState(pinSet, state.failedAttempts, state.lockedUntil.takeIf { it > now }, phone)
     }
 
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
@@ -101,6 +111,26 @@ class PinAuthenticator(
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "auto-lock timeout must be 0..${PinPolicy.MAX_AUTO_LOCK_MS} ms, got $ms")
         }
         serial { store.put(KEY_AUTO_LOCK_MS, ms.toString()) }
+    }
+
+    /** ADR-0013: after VERIFIED, the phone (and the server's session token) belong to this install. */
+    @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
+    suspend fun rememberVerifiedPhone(phone: String, token: String) = serial {
+        store.put(KEY_SESSION, Session(phone, token, pinCreated = false).encode())
+    }
+
+    /**
+     * The verified session, or null: none yet, one this version can't read, or one whose PIN is
+     * gone (a lost PIN record must not let anyone set a new PIN without an OTP). Call after
+     * [readRecord] in the same queued call, so a corrupt PIN record has been dealt with first.
+     */
+    private fun readSession(): Session? {
+        val session = store.get(KEY_SESSION)?.let(Session::decode) ?: return null
+        if (session.pinCreated && store.get(KEY_PIN) == null) {
+            store.remove(KEY_SESSION)
+            return null
+        }
+        return session
     }
 
     /** Biometrics ([BiometricAuthenticator]): [block] on the guarded store, in this queue, bound to this install. */
@@ -189,5 +219,30 @@ class PinAuthenticator(
         const val KEY_AUTO_LOCK_MS = "autoLockMs"
         /** ADR-0012: the biometric key's public key (SPKI DER, hex). Present = biometric unlock on. */
         const val KEY_BIOMETRIC_PUBLIC_KEY = "biometricPublicKey"
+        /**
+         * ADR-0013: `{"phone":"+62…","token":"…","pinCreated":bool}` after OTP. Valid while no PIN
+         * has been created yet, or while the PIN it created exists: losing the PIN record ends it.
+         */
+        const val KEY_SESSION = "session"
+    }
+}
+
+/** The verified-phone session (ADR-0013). Same JSON as core-js. */
+internal data class Session(val phone: String, val token: String, val pinCreated: Boolean) {
+    fun encode(): String = buildJsonObject {
+        put("phone", phone)
+        put("token", token)
+        put("pinCreated", pinCreated)
+    }.toString()
+
+    companion object {
+        fun decode(encoded: String): Session? = try {
+            val o = Json.parseToJsonElement(encoded) as? JsonObject ?: return null
+            val phone = (o["phone"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+            val token = (o["token"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+            Session(phone, token, (o["pinCreated"] as? JsonPrimitive)?.booleanOrNull == true)
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 }

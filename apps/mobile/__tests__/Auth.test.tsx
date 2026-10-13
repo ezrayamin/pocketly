@@ -7,6 +7,7 @@ import { Alert, AppState, type AppStateStatus } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { PIN_LOCKOUT_MS, PIN_MAX_ATTEMPTS } from '@pocketly/core-contract';
 import { useSecureScreen } from '@pocketly/native-secure-screen';
+import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
 import App from '../App';
 import { core } from '../src/core';
 
@@ -63,6 +64,14 @@ async function enter(tree: Tree, pin: string) {
 /** The biometrics library mock (jest.setup.js): sensor state and scripted scans. */
 const biometrics = jest.requireMock<{ __state: { available: boolean }; __scans: string[] }>('@sbaiahmed1/react-native-biometrics');
 
+/**
+ * ADR-0013: a PIN needs a phone verified by OTP. Each test verifies its own number: the fake
+ * server refuses a resend to the same number within 30 s, as a real one would.
+ */
+let phones = 0;
+const nextPhone = () => `+62812345${String(10000 + ++phones)}`;
+const verifyPhone = () => verifyTestPhone(core, nextPhone());
+
 beforeEach(async () => {
   await core.resetAuth();
   jest.mocked(useSecureScreen).mockClear();
@@ -71,7 +80,91 @@ beforeEach(async () => {
   biometrics.__scans.length = 0;
 });
 
-describe('first launch: create a PIN (FR-AUTH-03)', () => {
+describe('onboarding: phone and OTP (FR-AUTH-01/02)', () => {
+  async function typeDigits(tree: Tree, digits: string) {
+    for (const digit of digits) {
+      await ReactTestRenderer.act(async () => {
+        tree.root.findByProps({ testID: `pin-key-${digit}` }).props.onPress();
+      });
+    }
+  }
+
+  async function tap(tree: Tree, testID: string) {
+    await ReactTestRenderer.act(async () => {
+      tree.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0].props.onPress();
+    });
+  }
+
+  const sendDisabled = (tree: Tree) =>
+    tree.root.findAll((n) => n.props.testID === 'phone-send' && typeof n.props.onPress === 'function')[0].props.disabled;
+
+  /** Phone screen → a number → "Send verification code" → OTP screen. Returns the E.164 number. */
+  async function toOtp(tree: Tree): Promise<string> {
+    const phone = nextPhone();
+    await typeDigits(tree, `0${phone.slice(3)}`); // as people type it: 0812…
+    expect(sendDisabled(tree)).toBe(false);
+    await tap(tree, 'phone-send');
+    await until(tree, () => has(tree, 'onboarding-otp'));
+    return phone;
+  }
+
+  it('a fresh install starts at the phone number, before anything financial', async () => {
+    const tree = await launch();
+    expect(has(tree, 'onboarding-phone')).toBe(true);
+    expect(has(tree, 'balance')).toBe(false);
+    expect(sendDisabled(tree)).toBe(true);
+    tree.unmount();
+  });
+
+  it('keeps "Send" off until the number is valid, and says why it isn\'t (FR-AUTH-01)', async () => {
+    const tree = await launch();
+    await typeDigits(tree, '0812');
+    expect(sendDisabled(tree)).toBe(true);
+    expect(text(tree, 'phone-message').trim()).toBe('');
+    await tap(tree, 'phone-clear');
+    await typeDigits(tree, '21');
+    expect(text(tree, 'phone-message')).toMatch(/start with 8/);
+    expect(sendDisabled(tree)).toBe(true);
+    tree.unmount();
+  });
+
+  it('shows the number it sent to; wrong codes count down to a cooldown (FR-AUTH-02)', async () => {
+    const tree = await launch();
+    const phone = await toOtp(tree);
+    expect(JSON.stringify(tree.toJSON())).toContain(`+62 ${phone.slice(3, 6)}-${phone.slice(6, 10)}-${phone.slice(10)}`);
+    expect(text(tree, 'otp-resend-countdown')).toMatch(/^Resend code in 0:[23]\d$/);
+    expect(useSecureScreen).toHaveBeenCalled();
+    await typeDigits(tree, '000000');
+    await tap(tree, 'otp-verify');
+    await until(tree, () => text(tree, 'otp-message').includes("isn't right"));
+    expect(text(tree, 'otp-message')).toBe("That code isn't right. 2 attempts left.");
+    for (let i = 0; i < 2; i++) {
+      await typeDigits(tree, '000000');
+      await tap(tree, 'otp-verify');
+      await until(tree, () => true);
+    }
+    await until(tree, () => text(tree, 'otp-message').startsWith('Too many wrong codes'));
+    expect(text(tree, 'otp-message')).toMatch(/^Too many wrong codes\. Try again in 0:[23]\d\.$/);
+    tree.unmount();
+  });
+
+  it('the right code leads to PIN setup; "Edit number" goes back', async () => {
+    const tree = await launch();
+    await toOtp(tree);
+    await tap(tree, 'otp-edit-number');
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    const phone = await toOtp(tree);
+    await typeDigits(tree, '123456');
+    await tap(tree, 'otp-verify');
+    await until(tree, () => has(tree, 'create-pin'));
+    expect((await core.getAuthState()).phone).toBe(phone);
+    tree.unmount();
+  });
+});
+
+describe('after the OTP: create a PIN (FR-AUTH-03)', () => {
+  beforeEach(verifyPhone);
+
   it('shows the PIN setup before anything financial (FR-LOCK-01), with screenshots blocked', async () => {
     const tree = await launch();
     expect(has(tree, 'create-pin')).toBe(true);
@@ -83,8 +176,10 @@ describe('first launch: create a PIN (FR-AUTH-03)', () => {
   it('refuses a trivial PIN with the reason, before asking to confirm it', async () => {
     const tree = await launch();
     await enter(tree, '123456');
-    expect(text(tree, 'pin-title')).toBe('Create a PIN');
+    expect(text(tree, 'pin-title')).toBe('Set up your PIN');
     expect(text(tree, 'pin-message')).toBe('Too simple: avoid repeated or sequential digits.');
+    const rule = tree.root.findAll((n) => n.props.testID === 'pin-rule-simple' && typeof n.type === 'string')[0];
+    expect(rule.props.accessibilityLabel).toMatch(/not met$/);
     tree.unmount();
   });
 
@@ -93,7 +188,7 @@ describe('first launch: create a PIN (FR-AUTH-03)', () => {
     await enter(tree, GOOD);
     expect(text(tree, 'pin-title')).toBe('Confirm your PIN');
     await enter(tree, WRONG);
-    expect(text(tree, 'pin-title')).toBe('Create a PIN');
+    expect(text(tree, 'pin-title')).toBe('Set up your PIN');
     expect(text(tree, 'pin-message')).toBe("The PINs didn't match. Choose your PIN again.");
     expect((await core.getAuthState()).pinSet).toBe(false);
     tree.unmount();
@@ -126,6 +221,7 @@ describe('first launch: create a PIN (FR-AUTH-03)', () => {
 
 describe('later launches: unlock (FR-LOCK-01/04)', () => {
   beforeEach(async () => {
+    await verifyPhone();
     await core.setPin(GOOD);
   });
 
@@ -160,7 +256,7 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
     again.unmount();
   });
 
-  it('"Forgot PIN" deletes the PIN and starts setup again', async () => {
+  it('"Forgot PIN" deletes the PIN and the verified phone: onboarding starts at the phone (ADR-0013)', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
     });
@@ -168,8 +264,8 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
     await ReactTestRenderer.act(async () => {
       tree.root.findByProps({ testID: 'pin-forgot' }).props.onPress();
     });
-    await until(tree, () => has(tree, 'create-pin'));
-    expect((await core.getAuthState()).pinSet).toBe(false);
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
     alert.mockRestore();
     tree.unmount();
   });
@@ -234,6 +330,7 @@ describe('app lock lifecycle (FR-LOCK-02/03)', () => {
     const monoNow = () => Number(process.hrtime.bigint() / 1_000_000n);
     jest.spyOn(Date, 'now').mockImplementation(() => realNow() + offsetMs);
     jest.spyOn(performance, 'now').mockImplementation(() => monoNow() + offsetMs);
+    await verifyPhone();
     await core.setPin(GOOD);
     await core.setAutoLockTimeout(5_000);
   });
@@ -297,7 +394,8 @@ describe('app lock lifecycle (FR-LOCK-02/03)', () => {
 describe('biometric unlock (FR-AUTH-04)', () => {
   let alert: jest.SpyInstance;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await verifyPhone();
     biometrics.__state.available = true;
     alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
@@ -312,6 +410,7 @@ describe('biometric unlock (FR-AUTH-04)', () => {
 
   async function setUpWithBiometrics(): Promise<void> {
     const tree = await launch();
+    expect(tree.root.findAll((n) => n.props.children?.join?.('') === 'Step 1 of 2 · Create PIN').length).toBeGreaterThan(0);
     await enter(tree, GOOD);
     await enter(tree, GOOD);
     await until(tree, () => has(tree, 'biometric-offer'));

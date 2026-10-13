@@ -25,12 +25,16 @@ class PinAuthenticatorTest {
 
     private var now = 1_790_856_000_000L
 
-    private fun auth(
+    /** A PinAuthenticator whose install has a verified phone, unless [verified] is false (setPin needs one, ADR-0013). */
+    private suspend fun auth(
         store: MemorySecureStore,
         marker: MemoryMarker,
         crypto: PinCrypto = platformPinCrypto(),
         iterations: Int = FAST,
-    ) = PinAuthenticator(store, crypto, marker, Dispatchers.Default, { now }, iterations)
+        verified: Boolean = true,
+    ) = PinAuthenticator(store, crypto, marker, Dispatchers.Default, { now }, iterations).also {
+        if (verified) it.rememberVerifiedPhone(PHONE, "token")
+    }
 
     private val dying = object : PinCrypto by platformPinCrypto() {
         override fun pbkdf2Sha256(password: ByteArray, salt: ByteArray, iterations: Int, keyLength: Int): ByteArray =
@@ -57,7 +61,7 @@ class PinAuthenticatorTest {
         auth.setPin(GOOD)
         auth.verifyPin(WRONG)
         auth.verifyPin(WRONG)
-        assertEquals(AuthState(pinSet = true, failedAttempts = 2), auth(store, marker).getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 2, phone = PHONE), auth(store, marker).getAuthState())
     }
 
     @Test
@@ -67,7 +71,7 @@ class PinAuthenticatorTest {
         val auth = auth(store, marker)
         auth.setPin(GOOD)
         assertFailsWith<IllegalStateException> { auth(store, marker, dying).verifyPin(GOOD) }
-        assertEquals(AuthState(pinSet = true, failedAttempts = 1), auth.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 1, phone = PHONE), auth.getAuthState())
     }
 
     @Test
@@ -90,7 +94,7 @@ class PinAuthenticatorTest {
         now += PinPolicy.LOCKOUT_MS - 1
         assertEquals(UnlockResult(UnlockOutcome.LOCKED_OUT, 0, until), auth.verifyPin(GOOD))
         now += 1
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0), auth.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, phone = PHONE), auth.getAuthState())
         assertEquals(UnlockResult(UnlockOutcome.WRONG_PIN, PinPolicy.MAX_ATTEMPTS - 1), auth.verifyPin(WRONG))
         assertEquals(UnlockOutcome.UNLOCKED, auth.verifyPin(GOOD).outcome)
     }
@@ -139,7 +143,7 @@ class PinAuthenticatorTest {
         val marker = MemoryMarker()
         auth(store, marker).setPin(GOOD)
         store.values.remove(PinAuthenticator.KEY_LOCKOUT)
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0, lockedUntil = now + PinPolicy.LOCKOUT_MS), auth(store, marker).getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, lockedUntil = now + PinPolicy.LOCKOUT_MS, phone = PHONE), auth(store, marker).getAuthState())
     }
 
     @Test
@@ -148,7 +152,7 @@ class PinAuthenticatorTest {
         store.values[PinAuthenticator.KEY_PIN] = RECORD
         store.values[PinAuthenticator.KEY_INSTALL_ID] = "old-install"
         val marker = MemoryMarker(null)
-        assertEquals(AuthState(pinSet = false, failedAttempts = 0), auth(store, marker).getAuthState())
+        assertEquals(AuthState(pinSet = false, failedAttempts = 0), auth(store, marker, verified = false).getAuthState())
         assertTrue(Regex("^[0-9a-f]{32}$").matches(marker.id!!))
         assertEquals(marker.id, store.values[PinAuthenticator.KEY_INSTALL_ID])
     }
@@ -158,7 +162,7 @@ class PinAuthenticatorTest {
         val store = MemorySecureStore()
         store.values[PinAuthenticator.KEY_PIN] = RECORD
         store.values[PinAuthenticator.KEY_INSTALL_ID] = "old-install"
-        assertEquals(false, auth(store, MemoryMarker("new-install")).getAuthState().pinSet)
+        assertEquals(false, auth(store, MemoryMarker("new-install"), verified = false).getAuthState().pinSet)
         assertEquals("new-install", store.values[PinAuthenticator.KEY_INSTALL_ID])
     }
 
@@ -171,6 +175,7 @@ class PinAuthenticatorTest {
     }
 
     private companion object {
+        const val PHONE = "+6281234567890"
         const val GOOD = "482915"
         const val WRONG = "731048"
         const val FAST = 1000

@@ -64,6 +64,18 @@ namespace margelo::nitro::pocketly { struct UnlockResult; }
 namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
 // Forward declaration of `BiometricStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricStatus; }
 // Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
@@ -119,6 +131,12 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "UnlockResult.hpp"
 #include "UnlockOutcome.hpp"
 #include "AuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpSendOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "OtpVerifyOutcome.hpp"
 #include "BiometricStatus.hpp"
 #include "BiometricUnavailableReason.hpp"
 #include "BiometricKind.hpp"
@@ -326,6 +344,30 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override {
       auto __result = _swiftPart.setAutoLockTimeout(std::forward<decltype(ms)>(ms));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline PhoneCheck checkPhone(const std::string& nationalNumber) override {
+      auto __result = _swiftPart.checkPhone(nationalNumber);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<OtpSendResult>> requestOtp(const std::string& phone) override {
+      auto __result = _swiftPart.requestOtp(phone);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<OtpVerifyResult>> verifyOtp(const std::string& phone, const std::string& code) override {
+      auto __result = _swiftPart.verifyOtp(phone, code);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

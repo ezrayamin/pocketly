@@ -144,9 +144,33 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in
       let r = try await core.getAuthState()
       return AuthState(
+        phone: r.phone,
         pinSet: r.pinSet,
         failedAttempts: Double(r.failedAttempts),
         lockedUntil: r.lockedUntil.map { Double($0.int64Value) }
+      )
+    }
+  }
+
+  func checkPhone(nationalNumber: String) throws -> PhoneCheck {
+    let c = core.checkPhone(nationalNumber: nationalNumber)
+    return PhoneCheck(ok: c.ok, e164: c.e164, reason: c.reason.map { PhoneRejectReason(fromString: $0.name)! })
+  }
+
+  func requestOtp(phone: String) throws -> Promise<OtpSendResult> {
+    return Promise.async { [core] in
+      let r = try await core.requestOtp(phone: phone)
+      return OtpSendResult(outcome: OtpSendOutcome(fromString: r.outcome.name)!, resendAt: Double(r.resendAt))
+    }
+  }
+
+  func verifyOtp(phone: String, code: String) throws -> Promise<OtpVerifyResult> {
+    return Promise.async { [core] in
+      let r = try await core.verifyOtp(phone: phone, code: code)
+      return OtpVerifyResult(
+        outcome: OtpVerifyOutcome(fromString: r.outcome.name)!,
+        attemptsLeft: r.attemptsLeft.map { Double($0.int32Value) },
+        retryAt: r.retryAt.map { Double($0.int64Value) }
       )
     }
   }

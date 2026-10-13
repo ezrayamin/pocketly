@@ -5,6 +5,7 @@ import { DEFAULT_DATASET } from '@pocketly/core-contract';
 import type { Core } from '@pocketly/core-contract';
 import { SECURE_KEYS } from '../src/security/pinAuth';
 import { FaultySecureStore } from '../testing/faultySecureStore';
+import { TEST_PHONE, verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
 import { testCore } from '../testing/testCore';
 
 /**
@@ -27,6 +28,7 @@ describe('secure store failures (ADR-0010 §2.7)', () => {
     store = new FaultySecureStore();
     const core = start();
     await core.resetData(DEFAULT_DATASET);
+    await verifyTestPhone(core);
     await core.setPin(GOOD);
   });
 
@@ -40,7 +42,7 @@ describe('secure store failures (ADR-0010 §2.7)', () => {
     expect(store.values).toEqual(before);
 
     store.unavailable = false; // the user unlocked the phone
-    expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+    expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0 });
     expect((await core.verifyPin(GOOD)).outcome).toBe('UNLOCKED');
   });
 
@@ -49,15 +51,21 @@ describe('secure store failures (ADR-0010 §2.7)', () => {
     store.failingWrites.add(SECURE_KEYS.lockout);
     await expect(core.verifyPin(GOOD)).rejects.toMatchObject({ code: 'SECURE_STORAGE_UNAVAILABLE' });
     store.failingWrites.clear();
-    expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+    expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0 });
     expect((await core.verifyPin(GOOD)).outcome).toBe('UNLOCKED');
   });
 
-  it('a permanently unreadable PIN record restarts onboarding', async () => {
+  it('a permanently unreadable PIN record restarts onboarding at the phone (ADR-0013)', async () => {
     store.unreadable.add(SECURE_KEYS.pin);
     const core = start();
+    // The verified phone goes with the PIN it created: no new PIN without a new OTP.
     expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
     await expect(core.verifyPin(GOOD)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(core.setPin(GOOD)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    store.unreadable.clear();
+    await verifyTestPhone(core);
+    await core.setPin(GOOD);
+    expect((await core.verifyPin(GOOD)).outcome).toBe('UNLOCKED');
   });
 
   it('a permanently unreadable install id wipes every secret', async () => {

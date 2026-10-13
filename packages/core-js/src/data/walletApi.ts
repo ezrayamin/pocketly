@@ -1,4 +1,7 @@
-import type { DatasetConfig, Transaction, Wallet } from '@pocketly/core-contract';
+import type { DatasetConfig, OtpSendResult, OtpVerifyResult, Transaction, Wallet } from '@pocketly/core-contract';
+
+/** What the server answers on an OTP check: the result, plus a session token when verified. */
+export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string };
 
 /** One page of server changes, ordered by (updatedAt, id). */
 export interface ChangesPage {
@@ -19,6 +22,10 @@ export interface WalletApi {
   /** Changes after `afterToken` (all, when undefined): the replica's delta sync. */
   getChanges(afterToken: string | undefined, limit: number): Promise<ChangesPage>;
   getTransaction(id: string): Promise<Transaction>;
+  /** FR-AUTH-02 (ADR-0013): send a code by SMS. `phone` is E.164. */
+  requestOtp(phone: string): Promise<OtpSendResult>;
+  /** FR-AUTH-02: the server checks the code and counts wrong ones; VERIFIED carries a session token. */
+  verifyOtp(phone: string, code: string): Promise<ServerOtpVerify>;
 }
 
 /** Developer-menu controls (FR-DEV-*). Only the fake backend implements this. */

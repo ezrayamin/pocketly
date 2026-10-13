@@ -108,6 +108,18 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun checkPhone(nationalNumber: String): PhoneCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun requestOtp(phone: String): Promise<OtpSendResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun verifyOtp(phone: String, code: String): Promise<OtpVerifyResult>
+  
+  @DoNotStrip
+  @Keep
   abstract fun getBiometricStatus(): Promise<BiometricStatus>
   
   @DoNotStrip

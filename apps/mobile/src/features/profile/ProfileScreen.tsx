@@ -13,6 +13,7 @@ import { version } from '../../../package.json';
 import { DEV_TOOLS_ENABLED } from '../../devtools';
 import type { RootStackParamList } from '../../navigation';
 import { biometricNoun, capitalized } from '../auth/biometricCopy';
+import { formatPhone } from '../auth/phoneFormat';
 import { toUserError } from '../errors';
 const TAPS_TO_OPEN = 7;
 const TAP_WINDOW_MS = 3_000;
@@ -80,6 +81,13 @@ function SecuritySection() {
  * their features. Tapping the version 7× opens the Developer Menu (FR-DEV-01).
  */
 export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDevMenu: () => void; lockSkipped?: boolean }) {
+  // FR-AUTH-02: the number verified by OTP (ADR-0013).
+  const [phone, setPhone] = useState<string | undefined>();
+  useFocusEffect(
+    useCallback(() => {
+      core.getAuthState().then((s) => setPhone(s.phone), () => {});
+    }, []),
+  );
   const taps = useRef<number[]>([]);
   const [hint, setHint] = useState<string | null>(null);
 
@@ -108,7 +116,9 @@ export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDe
           <Avatar id="me" name="Rina Wijaya" size={56} />
           <View>
             <Text style={styles.name}>Rina Wijaya</Text>
-            <Text style={styles.caption}>+1 555 000 0000</Text>
+            <Text style={styles.caption} testID="profile-phone">
+              {phone === undefined ? 'Phone not verified' : formatPhone(phone)}
+            </Text>
           </View>
         </View>
         {!lockSkipped && <SecuritySection />}

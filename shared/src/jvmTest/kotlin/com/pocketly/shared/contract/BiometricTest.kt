@@ -17,6 +17,7 @@ import com.pocketly.shared.security.BiometricMessages
 import com.pocketly.shared.security.FakeBiometricSigner
 import com.pocketly.shared.security.FakeBiometricSigner.Scan
 import com.pocketly.shared.security.MemorySecureStore
+import com.pocketly.shared.security.PhonePolicy
 import com.pocketly.shared.security.PinPolicy
 import com.pocketly.shared.security.platformPinCrypto
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,7 @@ class BiometricTest {
             JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), MemorySecureStore(),
             clock = { now }, pinIterations = 1000, biometricSigner = signer,
         )
+        core.verifyTestPhone()
         core.setPin(GOOD)
     }
 
@@ -205,6 +207,8 @@ class BiometricTest {
         core.resetAuth()
         assertFalse(signer.hasKey)
         assertFalse(core.getBiometricStatus().enabled)
+        now += PhonePolicy.OTP_RESEND_MS // a new code is only sent once the last one is 30 s old
+        core.verifyTestPhone()
         core.setPin(GOOD)
         enable()
         core.disableBiometrics()

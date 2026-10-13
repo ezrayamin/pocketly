@@ -35,6 +35,12 @@ namespace margelo::nitro::pocketly { struct PinCheck; }
 namespace margelo::nitro::pocketly { struct UnlockResult; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
 // Forward declaration of `BiometricStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricStatus; }
 // Forward declaration of `BiometricEnableResult` to properly resolve imports.
@@ -65,6 +71,9 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "PinCheck.hpp"
 #include "UnlockResult.hpp"
 #include "AuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpVerifyResult.hpp"
 #include "BiometricStatus.hpp"
 #include "BiometricEnableResult.hpp"
 #include "BiometricPromptText.hpp"
@@ -125,6 +134,9 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<void>> resetAuth() = 0;
       virtual std::shared_ptr<Promise<double>> getAutoLockTimeout() = 0;
       virtual std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) = 0;
+      virtual PhoneCheck checkPhone(const std::string& nationalNumber) = 0;
+      virtual std::shared_ptr<Promise<OtpSendResult>> requestOtp(const std::string& phone) = 0;
+      virtual std::shared_ptr<Promise<OtpVerifyResult>> verifyOtp(const std::string& phone, const std::string& code) = 0;
       virtual std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() = 0;
       virtual std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) = 0;
       virtual std::shared_ptr<Promise<void>> disableBiometrics() = 0;

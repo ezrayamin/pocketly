@@ -20,6 +20,9 @@ import java.util.Objects
 data class AuthState(
   @DoNotStrip
   @Keep
+  val phone: String?,
+  @DoNotStrip
+  @Keep
   val pinSet: Boolean,
   @DoNotStrip
   @Keep
@@ -33,13 +36,15 @@ data class AuthState(
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (other !is AuthState) return false
-    return Objects.deepEquals(this.pinSet, other.pinSet)
+    return Objects.deepEquals(this.phone, other.phone)
+      && Objects.deepEquals(this.pinSet, other.pinSet)
       && Objects.deepEquals(this.failedAttempts, other.failedAttempts)
       && Objects.deepEquals(this.lockedUntil, other.lockedUntil)
   }
 
   override fun hashCode(): Int {
     return arrayOf<Any?>(
+      phone,
       pinSet,
       failedAttempts,
       lockedUntil
@@ -54,8 +59,8 @@ data class AuthState(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(pinSet: Boolean, failedAttempts: Double, lockedUntil: Double?): AuthState {
-      return AuthState(pinSet, failedAttempts, lockedUntil)
+    private fun fromCpp(phone: String?, pinSet: Boolean, failedAttempts: Double, lockedUntil: Double?): AuthState {
+      return AuthState(phone, pinSet, failedAttempts, lockedUntil)
     }
   }
 }

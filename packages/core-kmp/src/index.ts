@@ -16,6 +16,9 @@ import type {
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
@@ -113,7 +116,7 @@ export class KmpCore implements Core {
 
   async getAuthState(): Promise<AuthState> {
     const s = await this.native.getAuthState().catch(rethrow);
-    return s.lockedUntil === undefined ? { pinSet: s.pinSet, failedAttempts: s.failedAttempts } : s;
+    return withoutUndefined({ phone: s.phone, pinSet: s.pinSet, failedAttempts: s.failedAttempts, lockedUntil: s.lockedUntil });
   }
 
   resetAuth(): Promise<void> {
@@ -126,6 +129,20 @@ export class KmpCore implements Core {
 
   setAutoLockTimeout(ms: number): Promise<void> {
     return this.native.setAutoLockTimeout(ms).catch(rethrow);
+  }
+
+  checkPhone(nationalNumber: string): PhoneCheck {
+    const c = this.native.checkPhone(nationalNumber);
+    return withoutUndefined({ ok: c.ok, e164: c.e164, reason: c.reason });
+  }
+
+  requestOtp(phone: string): Promise<OtpSendResult> {
+    return this.native.requestOtp(phone).catch(rethrow);
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<OtpVerifyResult> {
+    const r = await this.native.verifyOtp(phone, code).catch(rethrow);
+    return withoutUndefined({ outcome: r.outcome, attemptsLeft: r.attemptsLeft, retryAt: r.retryAt });
   }
 
   async getBiometricStatus(): Promise<BiometricStatus> {

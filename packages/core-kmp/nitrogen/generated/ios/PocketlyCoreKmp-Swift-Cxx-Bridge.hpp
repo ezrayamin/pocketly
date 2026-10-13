@@ -54,6 +54,18 @@ namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
 // Forward declaration of `PinCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PinCheck; }
 // Forward declaration of `PinRejectReason` to properly resolve imports.
@@ -111,6 +123,12 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
 #include "NetworkSimulation.hpp"
+#include "OtpSendOutcome.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpVerifyOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "PhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
 #include "PriceTick.hpp"
@@ -690,6 +708,89 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Func_void_double_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::optional<PhoneRejectReason>
+  /**
+   * Specialized version of `std::optional<PhoneRejectReason>`.
+   */
+  using std__optional_PhoneRejectReason_ = std::optional<PhoneRejectReason>;
+  inline std::optional<PhoneRejectReason> create_std__optional_PhoneRejectReason_(const PhoneRejectReason& value) noexcept {
+    return std::optional<PhoneRejectReason>(value);
+  }
+  inline bool has_value_std__optional_PhoneRejectReason_(const std::optional<PhoneRejectReason>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline PhoneRejectReason get_std__optional_PhoneRejectReason_(const std::optional<PhoneRejectReason>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<OtpSendResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<OtpSendResult>>`.
+   */
+  using std__shared_ptr_Promise_OtpSendResult__ = std::shared_ptr<Promise<OtpSendResult>>;
+  inline std::shared_ptr<Promise<OtpSendResult>> create_std__shared_ptr_Promise_OtpSendResult__() noexcept {
+    return Promise<OtpSendResult>::create();
+  }
+  inline PromiseHolder<OtpSendResult> wrap_std__shared_ptr_Promise_OtpSendResult__(std::shared_ptr<Promise<OtpSendResult>> promise) noexcept {
+    return PromiseHolder<OtpSendResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const OtpSendResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const OtpSendResult&)>`.
+   */
+  using Func_void_OtpSendResult = std::function<void(const OtpSendResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const OtpSendResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_OtpSendResult_Wrapper final {
+  public:
+    explicit Func_void_OtpSendResult_Wrapper(std::function<void(const OtpSendResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const OtpSendResult& /* result */)>>(std::move(func))) {}
+    inline void call(OtpSendResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const OtpSendResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_OtpSendResult create_Func_void_OtpSendResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_OtpSendResult_Wrapper wrap_Func_void_OtpSendResult(Func_void_OtpSendResult value) noexcept {
+    return Func_void_OtpSendResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<OtpVerifyResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<OtpVerifyResult>>`.
+   */
+  using std__shared_ptr_Promise_OtpVerifyResult__ = std::shared_ptr<Promise<OtpVerifyResult>>;
+  inline std::shared_ptr<Promise<OtpVerifyResult>> create_std__shared_ptr_Promise_OtpVerifyResult__() noexcept {
+    return Promise<OtpVerifyResult>::create();
+  }
+  inline PromiseHolder<OtpVerifyResult> wrap_std__shared_ptr_Promise_OtpVerifyResult__(std::shared_ptr<Promise<OtpVerifyResult>> promise) noexcept {
+    return PromiseHolder<OtpVerifyResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const OtpVerifyResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const OtpVerifyResult&)>`.
+   */
+  using Func_void_OtpVerifyResult = std::function<void(const OtpVerifyResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const OtpVerifyResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_OtpVerifyResult_Wrapper final {
+  public:
+    explicit Func_void_OtpVerifyResult_Wrapper(std::function<void(const OtpVerifyResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const OtpVerifyResult& /* result */)>>(std::move(func))) {}
+    inline void call(OtpVerifyResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const OtpVerifyResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_OtpVerifyResult create_Func_void_OtpVerifyResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_OtpVerifyResult_Wrapper wrap_Func_void_OtpVerifyResult(Func_void_OtpVerifyResult value) noexcept {
+    return Func_void_OtpVerifyResult_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::optional<BiometricUnavailableReason>
   /**
    * Specialized version of `std::optional<BiometricUnavailableReason>`.
@@ -1001,6 +1102,33 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<double>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<PhoneCheck>
+  using Result_PhoneCheck_ = Result<PhoneCheck>;
+  inline Result_PhoneCheck_ create_Result_PhoneCheck_(const PhoneCheck& value) noexcept {
+    return Result<PhoneCheck>::withValue(value);
+  }
+  inline Result_PhoneCheck_ create_Result_PhoneCheck_(const std::exception_ptr& error) noexcept {
+    return Result<PhoneCheck>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<OtpSendResult>>>
+  using Result_std__shared_ptr_Promise_OtpSendResult___ = Result<std::shared_ptr<Promise<OtpSendResult>>>;
+  inline Result_std__shared_ptr_Promise_OtpSendResult___ create_Result_std__shared_ptr_Promise_OtpSendResult___(const std::shared_ptr<Promise<OtpSendResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<OtpSendResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_OtpSendResult___ create_Result_std__shared_ptr_Promise_OtpSendResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<OtpSendResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<OtpVerifyResult>>>
+  using Result_std__shared_ptr_Promise_OtpVerifyResult___ = Result<std::shared_ptr<Promise<OtpVerifyResult>>>;
+  inline Result_std__shared_ptr_Promise_OtpVerifyResult___ create_Result_std__shared_ptr_Promise_OtpVerifyResult___(const std::shared_ptr<Promise<OtpVerifyResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<OtpVerifyResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_OtpVerifyResult___ create_Result_std__shared_ptr_Promise_OtpVerifyResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<OtpVerifyResult>>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<Promise<BiometricStatus>>>

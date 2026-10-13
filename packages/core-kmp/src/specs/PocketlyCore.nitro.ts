@@ -11,6 +11,9 @@ import type {
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
   PinCheck,
   PriceTick,
   SpendingSummary,
@@ -63,6 +66,9 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   resetAuth(): Promise<void>;
   getAutoLockTimeout(): Promise<number>;
   setAutoLockTimeout(ms: number): Promise<void>;
+  checkPhone(nationalNumber: string): PhoneCheck;
+  requestOtp(phone: string): Promise<OtpSendResult>;
+  verifyOtp(phone: string, code: string): Promise<OtpVerifyResult>;
   getBiometricStatus(): Promise<BiometricStatus>;
   enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult>;
   disableBiometrics(): Promise<void>;

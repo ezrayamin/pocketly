@@ -1,4 +1,4 @@
-import { DEFAULT_DATASET, DEFAULT_NOW_MILLIS, MAX_PAGE_SIZE } from '@pocketly/core-contract';
+import { DEFAULT_DATASET, DEFAULT_NOW_MILLIS, FAKE_OTP_CODE, MAX_PAGE_SIZE } from '@pocketly/core-contract';
 import type { DatasetConfig, Transaction } from '@pocketly/core-contract';
 import { core } from '../core';
 
@@ -52,6 +52,7 @@ const BM04_SOURCE: DatasetConfig = { seed: 2026, transactionCount: 5_000, nowMil
 const BM06_COUNT = 10_000;
 /** BM-11: the PIN unlocked in every run (ADR-0010: PBKDF2-HMAC-SHA256, 600,000 iterations). */
 const BM11_PIN = '482915';
+const BM11_PHONE = '+6281234567890';
 /** BM-11: how often the JS-thread probe ticks while a PIN is checked. */
 const BM11_PROBE_MS = 4;
 
@@ -250,6 +251,9 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
     case 'BM-11': {
       // Replaces whatever PIN this install had: run it on benchmark installs only.
       await core.resetAuth();
+      // ADR-0013: a PIN needs a verified phone. The fake server's code, not timed.
+      await core.requestOtp(BM11_PHONE);
+      await core.verifyOtp(BM11_PHONE, FAKE_OTP_CODE);
       await core.setPin(BM11_PIN);
       const setupMs = now() - setupStart;
       const outcomes: string[] = [];

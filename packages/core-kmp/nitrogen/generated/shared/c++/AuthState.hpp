@@ -30,6 +30,7 @@
 
 
 
+#include <string>
 #include <optional>
 
 namespace margelo::nitro::pocketly {
@@ -39,13 +40,14 @@ namespace margelo::nitro::pocketly {
    */
   struct AuthState final {
   public:
+    std::optional<std::string> phone     SWIFT_PRIVATE;
     bool pinSet     SWIFT_PRIVATE;
     double failedAttempts     SWIFT_PRIVATE;
     std::optional<double> lockedUntil     SWIFT_PRIVATE;
 
   public:
     AuthState() = default;
-    explicit AuthState(bool pinSet, double failedAttempts, std::optional<double> lockedUntil): pinSet(pinSet), failedAttempts(failedAttempts), lockedUntil(lockedUntil) {}
+    explicit AuthState(std::optional<std::string> phone, bool pinSet, double failedAttempts, std::optional<double> lockedUntil): phone(phone), pinSet(pinSet), failedAttempts(failedAttempts), lockedUntil(lockedUntil) {}
 
   public:
     friend bool operator==(const AuthState& lhs, const AuthState& rhs) = default;
@@ -61,6 +63,7 @@ namespace margelo::nitro {
     static inline margelo::nitro::pocketly::AuthState fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::pocketly::AuthState(
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "phone"))),
         JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "pinSet"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "failedAttempts"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "lockedUntil")))
@@ -68,6 +71,7 @@ namespace margelo::nitro {
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pocketly::AuthState& arg) {
       jsi::Object obj(runtime);
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "phone"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.phone));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "pinSet"), JSIConverter<bool>::toJSI(runtime, arg.pinSet));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "failedAttempts"), JSIConverter<double>::toJSI(runtime, arg.failedAttempts));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "lockedUntil"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.lockedUntil));
@@ -81,6 +85,7 @@ namespace margelo::nitro {
       if (!nitro::isPlainObject(runtime, obj)) {
         return false;
       }
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "phone")))) return false;
       if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "pinSet")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "failedAttempts")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "lockedUntil")))) return false;

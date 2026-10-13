@@ -11,6 +11,15 @@
  */
 import {
   DEFAULT_AUTO_LOCK_MS,
+  FAKE_OTP_CODE,
+  OTP_COOLDOWN_MS,
+  OTP_LENGTH,
+  OTP_MAX_ATTEMPTS,
+  OTP_RESEND_MS,
+  OTP_TTL_MS,
+  PHONE_COUNTRY_CODE,
+  PHONE_MAX_DIGITS,
+  PHONE_MIN_DIGITS,
   DEFAULT_DATASET,
   MAX_AUTO_LOCK_MS,
   NETWORK_NORMAL,
@@ -28,7 +37,9 @@ import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
 import network from '../../fixtures/network.json';
+import phoneFixture from '../../fixtures/phone.json';
 import pin from '../../fixtures/pin.json';
+import { TEST_PHONE, verifyTestPhone } from './onboarding';
 import timeZones from '../../fixtures/time-zones.json';
 
 type CoreFactory = () => Core | Promise<Core>;
@@ -371,12 +382,79 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
     });
 
+    describe('phone and OTP (FR-AUTH-01/02, ADR-0013)', () => {
+      const PHONE = TEST_PHONE;
+
+      beforeEach(async () => {
+        await core.resetAuth();
+      });
+
+      it('uses the parameters in fixtures/phone.json', () => {
+        expect({
+          countryCode: PHONE_COUNTRY_CODE,
+          minDigits: PHONE_MIN_DIGITS,
+          maxDigits: PHONE_MAX_DIGITS,
+          otpLength: OTP_LENGTH,
+          fakeCode: FAKE_OTP_CODE,
+          maxAttempts: OTP_MAX_ATTEMPTS,
+          cooldownMs: OTP_COOLDOWN_MS,
+          resendMs: OTP_RESEND_MS,
+          ttlMs: OTP_TTL_MS,
+        }).toEqual(phoneFixture.params);
+      });
+
+      it.each(phoneFixture.check)('checkPhone($input)', ({ input, ok, e164, reason }) => {
+        expect(core.checkPhone(input)).toEqual(ok ? { ok, e164 } : { ok, reason });
+      });
+
+      it('refuses numbers checkPhone refuses, and codes that aren\'t 6 digits', async () => {
+        await expectCoreError(core.requestOtp('+62081234567890'), 'INVALID_ARGUMENT');
+        await expectCoreError(core.requestOtp('081234567890'), 'INVALID_ARGUMENT');
+        await expectCoreError(core.verifyOtp(PHONE, '12345'), 'INVALID_ARGUMENT');
+      });
+
+      it('no PIN before the phone is verified', async () => {
+        await expectCoreError(core.setPin('482915'), 'NOT_FOUND');
+        expect(await core.verifyOtp(PHONE, FAKE_OTP_CODE)).toEqual({ outcome: 'NO_CODE' });
+      });
+
+      it('sends a code, refuses a resend within 30 s, and verifies the right code once', async () => {
+        const sent = await core.requestOtp(PHONE);
+        expect(sent.outcome).toBe('SENT');
+        expect(await core.requestOtp(PHONE)).toEqual({ outcome: 'TOO_SOON', resendAt: sent.resendAt });
+        expect(await core.verifyOtp(PHONE, FAKE_OTP_CODE)).toEqual({ outcome: 'VERIFIED' });
+        expect(await core.getAuthState()).toEqual({ phone: PHONE, pinSet: false, failedAttempts: 0 });
+        expect(await core.verifyOtp(PHONE, FAKE_OTP_CODE)).toEqual({ outcome: 'NO_CODE' }); // used up
+        await core.setPin('482915');
+        expect((await core.getAuthState()).pinSet).toBe(true);
+      });
+
+      it(`${OTP_MAX_ATTEMPTS} wrong codes start a cooldown that the right code doesn't skip`, async () => {
+        await core.requestOtp(PHONE);
+        expect(await core.verifyOtp(PHONE, '000000')).toEqual({ outcome: 'WRONG_CODE', attemptsLeft: 2 });
+        expect(await core.verifyOtp(PHONE, '000000')).toEqual({ outcome: 'WRONG_CODE', attemptsLeft: 1 });
+        const cooldown = await core.verifyOtp(PHONE, '000000');
+        expect(cooldown.outcome).toBe('COOLDOWN');
+        expect(cooldown.retryAt).toBeGreaterThan(Date.now() + OTP_COOLDOWN_MS - 5_000);
+        expect(await core.verifyOtp(PHONE, FAKE_OTP_CODE)).toEqual(cooldown);
+        expect((await core.getAuthState()).phone).toBeUndefined();
+      });
+
+      it('resetAuth forgets the verified phone ("Forgot PIN" starts over at the phone)', async () => {
+        await verifyTestPhone(core);
+        await core.resetAuth();
+        expect((await core.getAuthState()).phone).toBeUndefined();
+        await expectCoreError(core.setPin('482915'), 'NOT_FOUND');
+      });
+    });
+
     describe('PIN and lockout (FR-AUTH-03/05, FR-LOCK-01/04, ADR-0010)', () => {
       const GOOD = '482915';
       const OTHER = '731048';
 
       beforeEach(async () => {
         await core.resetAuth();
+        await verifyTestPhone(core);
       });
 
       it('uses the parameters in fixtures/pin.json', () => {
@@ -395,7 +473,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
 
       it('starts with no PIN, and verifying one is NOT_FOUND', async () => {
-        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: false, failedAttempts: 0 });
         await expectCoreError(core.verifyPin(GOOD), 'NOT_FOUND');
       });
 
@@ -406,12 +484,12 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
       it('unlocks with the right PIN only, counting wrong attempts until an unlock', async () => {
         await core.setPin(GOOD);
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0 });
         expect(await core.verifyPin(OTHER)).toEqual({ outcome: 'WRONG_PIN', attemptsLeft: PIN_MAX_ATTEMPTS - 1 });
         expect(await core.verifyPin(OTHER)).toEqual({ outcome: 'WRONG_PIN', attemptsLeft: PIN_MAX_ATTEMPTS - 2 });
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 2 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 2 });
         expect(await core.verifyPin(GOOD)).toEqual({ outcome: 'UNLOCKED', attemptsLeft: PIN_MAX_ATTEMPTS });
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0 });
       });
 
       it(`${PIN_MAX_ATTEMPTS} wrong PINs lock out for ${PIN_LOCKOUT_MS / 60_000} min, even for the right PIN`, async () => {
@@ -426,14 +504,14 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(locked.lockedUntil).toBeLessThanOrEqual(Date.now() + PIN_LOCKOUT_MS);
 
         expect(await core.verifyPin(GOOD)).toEqual(locked);
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0, lockedUntil: locked.lockedUntil });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0, lockedUntil: locked.lockedUntil });
       });
 
       it('setPin replaces the PIN and clears the counter', async () => {
         await core.setPin(GOOD);
         await core.verifyPin(GOOD.split('').reverse().join(''));
         await core.setPin(OTHER);
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 0 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 0 });
         expect((await core.verifyPin(GOOD)).outcome).toBe('WRONG_PIN');
         expect((await core.verifyPin(OTHER)).outcome).toBe('UNLOCKED');
       });
@@ -459,9 +537,9 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         await core.setPin(GOOD);
         await core.verifyPin(OTHER);
         await core.resetData(DEFAULT_DATASET);
-        expect(await core.getAuthState()).toEqual({ pinSet: true, failedAttempts: 1 });
+        expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 1 });
         await core.resetAuth();
-        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 }); // the phone goes too
       });
     });
   });

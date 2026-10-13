@@ -4,6 +4,7 @@ import bio from '@pocketly/core-contract/fixtures/biometric.json';
 import { transferMessage, unlockMessage, utf8 } from '../src/security/biometricMessages';
 import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { nodePinCrypto } from '../testing/nodePinCrypto';
+import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
 import { testCore } from '../testing/testCore';
 
 /** ADR-0012. Same cases as shared/src/jvmTest/.../contract/BiometricTest.kt. */
@@ -48,6 +49,7 @@ describe('biometric unlock (FR-AUTH-04)', () => {
     signer = new FakeBiometricSigner();
     now = 1_790_856_000_000;
     core = testCore({ biometrics: signer, clock: () => now, pinIterations: 1000 });
+    await verifyTestPhone(core);
     await core.setPin(GOOD);
   });
 

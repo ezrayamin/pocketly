@@ -9,6 +9,9 @@ import type {
   MinorUnits,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
@@ -102,7 +105,8 @@ export interface Core {
   checkPin(pin: string): PinCheck;
   /**
    * FR-AUTH-03/05: stores a salted PBKDF2 record of the PIN in secure storage, replacing any
-   * previous one, and clears the attempt counter. Throws INVALID_ARGUMENT if checkPin refuses it.
+   * previous one, and clears the attempt counter. Throws INVALID_ARGUMENT if checkPin refuses it,
+   * NOT_FOUND if no phone has been verified yet (verifyOtp).
    */
   setPin(pin: string): Promise<void>;
   /**
@@ -121,6 +125,17 @@ export interface Core {
   getAutoLockTimeout(): Promise<number>;
   /** 0..MAX_AUTO_LOCK_MS, whole milliseconds; anything else is INVALID_ARGUMENT. */
   setAutoLockTimeout(ms: number): Promise<void>;
+
+  // ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ──────────────────
+  /** FR-AUTH-01: an Indonesian mobile number as typed (a leading 0 is allowed and dropped). */
+  checkPhone(nationalNumber: string): PhoneCheck;
+  /** Asks the (fake) server for a code. INVALID_ARGUMENT if checkPhone refuses the number. */
+  requestOtp(phone: string): Promise<OtpSendResult>;
+  /**
+   * FR-AUTH-02. On VERIFIED the phone becomes this install's verified phone (secure storage);
+   * setPin is refused (NOT_FOUND) until then. resetAuth forgets it, so "Forgot PIN" starts here.
+   */
+  verifyOtp(phone: string, code: string): Promise<OtpVerifyResult>;
 
   // ── Biometrics (FR-AUTH-04; ADR-0012) ─────────────────────────────────
   // One primitive for every use: a strong-biometric-bound P-256 key signs bytes the core chose,

@@ -73,6 +73,13 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun getAutoLockTimeout(): Promise<Double> = Promise.async { core.getAutoLockTimeout().toDouble() }
 
+    override fun checkPhone(nationalNumber: String): PhoneCheck = core.checkPhone(nationalNumber).toNitro()
+
+    override fun requestOtp(phone: String): Promise<OtpSendResult> = Promise.async { core.requestOtp(phone).toNitro() }
+
+    override fun verifyOtp(phone: String, code: String): Promise<OtpVerifyResult> =
+        Promise.async { core.verifyOtp(phone, code).toNitro() }
+
     override fun getBiometricStatus(): Promise<BiometricStatus> = Promise.async { core.getBiometricStatus().toNitro() }
 
     override fun enableBiometrics(pin: String, prompt: BiometricPromptText): Promise<BiometricEnableResult> =

@@ -2,6 +2,7 @@ package com.pocketly.shared.data.fake
 
 import com.pocketly.shared.data.ChangesPage
 import com.pocketly.shared.data.FakeBackendControls
+import com.pocketly.shared.data.ServerOtpVerify
 import com.pocketly.shared.data.TimeZoneHolder
 import com.pocketly.shared.data.TransactionDtoValidator
 import com.pocketly.shared.data.WalletApi
@@ -11,6 +12,7 @@ import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.Wallet
 import com.pocketly.shared.domain.ZonedCalendar
@@ -25,8 +27,21 @@ import kotlin.concurrent.Volatile
 internal class FakeWalletApi(
     private val store: ServerStore,
     private val timeZone: TimeZoneHolder,
+    /** The OTP side's clock (ADR-0013): the device's, not the dataset's frozen one. */
+    otpClock: () -> Long = ::currentTimeMillis,
 ) : WalletApi, FakeBackendControls {
     private val network = NetworkSimulator()
+    private val otp = OtpServer(otpClock)
+
+    override suspend fun requestOtp(phone: String): OtpSendResult {
+        network.beforeCall()
+        return otp.send(phone)
+    }
+
+    override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify {
+        network.beforeCall()
+        return otp.verify(phone, code)
+    }
 
     @Volatile
     private var frozenNow: Long? = null

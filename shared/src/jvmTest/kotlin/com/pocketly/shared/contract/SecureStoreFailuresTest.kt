@@ -47,6 +47,7 @@ class SecureStoreFailuresTest {
         store = FaultySecureStore()
         val core = start()
         core.resetData(DatasetConfig.DEFAULT)
+        core.verifyTestPhone()
         core.setPin(GOOD)
     }
 
@@ -61,7 +62,7 @@ class SecureStoreFailuresTest {
         assertEquals(before, store.values)
 
         store.unavailable = false // the user unlocked the phone
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, phone = TEST_PHONE), core.getAuthState())
         assertEquals(UnlockOutcome.UNLOCKED, core.verifyPin(GOOD).outcome)
     }
 
@@ -71,16 +72,22 @@ class SecureStoreFailuresTest {
         store.failingWrites += PinAuthenticator.KEY_LOCKOUT
         assertUnavailable { core.verifyPin(GOOD) }
         store.failingWrites.clear()
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, phone = TEST_PHONE), core.getAuthState())
         assertEquals(UnlockOutcome.UNLOCKED, core.verifyPin(GOOD).outcome)
     }
 
     @Test
-    fun aPermanentlyUnreadablePinRecordRestartsOnboarding() = runTest {
+    fun aPermanentlyUnreadablePinRecordRestartsOnboardingAtThePhone() = runTest {
         store.unreadable += PinAuthenticator.KEY_PIN
         val core = start()
+        // The verified phone goes with the PIN it created: no new PIN without a new OTP.
         assertEquals(AuthState(pinSet = false, failedAttempts = 0), core.getAuthState())
         assertEquals(ErrorCode.NOT_FOUND, assertFailsWith<CoreException> { core.verifyPin(GOOD) }.code)
+        assertEquals(ErrorCode.NOT_FOUND, assertFailsWith<CoreException> { core.setPin(GOOD) }.code)
+        store.unreadable.clear()
+        core.verifyTestPhone()
+        core.setPin(GOOD)
+        assertEquals(UnlockOutcome.UNLOCKED, core.verifyPin(GOOD).outcome)
     }
 
     @Test

@@ -59,6 +59,23 @@ export const DEFAULT_AUTO_LOCK_MS = 60_000;
 /** Longest auto-lock timeout either core accepts. 0 = lock every time the app leaves the foreground. */
 export const MAX_AUTO_LOCK_MS = 60 * 60_000;
 
+// ── Phone + OTP (FR-AUTH-01/02; ADR-0013). Kotlin: shared/.../security/PhonePolicy.kt ──
+
+export const PHONE_COUNTRY_CODE = '+62';
+/** Indonesian mobile numbers: 8xx…, 9–12 digits after the country code. */
+export const PHONE_MIN_DIGITS = 9;
+export const PHONE_MAX_DIGITS = 12;
+export const OTP_LENGTH = 6;
+/** FR-AUTH-02: the fake server's code, always. */
+export const FAKE_OTP_CODE = '123456';
+/** FR-AUTH-02: this many wrong codes in a row start a cooldown. */
+export const OTP_MAX_ATTEMPTS = 3;
+export const OTP_COOLDOWN_MS = 30_000;
+/** FR-AUTH-02: "Resend" is allowed this long after the last code was sent. */
+export const OTP_RESEND_MS = 30_000;
+/** A code is valid this long after it was sent. */
+export const OTP_TTL_MS = 5 * 60_000;
+
 // ── Biometrics (ADR-0012). Kotlin: shared/.../security/BiometricPolicy.kt ──
 
 /** A biometric unlock challenge must be signed within this long, once. */

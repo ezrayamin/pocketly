@@ -48,6 +48,7 @@ class PinFixturesTest {
         store = MemorySecureStore()
         core = PocketlyCore.create(JvmDatabaseDrivers(), store)
         core.resetData(DatasetConfig.DEFAULT)
+        core.verifyTestPhone()
     }
 
     @Test
@@ -114,7 +115,7 @@ class PinFixturesTest {
 
     @Test
     fun startsWithNoPin() = runTest {
-        assertEquals(AuthState(pinSet = false, failedAttempts = 0), core.getAuthState())
+        assertEquals(AuthState(pinSet = false, failedAttempts = 0, phone = TEST_PHONE), core.getAuthState())
         assertEquals(ErrorCode.NOT_FOUND, assertFailsWith<CoreException> { core.verifyPin(GOOD) }.code)
     }
 
@@ -131,9 +132,9 @@ class PinFixturesTest {
         core.setPin(GOOD)
         assertEquals(UnlockResult(UnlockOutcome.WRONG_PIN, 4), core.verifyPin(OTHER))
         assertEquals(UnlockResult(UnlockOutcome.WRONG_PIN, 3), core.verifyPin(OTHER))
-        assertEquals(AuthState(pinSet = true, failedAttempts = 2), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 2, phone = TEST_PHONE), core.getAuthState())
         assertEquals(UnlockResult(UnlockOutcome.UNLOCKED, 5), core.verifyPin(GOOD))
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, phone = TEST_PHONE), core.getAuthState())
     }
 
     @Test
@@ -147,7 +148,7 @@ class PinFixturesTest {
         val until = assertNotNull(locked.lockedUntil)
         assertTrue(until >= before + PinPolicy.LOCKOUT_MS && until <= System.currentTimeMillis() + PinPolicy.LOCKOUT_MS)
         assertEquals(locked, core.verifyPin(GOOD))
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0, lockedUntil = until), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, lockedUntil = until, phone = TEST_PHONE), core.getAuthState())
     }
 
     @Test
@@ -155,7 +156,7 @@ class PinFixturesTest {
         core.setPin(GOOD)
         core.verifyPin(GOOD.reversed())
         core.setPin(OTHER)
-        assertEquals(AuthState(pinSet = true, failedAttempts = 0), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 0, phone = TEST_PHONE), core.getAuthState())
         assertEquals(UnlockOutcome.WRONG_PIN, core.verifyPin(GOOD).outcome)
         assertEquals(UnlockOutcome.UNLOCKED, core.verifyPin(OTHER).outcome)
     }
@@ -186,7 +187,7 @@ class PinFixturesTest {
         core.setPin(GOOD)
         core.verifyPin(OTHER)
         core.resetData(DatasetConfig.DEFAULT)
-        assertEquals(AuthState(pinSet = true, failedAttempts = 1), core.getAuthState())
+        assertEquals(AuthState(pinSet = true, failedAttempts = 1, phone = TEST_PHONE), core.getAuthState())
         core.resetAuth()
         assertEquals(AuthState(pinSet = false, failedAttempts = 0), core.getAuthState())
     }

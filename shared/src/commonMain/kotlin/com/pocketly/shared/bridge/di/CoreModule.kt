@@ -28,10 +28,12 @@ internal fun coreModule(
     db: CoroutineDispatcher,
     pin: (InstallMarker) -> PinAuthenticator,
     biometric: (PinAuthenticator) -> BiometricAuthenticator,
+    /** The device clock (or a test clock) for the fake server's OTP side (ADR-0013). */
+    clock: () -> Long,
 ) = module {
     single { TimeZoneHolder() }
     // ADR-0009: two databases, two files. Only the fake backend touches the server's.
-    single { FakeWalletApi(ServerStore(drivers.server()), get()) }
+    single { FakeWalletApi(ServerStore(drivers.server()), get(), clock) }
     single { CacheStore(drivers.cache()) }
     // NFR-REL-01: the core only talks to the backend through a timeout.
     single<WalletApi> {

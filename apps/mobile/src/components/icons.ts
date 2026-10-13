@@ -4,6 +4,7 @@
  */
 export { default as ArrowDownLeft } from 'lucide-react-native/icons/arrow-down-left';
 export { default as ArrowLeftRight } from 'lucide-react-native/icons/arrow-left-right';
+export { default as ArrowRight } from 'lucide-react-native/icons/arrow-right';
 export { default as ArrowUpRight } from 'lucide-react-native/icons/arrow-up-right';
 export { default as Bell } from 'lucide-react-native/icons/bell';
 export { default as Car } from 'lucide-react-native/icons/car';
@@ -22,6 +23,7 @@ export { default as Delete } from 'lucide-react-native/icons/delete';
 export { default as Eye } from 'lucide-react-native/icons/eye';
 export { default as EyeOff } from 'lucide-react-native/icons/eye-off';
 export { default as Fingerprint } from 'lucide-react-native/icons/fingerprint-pattern';
+export { default as Grid3x3 } from 'lucide-react-native/icons/grid-3x3';
 export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';
@@ -33,6 +35,7 @@ export { default as ScanLine } from 'lucide-react-native/icons/scan-line';
 export { default as Share2 } from 'lucide-react-native/icons/share-2';
 export { default as ShieldCheck } from 'lucide-react-native/icons/shield-check';
 export { default as ShoppingBag } from 'lucide-react-native/icons/shopping-bag';
+export { default as Smartphone } from 'lucide-react-native/icons/smartphone';
 export { default as TrendingUp } from 'lucide-react-native/icons/trending-up';
 export { default as TriangleAlert } from 'lucide-react-native/icons/triangle-alert';
 export { default as User } from 'lucide-react-native/icons/user';

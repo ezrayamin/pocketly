@@ -1,0 +1,101 @@
+{
+  "_comment": "ADR-0013. Indonesia (+62) mobile numbers: national number starts with 8, 9–12 digits; one typed leading 0 is dropped. Both cores must agree.",
+  "params": {
+    "countryCode": "+62",
+    "minDigits": 9,
+    "maxDigits": 12,
+    "otpLength": 6,
+    "fakeCode": "123456",
+    "maxAttempts": 3,
+    "cooldownMs": 30000,
+    "resendMs": 30000,
+    "ttlMs": 300000
+  },
+  "check": [
+    {
+      "input": "81234567890",
+      "ok": true,
+      "e164": "+6281234567890"
+    },
+    {
+      "input": "081234567890",
+      "ok": true,
+      "e164": "+6281234567890"
+    },
+    {
+      "input": "812345678",
+      "ok": true,
+      "e164": "+62812345678"
+    },
+    {
+      "input": "812345678901",
+      "ok": true,
+      "e164": "+62812345678901"
+    },
+    {
+      "input": "0812345678901",
+      "ok": true,
+      "e164": "+62812345678901"
+    },
+    {
+      "input": "",
+      "ok": false,
+      "reason": "TOO_SHORT"
+    },
+    {
+      "input": "8123",
+      "ok": false,
+      "reason": "TOO_SHORT"
+    },
+    {
+      "input": "81234567",
+      "ok": false,
+      "reason": "TOO_SHORT"
+    },
+    {
+      "input": "0",
+      "ok": false,
+      "reason": "TOO_SHORT"
+    },
+    {
+      "input": "8123456789012",
+      "ok": false,
+      "reason": "TOO_LONG"
+    },
+    {
+      "input": "2112345678",
+      "ok": false,
+      "reason": "NOT_MOBILE"
+    },
+    {
+      "input": "6281234567890",
+      "ok": false,
+      "reason": "NOT_MOBILE"
+    },
+    {
+      "input": "00812345678",
+      "ok": false,
+      "reason": "NOT_MOBILE"
+    },
+    {
+      "input": "8123-456789",
+      "ok": false,
+      "reason": "NOT_DIGITS"
+    },
+    {
+      "input": "+6281234567",
+      "ok": false,
+      "reason": "NOT_DIGITS"
+    },
+    {
+      "input": "８１２３４５６７８",
+      "ok": false,
+      "reason": "NOT_DIGITS"
+    },
+    {
+      "input": "812 3456 789",
+      "ok": false,
+      "reason": "NOT_DIGITS"
+    }
+  ]
+}

@@ -23,6 +23,10 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.OtpSendResult
+import com.pocketly.shared.domain.OtpVerifyOutcome
+import com.pocketly.shared.domain.OtpVerifyResult
+import com.pocketly.shared.domain.PhoneCheck
 import com.pocketly.shared.domain.PinCheck
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.SpendingCalculator
@@ -37,6 +41,7 @@ import com.pocketly.shared.security.BiometricAuthenticator
 import com.pocketly.shared.security.BiometricSigner
 import com.pocketly.shared.security.InstallMarker
 import com.pocketly.shared.security.NoBiometricSigner
+import com.pocketly.shared.security.PhonePolicy
 import com.pocketly.shared.security.PinAuthenticator
 import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
@@ -226,6 +231,28 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun setAutoLockTimeout(ms: Long) = pin.setAutoLockTimeout(ms)
 
+    // ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ───────────────────
+
+    /** FR-AUTH-01: an Indonesian mobile number as typed (a leading 0 is allowed and dropped). */
+    fun checkPhone(nationalNumber: String): PhoneCheck = PhonePolicy.check(nationalNumber)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun requestOtp(phone: String): OtpSendResult {
+        if (!PhonePolicy.isValidE164(phone)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not a valid +62 mobile number")
+        return onDb { api.requestOtp(phone) }
+    }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun verifyOtp(phone: String, code: String): OtpVerifyResult {
+        if (!PhonePolicy.isValidE164(phone)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not a valid +62 mobile number")
+        if (!PhonePolicy.isOtpCode(code)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "the code has ${PhonePolicy.OTP_LENGTH} digits")
+        val answer = onDb { api.verifyOtp(phone, code) }
+        if (answer.result.outcome == OtpVerifyOutcome.VERIFIED && answer.sessionToken != null) {
+            this.pin.rememberVerifiedPhone(phone, answer.sessionToken)
+        }
+        return answer.result
+    }
+
     // ── Biometrics (FR-AUTH-04; ADR-0012) ──────────────────────────────────
 
     @Throws(CoreException::class, CancellationException::class)
@@ -323,7 +350,7 @@ class PocketlyCore internal constructor(
             // PBKDF2 blocks for hundreds of ms: off the database thread, which other calls share.
             val pin = { marker: InstallMarker -> PinAuthenticator(secureStore, crypto, marker, Dispatchers.Default, clock, pinIterations) }
             val biometric = { auth: PinAuthenticator -> BiometricAuthenticator(auth, biometricSigner, crypto, clock) }
-            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric)) }.koin.get()
+            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric, clock)) }.koin.get()
         }
 
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

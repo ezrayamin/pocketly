@@ -18,8 +18,14 @@ public extension AuthState {
   /**
    * Create a new instance of `AuthState`.
    */
-  init(pinSet: Bool, failedAttempts: Double, lockedUntil: Double?) {
-    self.init(pinSet, failedAttempts, { () -> bridge.std__optional_double_ in
+  init(phone: String?, pinSet: Bool, failedAttempts: Double, lockedUntil: Double?) {
+    self.init({ () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = phone {
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+      } else {
+        return .init()
+      }
+    }(), pinSet, failedAttempts, { () -> bridge.std__optional_double_ in
       if let __unwrappedValue = lockedUntil {
         return bridge.create_std__optional_double_(__unwrappedValue)
       } else {
@@ -28,6 +34,18 @@ public extension AuthState {
     }())
   }
 
+  @inline(__always)
+  var phone: String? {
+    return { () -> String? in
+      if bridge.has_value_std__optional_std__string_(self.__phone) {
+        let __unwrapped = bridge.get_std__optional_std__string_(self.__phone)
+        return String(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
+  }
+  
   @inline(__always)
   var pinSet: Bool {
     return self.__pinSet

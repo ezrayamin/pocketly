@@ -55,6 +55,18 @@ namespace margelo::nitro::pocketly { struct UnlockResult; }
 namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
 // Forward declaration of `BiometricStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricStatus; }
 // Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
@@ -138,6 +150,18 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JUnlockOutcome.hpp"
 #include "AuthState.hpp"
 #include "JAuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "JPhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
+#include "JPhoneRejectReason.hpp"
+#include "OtpSendResult.hpp"
+#include "JOtpSendResult.hpp"
+#include "OtpSendOutcome.hpp"
+#include "JOtpSendOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "JOtpVerifyResult.hpp"
+#include "OtpVerifyOutcome.hpp"
+#include "JOtpVerifyOutcome.hpp"
 #include "BiometricStatus.hpp"
 #include "JBiometricStatus.hpp"
 #include "BiometricUnavailableReason.hpp"
@@ -458,6 +482,43 @@ namespace margelo::nitro::pocketly {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
         __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  PhoneCheck JHybridPocketlyCoreSpec::checkPhone(const std::string& nationalNumber) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPhoneCheck>(jni::alias_ref<jni::JString> /* nationalNumber */)>("checkPhone");
+    auto __result = method(_javaPart, jni::make_jstring(nationalNumber));
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<OtpSendResult>> JHybridPocketlyCoreSpec::requestOtp(const std::string& phone) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* phone */)>("requestOtp");
+    auto __result = method(_javaPart, jni::make_jstring(phone));
+    return [&]() {
+      auto __promise = Promise<OtpSendResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JOtpSendResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<OtpVerifyResult>> JHybridPocketlyCoreSpec::verifyOtp(const std::string& phone, const std::string& code) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* phone */, jni::alias_ref<jni::JString> /* code */)>("verifyOtp");
+    auto __result = method(_javaPart, jni::make_jstring(phone), jni::make_jstring(code));
+    return [&]() {
+      auto __promise = Promise<OtpVerifyResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JOtpVerifyResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
         jni::JniException __jniError(__throwable);

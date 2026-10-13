@@ -11,6 +11,7 @@
 #include "AuthState.hpp"
 
 #include <optional>
+#include <string>
 
 namespace margelo::nitro::pocketly {
 
@@ -31,6 +32,8 @@ namespace margelo::nitro::pocketly {
     [[nodiscard]]
     AuthState toCpp() const {
       static const auto clazz = javaClassStatic();
+      static const auto fieldPhone = clazz->getField<jni::JString>("phone");
+      jni::local_ref<jni::JString> phone = this->getFieldValue(fieldPhone);
       static const auto fieldPinSet = clazz->getField<jboolean>("pinSet");
       jboolean pinSet = this->getFieldValue(fieldPinSet);
       static const auto fieldFailedAttempts = clazz->getField<double>("failedAttempts");
@@ -38,6 +41,7 @@ namespace margelo::nitro::pocketly {
       static const auto fieldLockedUntil = clazz->getField<jni::JDouble>("lockedUntil");
       jni::local_ref<jni::JDouble> lockedUntil = this->getFieldValue(fieldLockedUntil);
       return AuthState(
+        phone != nullptr ? std::make_optional(phone->toStdString()) : std::nullopt,
         static_cast<bool>(pinSet),
         failedAttempts,
         lockedUntil != nullptr ? std::make_optional(lockedUntil->value()) : std::nullopt
@@ -50,11 +54,12 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JAuthState::javaobject> fromCpp(const AuthState& value) {
-      using JSignature = JAuthState(jboolean, double, jni::alias_ref<jni::JDouble>);
+      using JSignature = JAuthState(jni::alias_ref<jni::JString>, jboolean, double, jni::alias_ref<jni::JDouble>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
+        value.phone.has_value() ? jni::make_jstring(value.phone.value()) : nullptr,
         value.pinSet,
         value.failedAttempts,
         value.lockedUntil.has_value() ? jni::JDouble::valueOf(value.lockedUntil.value()) : nullptr

@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { Alert, AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_AUTO_LOCK_MS } from '@pocketly/core-contract';
-import type { BiometricKind } from '@pocketly/core-contract';
+import type { BiometricKind, OtpSendResult } from '@pocketly/core-contract';
 import { LockKeyhole } from '../../components/icons';
 import { core } from '../../core';
 import { colors, radius, spacing, type } from '../../theme/tokens';
@@ -11,11 +11,17 @@ import { awayMs, leftNow, shouldRelock, type LeftAt } from './appLock';
 import { BiometricOfferScreen } from './BiometricOfferScreen';
 import { WRONG_PINS_NOTICE } from './biometricCopy';
 import { CreatePinScreen } from './CreatePinScreen';
+import { OtpScreen } from './OtpScreen';
+import { PhoneScreen } from './PhoneScreen';
 import { UnlockScreen, type Unlocked } from './UnlockScreen';
 
 type Gate =
   | { kind: 'checking' }
-  | { kind: 'create' }
+  /** FR-AUTH-01/02 (ADR-0013): onboarding starts with the phone and its OTP. */
+  | { kind: 'phone' }
+  | { kind: 'otp'; phone: string; sent: OtpSendResult }
+  /** FR-AUTH-03. `twoSteps`: biometrics will be offered next ("Step 1 of 2"). */
+  | { kind: 'create'; twoSteps: boolean }
   | { kind: 'locked'; lockedUntil?: number; biometric?: { kind?: BiometricKind } }
   /** FR-AUTH-04: "Unlock with your fingerprint?" (after PIN setup, or after an invalidated key). */
   | { kind: 'offer'; again: boolean; biometricKind?: BiometricKind }
@@ -80,11 +86,19 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /** PIN creation, labelled "Step 1 of 2" when biometrics will be offered after it. */
+  const toCreate = useCallback(async () => {
+    const s = await usableBiometric();
+    setGate({ kind: 'create', twoSteps: s?.available === true && !s.enabled });
+  }, [usableBiometric]);
+
   const check = useCallback(async () => {
     try {
       const state = await core.getAuthState();
       if (!state.pinSet) {
-        setGate({ kind: 'create' });
+        // ADR-0013: no PIN without a verified phone.
+        if (state.phone !== undefined) await toCreate();
+        else setGate({ kind: 'phone' });
         return;
       }
       await usableBiometric();
@@ -92,7 +106,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     } catch (e) {
       setGate({ kind: 'unavailable', message: toUserError(e).message });
     }
-  }, [usableBiometric]);
+  }, [usableBiometric, toCreate]);
 
   useEffect(() => {
     check();
@@ -154,9 +168,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     open();
   }, [open]);
 
+  /** "Forgot PIN", reset onboarding: every secret is gone, the verified phone too, so: the phone. */
   const reset = useCallback(() => {
     setAppMounted(false);
-    setGate({ kind: 'create' });
+    setGate({ kind: 'phone' });
   }, []);
 
   // FR-LOCK-02/03 while the app is open.
@@ -220,7 +235,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           <View style={StyleSheet.absoluteFill}>
             <SafeAreaProvider>
               {gate.kind === 'checking' && <View style={styles.root} testID="auth-checking" />}
-              {gate.kind === 'create' && <CreatePinScreen onCreated={created} />}
+              {gate.kind === 'phone' && <PhoneScreen onSent={(phone, sent) => setGate({ kind: 'otp', phone, sent })} />}
+              {gate.kind === 'otp' && (
+                <OtpScreen
+                  phone={gate.phone}
+                  firstSend={gate.sent}
+                  onVerified={toCreate}
+                  onEditNumber={() => setGate({ kind: 'phone' })}
+                />
+              )}
+              {gate.kind === 'create' && (
+                <CreatePinScreen onCreated={created} step={gate.twoSteps ? { index: 1, total: 2 } : undefined} />
+              )}
               {gate.kind === 'locked' && (
                 <UnlockScreen
                   initialLockedUntil={gate.lockedUntil}
@@ -234,6 +260,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
                   kind={gate.biometricKind}
                   pin={offerPin.current}
                   again={gate.again}
+                  step={gate.again ? undefined : { index: 2, total: 2 }}
                   onDone={offerDone}
                 />
               )}

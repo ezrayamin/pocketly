@@ -4,6 +4,7 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PRICE_INTERVAL_MS,
   MAX_PAGE_SIZE,
+  OTP_LENGTH,
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
@@ -18,6 +19,9 @@ import type {
   IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
@@ -41,6 +45,7 @@ import { formatMoney, parseMoney } from './domain/money';
 import { BiometricAuth } from './security/biometricAuth';
 import type { BiometricSigner } from './security/biometricSigner';
 import { PinAuth } from './security/pinAuth';
+import { checkPhone, isValidE164 } from './security/phonePolicy';
 import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
 import type { SecureStore } from './security/secureStore';
@@ -94,7 +99,7 @@ export class JsCore implements Core {
   private readonly biometric: BiometricAuth;
 
   constructor(options: JsCoreOptions) {
-    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
+    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone, options.clock ?? Date.now);
     const cache = new CacheStore(options.cache);
     this.backend = backend;
     this.api = new TimeoutWalletApi(backend, () => backend.network.get().readTimeoutMs!);
@@ -250,6 +255,25 @@ export class JsCore implements Core {
 
   resetAuth(): Promise<void> {
     return this.biometric.reset();
+  }
+
+  checkPhone(nationalNumber: string): PhoneCheck {
+    return checkPhone(nationalNumber);
+  }
+
+  async requestOtp(phone: string): Promise<OtpSendResult> {
+    if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
+    await this.ready;
+    return this.api.requestOtp(phone);
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<OtpVerifyResult> {
+    if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
+    if (!new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(code)) throw new CoreError('INVALID_ARGUMENT', `the code has ${OTP_LENGTH} digits`);
+    await this.ready;
+    const { sessionToken, ...result } = await this.api.verifyOtp(phone, code);
+    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) await this.pin.rememberVerifiedPhone(phone, sessionToken);
+    return result;
   }
 
   getBiometricStatus(): Promise<BiometricStatus> {

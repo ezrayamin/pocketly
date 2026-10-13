@@ -163,7 +163,13 @@ enum class UnlockOutcome { UNLOCKED, WRONG_PIN, LOCKED_OUT }
 
 data class UnlockResult(val outcome: UnlockOutcome, val attemptsLeft: Int, val lockedUntil: EpochMillis? = null)
 
-data class AuthState(val pinSet: Boolean, val failedAttempts: Int, val lockedUntil: EpochMillis? = null)
+data class AuthState(
+    val pinSet: Boolean,
+    val failedAttempts: Int,
+    val lockedUntil: EpochMillis? = null,
+    /** FR-AUTH-02: the phone verified by OTP on this install (E.164). */
+    val phone: String? = null,
+)
 
 // ── Biometrics (FR-AUTH-04; ADR-0012) ────────────────────────────────────
 
@@ -188,3 +194,19 @@ data class BiometricEnableResult(val outcome: BiometricEnableOutcome, val attemp
 enum class BiometricUnlockOutcome { UNLOCKED, CANCELLED, BIOMETRIC_LOCKED_OUT, KEY_INVALIDATED, FAILED, UNAVAILABLE }
 
 data class BiometricUnlockResult(val outcome: BiometricUnlockOutcome, val pinLockedOut: Boolean)
+
+// ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ─────────────────────
+
+enum class PhoneRejectReason { NOT_DIGITS, NOT_MOBILE, TOO_SHORT, TOO_LONG }
+
+data class PhoneCheck(val e164: String?, val reason: PhoneRejectReason?) {
+    val ok: Boolean get() = e164 != null
+}
+
+enum class OtpSendOutcome { SENT, TOO_SOON }
+
+data class OtpSendResult(val outcome: OtpSendOutcome, val resendAt: EpochMillis)
+
+enum class OtpVerifyOutcome { VERIFIED, WRONG_CODE, COOLDOWN, EXPIRED, NO_CODE }
+
+data class OtpVerifyResult(val outcome: OtpVerifyOutcome, val attemptsLeft: Int? = null, val retryAt: EpochMillis? = null)

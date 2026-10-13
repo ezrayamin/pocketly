@@ -463,6 +463,56 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func checkPhone(nationalNumber: std.string) -> bridge.Result_PhoneCheck_ {
+    do {
+      let __result = try self.__implementation.checkPhone(nationalNumber: String(nationalNumber))
+      let __resultCpp = __result
+      return bridge.create_Result_PhoneCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_PhoneCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func requestOtp(phone: std.string) -> bridge.Result_std__shared_ptr_Promise_OtpSendResult___ {
+    do {
+      let __result = try self.__implementation.requestOtp(phone: String(phone))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_OtpSendResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_OtpSendResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_OtpSendResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpSendResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpSendResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func verifyOtp(phone: std.string, code: std.string) -> bridge.Result_std__shared_ptr_Promise_OtpVerifyResult___ {
+    do {
+      let __result = try self.__implementation.verifyOtp(phone: String(phone), code: String(code))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_OtpVerifyResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_OtpVerifyResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_OtpVerifyResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpVerifyResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpVerifyResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func getBiometricStatus() -> bridge.Result_std__shared_ptr_Promise_BiometricStatus___ {
     do {
       let __result = try self.__implementation.getBiometricStatus()

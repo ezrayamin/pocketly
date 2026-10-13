@@ -282,6 +282,8 @@ export interface UnlockResult {
 
 /** What the lock screen needs on start. Read from secure storage, so it survives force-closing. */
 export interface AuthState {
+  /** FR-AUTH-02: the phone verified by OTP on this install (E.164). Absent: onboarding starts there. */
+  phone?: string;
   pinSet: boolean;
   /** Wrong attempts since the last unlock or lockout (0..PIN_MAX_ATTEMPTS-1). */
   failedAttempts: number;
@@ -360,4 +362,42 @@ export interface BiometricUnlockResult {
    * the user someone entered wrong PINs.
    */
   pinLockedOut: boolean;
+}
+
+// ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ────────────────────
+
+/** FR-AUTH-01: why a phone number is refused. Indonesia (+62) mobile numbers only. */
+export type PhoneRejectReason = 'NOT_DIGITS' | 'NOT_MOBILE' | 'TOO_SHORT' | 'TOO_LONG';
+
+export interface PhoneCheck {
+  ok: boolean;
+  /** E.164, e.g. "+6281234567890"; set when ok. */
+  e164?: string;
+  reason?: PhoneRejectReason;
+}
+
+/** requestOtp. TOO_SOON: a code was sent less than OTP_RESEND_MS ago; nothing was sent. */
+export type OtpSendOutcome = 'SENT' | 'TOO_SOON';
+
+export interface OtpSendResult {
+  outcome: OtpSendOutcome;
+  /** When "Resend" may be used. */
+  resendAt: EpochMillis;
+}
+
+/**
+ * verifyOtp (counted by the server, as a real backend would).
+ * - VERIFIED: the phone is now this install's verified phone (secure storage); the PIN comes next.
+ * - WRONG_CODE: `attemptsLeft` before a cooldown.
+ * - COOLDOWN: OTP_MAX_ATTEMPTS wrong codes; no code is checked until `retryAt`.
+ * - EXPIRED / NO_CODE: request a new code.
+ */
+export type OtpVerifyOutcome = 'VERIFIED' | 'WRONG_CODE' | 'COOLDOWN' | 'EXPIRED' | 'NO_CODE';
+
+export interface OtpVerifyResult {
+  outcome: OtpVerifyOutcome;
+  /** WRONG_CODE only. */
+  attemptsLeft?: number;
+  /** COOLDOWN only. */
+  retryAt?: EpochMillis;
 }
