@@ -10,7 +10,8 @@ import { usePinEntry } from './usePinEntry';
  * the second entry, so the user isn't asked to repeat a PIN that can't be used. The first entry
  * is held only until the second one arrives.
  */
-export function CreatePinScreen({ onCreated }: { onCreated: () => void }) {
+/** `onCreated` gets the new PIN so the gate can offer biometrics with it (and then drop it). */
+export function CreatePinScreen({ onCreated }: { onCreated: (pin: string) => void }) {
   const [stage, setStage] = useState<'choose' | 'confirm'>('choose');
   const [message, setMessage] = useState<PinMessage | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +48,7 @@ export function CreatePinScreen({ onCreated }: { onCreated: () => void }) {
     setBusy(true);
     try {
       await core.setPin(pin); // hashes: a few hundred ms (ADR-0010)
-      onCreated();
+      onCreated(pin);
     } catch (e) {
       setBusy(false);
       refuse(toUserError(e).message);

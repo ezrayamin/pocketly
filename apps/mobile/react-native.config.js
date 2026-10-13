@@ -37,9 +37,13 @@ module.exports = {
     'react-native-quick-crypto': {
       platforms: { android: null, ...(linkKmpOnIos ? { ios: null } : {}) },
     },
-    // A codegen Turbo Module (quick-crypto's peer): wired into the app's generated C++ autolinking,
-    // so on Android it stays in both flavors, like the Nitro runtime (ADR-0003 known gap).
+    // Codegen Turbo Modules: wired into the app's generated C++ autolinking, so on Android they
+    // stay in both flavors, like the Nitro runtime (ADR-0003 known gap). quick-base64 is
+    // quick-crypto's peer; the biometrics library is jsCore's biometric key (ADR-0012).
     'react-native-quick-base64': {
+      platforms: linkKmpOnIos ? { ios: null } : {},
+    },
+    '@sbaiahmed1/react-native-biometrics': {
       platforms: linkKmpOnIos ? { ios: null } : {},
     },
   },

@@ -39,6 +39,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.sqldelight.android.driver) // system SQLite (ADR-0009)
+            implementation(libs.androidx.biometric) // BiometricPrompt + CryptoObject (ADR-0012)
         }
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver) // system SQLite (ADR-0009)

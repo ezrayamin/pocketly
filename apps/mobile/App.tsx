@@ -7,6 +7,7 @@ import { BenchScreen } from './src/bench/BenchScreen';
 import { TabBar, type TabKey } from './src/components/TabBar';
 import { DEV_TOOLS_ENABLED } from './src/devtools';
 import { AuthGate, useAppLocked } from './src/features/auth/AuthGate';
+import { BiometricSetupScreen } from './src/features/auth/BiometricSetupScreen';
 import { DevMenu } from './src/features/devmenu/DevMenu';
 import { applyDevLink } from './src/features/devmenu/devLinks';
 import { HistoryScreen } from './src/features/history/HistoryScreen';
@@ -85,7 +86,7 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
       )}
       {tab === 'profile' && (
         <View style={styles.screen}>
-          <ProfileScreen onOpenDevMenu={() => setDevMenuOpen(true)} />
+          <ProfileScreen onOpenDevMenu={() => setDevMenuOpen(true)} lockSkipped={lockSkipped} />
         </View>
       )}
       <TabBar active={tab} onSelect={selectTab} />
@@ -98,6 +99,7 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
           <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
+          <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (

@@ -12,6 +12,22 @@
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BalanceCheck; }
+// Forward declaration of `BiometricEnableOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnavailableReason; }
+// Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `CategoryTotal` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct CategoryTotal; }
 // Forward declaration of `Category` to properly resolve imports.
@@ -74,6 +90,14 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 // Include C++ defined types
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
+#include "BiometricEnableOutcome.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricKind.hpp"
+#include "BiometricPromptText.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricUnavailableReason.hpp"
+#include "BiometricUnlockOutcome.hpp"
+#include "BiometricUnlockResult.hpp"
 #include "Category.hpp"
 #include "CategoryTotal.hpp"
 #include "Counterparty.hpp"

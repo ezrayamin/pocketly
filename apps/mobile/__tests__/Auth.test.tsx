@@ -60,9 +60,15 @@ async function enter(tree: Tree, pin: string) {
   await until(tree, () => !has(tree, 'pin-busy'));
 }
 
+/** The biometrics library mock (jest.setup.js): sensor state and scripted scans. */
+const biometrics = jest.requireMock<{ __state: { available: boolean }; __scans: string[] }>('@sbaiahmed1/react-native-biometrics');
+
 beforeEach(async () => {
   await core.resetAuth();
   jest.mocked(useSecureScreen).mockClear();
+  // PIN-only unless a test turns the sensor on.
+  biometrics.__state.available = false;
+  biometrics.__scans.length = 0;
 });
 
 describe('first launch: create a PIN (FR-AUTH-03)', () => {
@@ -277,6 +283,110 @@ describe('app lock lifecycle (FR-LOCK-02/03)', () => {
     await appState(tree, 'background');
     await appState(tree, 'active');
     expect(has(tree, 'unlock')).toBe(true);
+    tree.unmount();
+  });
+});
+
+describe('biometric unlock (FR-AUTH-04)', () => {
+  let alert: jest.SpyInstance;
+
+  beforeEach(() => {
+    biometrics.__state.available = true;
+    alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => alert.mockRestore());
+
+  async function press(tree: Tree, testID: string) {
+    await ReactTestRenderer.act(async () => {
+      tree.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0].props.onPress();
+    });
+  }
+
+  async function setUpWithBiometrics(): Promise<void> {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-enable');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    tree.unmount();
+  }
+
+  it('offers biometrics after the PIN is created; "Not now" opens the app with them off', async () => {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-skip');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(false);
+    tree.unmount();
+  });
+
+  it('then asks for the fingerprint as soon as the lock screen appears, and opens on a match', async () => {
+    await setUpWithBiometrics();
+    const tree = await launch();
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getAuthState()).failedAttempts).toBe(0);
+    tree.unmount();
+  });
+
+  it('cancelling the prompt shows the keypad and a "Use fingerprint" link that tries again', async () => {
+    await setUpWithBiometrics();
+    biometrics.__scans.push('CANCEL');
+    const tree = await launch();
+    await until(tree, () => has(tree, 'pin-use-biometrics'));
+    expect(has(tree, 'unlock')).toBe(true);
+    expect(text(tree, 'pin-message').trim()).toBe('');
+    await press(tree, 'pin-use-biometrics');
+    await until(tree, () => has(tree, 'balance'));
+    tree.unmount();
+  });
+
+  it('an invalidated key falls back to the PIN, then offers to turn biometrics back on', async () => {
+    await setUpWithBiometrics();
+    biometrics.__scans.push('INVALIDATED');
+    const tree = await launch();
+    await until(tree, () => text(tree, 'pin-message').includes('turned off'));
+    expect(has(tree, 'pin-use-biometrics')).toBe(false);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-enable');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    tree.unmount();
+  });
+
+  it('during a PIN lockout the fingerprint still opens the app, and the user is told about the wrong PINs', async () => {
+    await setUpWithBiometrics();
+    for (let i = 0; i < PIN_MAX_ATTEMPTS; i++) await core.verifyPin(WRONG);
+    const tree = await launch();
+    await until(tree, () => has(tree, 'balance'));
+    expect(alert).toHaveBeenCalledWith('Wrong PIN attempts', expect.stringContaining('wrong PIN 5 times'));
+    expect((await core.getAuthState()).lockedUntil).toBeDefined();
+    tree.unmount();
+  });
+
+  it('Profile → Security turns biometrics on (PIN, then a scan) and off (FR-AUTH-04)', async () => {
+    await core.setPin(GOOD);
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await press(tree, 'tab-profile');
+    await until(tree, () => has(tree, 'profile-biometric-switch'));
+    const sw = () => tree.root.findAll((n) => n.props.testID === 'profile-biometric-switch' && n.props.onValueChange)[0];
+    expect(sw().props.value).toBe(false);
+    await ReactTestRenderer.act(async () => sw().props.onValueChange(true));
+    await until(tree, () => has(tree, 'biometric-setup'));
+    await enter(tree, GOOD);
+    await until(tree, () => !has(tree, 'biometric-setup'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    await until(tree, () => sw()?.props.value === true);
+    await ReactTestRenderer.act(async () => sw().props.onValueChange(false));
+    await until(tree, () => sw()?.props.value === false);
+    expect((await core.getBiometricStatus()).enabled).toBe(false);
     tree.unmount();
   });
 });

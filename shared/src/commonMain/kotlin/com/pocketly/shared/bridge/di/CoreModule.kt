@@ -9,6 +9,7 @@ import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
 import com.pocketly.shared.data.fake.ServerStore
 import com.pocketly.shared.domain.DatasetConfig
+import com.pocketly.shared.security.BiometricAuthenticator
 import com.pocketly.shared.security.InstallMarker
 import com.pocketly.shared.security.PinAuthenticator
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,6 +27,7 @@ internal fun coreModule(
     initialDataset: DatasetConfig,
     db: CoroutineDispatcher,
     pin: (InstallMarker) -> PinAuthenticator,
+    biometric: (PinAuthenticator) -> BiometricAuthenticator,
 ) = module {
     single { TimeZoneHolder() }
     // ADR-0009: two databases, two files. Only the fake backend touches the server's.
@@ -37,6 +39,6 @@ internal fun coreModule(
         TimeoutWalletApi(backend) { backend.networkSimulation.readTimeoutMs.toLong() }
     }
     single {
-        PocketlyCore(api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db, pin = pin)
+        PocketlyCore(api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db, pin = pin, biometric = biometric)
     }
 }

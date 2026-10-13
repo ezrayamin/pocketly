@@ -1,19 +1,24 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_AUTO_LOCK_MS } from '@pocketly/core-contract';
+import type { BiometricKind } from '@pocketly/core-contract';
 import { LockKeyhole } from '../../components/icons';
 import { core } from '../../core';
 import { colors, radius, spacing, type } from '../../theme/tokens';
 import { toUserError } from '../errors';
 import { awayMs, leftNow, shouldRelock, type LeftAt } from './appLock';
+import { BiometricOfferScreen } from './BiometricOfferScreen';
+import { WRONG_PINS_NOTICE } from './biometricCopy';
 import { CreatePinScreen } from './CreatePinScreen';
-import { UnlockScreen } from './UnlockScreen';
+import { UnlockScreen, type Unlocked } from './UnlockScreen';
 
 type Gate =
   | { kind: 'checking' }
   | { kind: 'create' }
-  | { kind: 'locked'; lockedUntil?: number }
+  | { kind: 'locked'; lockedUntil?: number; biometric?: { kind?: BiometricKind } }
+  /** FR-AUTH-04: "Unlock with your fingerprint?" (after PIN setup, or after an invalidated key). */
+  | { kind: 'offer'; again: boolean; biometricKind?: BiometricKind }
   | { kind: 'open' }
   /** ADR-0010 §2.7: secure storage can't be read right now (e.g. the phone is locked). Nothing was wiped. */
   | { kind: 'unavailable'; message: string };
@@ -59,15 +64,35 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [autoLockMs, setAutoLockMs] = useState(DEFAULT_AUTO_LOCK_MS);
   const autoLockRef = useRef(DEFAULT_AUTO_LOCK_MS);
   const leftAt = useRef<LeftAt | null>(null);
+  /** Biometric unlock usable at the last unlock: a re-lock prompts for it at once. */
+  const biometricRef = useRef<{ kind?: BiometricKind } | undefined>(undefined);
+  /** The PIN just entered, held only while the biometric offer is on screen. */
+  const offerPin = useRef<string | null>(null);
+
+  const usableBiometric = useCallback(async () => {
+    try {
+      const s = await core.getBiometricStatus();
+      biometricRef.current = s.enabled && s.available ? { kind: s.kind } : undefined;
+      return s;
+    } catch {
+      biometricRef.current = undefined;
+      return undefined;
+    }
+  }, []);
 
   const check = useCallback(async () => {
     try {
       const state = await core.getAuthState();
-      setGate(state.pinSet ? { kind: 'locked', lockedUntil: state.lockedUntil } : { kind: 'create' });
+      if (!state.pinSet) {
+        setGate({ kind: 'create' });
+        return;
+      }
+      await usableBiometric();
+      setGate({ kind: 'locked', lockedUntil: state.lockedUntil, biometric: biometricRef.current });
     } catch (e) {
       setGate({ kind: 'unavailable', message: toUserError(e).message });
     }
-  }, []);
+  }, [usableBiometric]);
 
   useEffect(() => {
     check();
@@ -93,7 +118,41 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     // Read on every unlock, so the decision when coming back needs no async call. If it can't
     // be read, lock every time (fail closed).
     core.getAutoLockTimeout().then(rememberTimeout, () => rememberTimeout(0));
-  }, [rememberTimeout]);
+    usableBiometric();
+  }, [rememberTimeout, usableBiometric]);
+
+  /** Offer biometrics with the PIN just entered, if the sensor can be used and they're off. */
+  const offerOrOpen = useCallback(
+    async (pin: string, again: boolean) => {
+      const s = await usableBiometric();
+      if (s?.available && !s.enabled) {
+        offerPin.current = pin;
+        setGate({ kind: 'offer', again, biometricKind: s.kind });
+      } else {
+        open();
+      }
+    },
+    [open, usableBiometric],
+  );
+
+  const created = useCallback((pin: string) => offerOrOpen(pin, false), [offerOrOpen]);
+
+  const unlocked = useCallback(
+    (how: Unlocked) => {
+      if (how.offerBiometricsWithPin !== undefined) {
+        offerOrOpen(how.offerBiometricsWithPin, true);
+        return;
+      }
+      open();
+      if (how.pinLockedOut) Alert.alert('Wrong PIN attempts', WRONG_PINS_NOTICE);
+    },
+    [offerOrOpen, open],
+  );
+
+  const offerDone = useCallback(() => {
+    offerPin.current = null;
+    open();
+  }, [open]);
 
   const reset = useCallback(() => {
     setAppMounted(false);
@@ -114,7 +173,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       // Both updates land in the same render: the cover is never lifted off an app that's
       // about to lock.
       if (since !== null && shouldRelock(awayMs(since), autoLockRef.current)) {
-        setGate({ kind: 'locked' });
+        setGate({ kind: 'locked', biometric: biometricRef.current });
       }
       setCovered(false);
     });
@@ -156,9 +215,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           <View style={StyleSheet.absoluteFill}>
             <SafeAreaProvider>
               {gate.kind === 'checking' && <View style={styles.root} testID="auth-checking" />}
-              {gate.kind === 'create' && <CreatePinScreen onCreated={open} />}
+              {gate.kind === 'create' && <CreatePinScreen onCreated={created} />}
               {gate.kind === 'locked' && (
-                <UnlockScreen initialLockedUntil={gate.lockedUntil} onUnlocked={open} onReset={reset} />
+                <UnlockScreen
+                  initialLockedUntil={gate.lockedUntil}
+                  biometric={gate.biometric}
+                  onUnlocked={unlocked}
+                  onReset={reset}
+                />
+              )}
+              {gate.kind === 'offer' && offerPin.current !== null && (
+                <BiometricOfferScreen
+                  kind={gate.biometricKind}
+                  pin={offerPin.current}
+                  again={gate.again}
+                  onDone={offerDone}
+                />
               )}
               {gate.kind === 'unavailable' && (
                 <SafeAreaView style={[styles.root, styles.center]} testID="auth-unavailable">

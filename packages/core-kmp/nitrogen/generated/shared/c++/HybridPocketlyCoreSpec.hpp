@@ -35,6 +35,14 @@ namespace margelo::nitro::pocketly { struct PinCheck; }
 namespace margelo::nitro::pocketly { struct UnlockResult; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -57,6 +65,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "PinCheck.hpp"
 #include "UnlockResult.hpp"
 #include "AuthState.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricPromptText.hpp"
+#include "BiometricUnlockResult.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -113,6 +125,10 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<void>> resetAuth() = 0;
       virtual std::shared_ptr<Promise<double>> getAutoLockTimeout() = 0;
       virtual std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) = 0;
+      virtual std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() = 0;
+      virtual std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) = 0;
+      virtual std::shared_ptr<Promise<void>> disableBiometrics() = 0;
+      virtual std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) = 0;
       virtual double echo(double value) = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) = 0;

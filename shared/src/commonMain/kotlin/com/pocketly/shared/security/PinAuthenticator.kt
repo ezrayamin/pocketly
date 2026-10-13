@@ -103,6 +103,15 @@ class PinAuthenticator(
         serial { store.put(KEY_AUTO_LOCK_MS, ms.toString()) }
     }
 
+    /** Biometrics ([BiometricAuthenticator]): [block] on the guarded store, in this queue, bound to this install. */
+    internal suspend fun <T> withStore(block: suspend (SecureStore) -> T): T = serial { block(store) }
+
+    /** Biometrics: whether a PIN lockout is running (call inside [withStore]). */
+    internal fun lockedOutNow(): Boolean {
+        val now = clock()
+        return readLockout(now, pinSet = true).lockedUntil > now
+    }
+
     /** Runs [block] on [work] after every earlier call has finished, bound to this install. */
     private suspend fun <T> serial(block: suspend () -> T): T = withContext(work) {
         mutex.withLock {
@@ -178,5 +187,7 @@ class PinAuthenticator(
         const val KEY_LOCKOUT = "lockout"
         const val KEY_INSTALL_ID = "installId"
         const val KEY_AUTO_LOCK_MS = "autoLockMs"
+        /** ADR-0012: the biometric key's public key (SPKI DER, hex). Present = biometric unlock on. */
+        const val KEY_BIOMETRIC_PUBLIC_KEY = "biometricPublicKey"
     }
 }

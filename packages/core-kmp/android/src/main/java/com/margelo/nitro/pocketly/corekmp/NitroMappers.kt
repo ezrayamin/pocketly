@@ -13,6 +13,10 @@ import com.pocketly.shared.domain.IngestResult as KIngestResult
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyParseResult as KMoneyParseResult
 import com.pocketly.shared.domain.AuthState as KAuthState
+import com.pocketly.shared.domain.BiometricEnableResult as KBiometricEnableResult
+import com.pocketly.shared.domain.BiometricPromptText as KBiometricPromptText
+import com.pocketly.shared.domain.BiometricStatus as KBiometricStatus
+import com.pocketly.shared.domain.BiometricUnlockResult as KBiometricUnlockResult
 import com.pocketly.shared.domain.PinCheck as KPinCheck
 import com.pocketly.shared.domain.UnlockResult as KUnlockResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
@@ -153,5 +157,19 @@ internal fun KUnlockResult.toNitro() =
     UnlockResult(UnlockOutcome.valueOf(outcome.name), attemptsLeft.toDouble(), lockedUntil?.toDouble())
 
 internal fun KAuthState.toNitro() = AuthState(pinSet, failedAttempts.toDouble(), lockedUntil?.toDouble())
+
+internal fun KBiometricStatus.toNitro() = BiometricStatus(
+    available,
+    reason?.let { BiometricUnavailableReason.valueOf(it.name) },
+    kind?.let { BiometricKind.valueOf(it.name) },
+    enabled,
+)
+
+internal fun BiometricPromptText.toDomain() = KBiometricPromptText(title, subtitle, cancel)
+
+internal fun KBiometricEnableResult.toNitro() =
+    BiometricEnableResult(BiometricEnableOutcome.valueOf(outcome.name), attemptsLeft?.toDouble(), lockedUntil?.toDouble())
+
+internal fun KBiometricUnlockResult.toNitro() = BiometricUnlockResult(BiometricUnlockOutcome.valueOf(outcome.name), pinLockedOut)
 
 internal fun KPriceTick.toNitro() = PriceTick(symbol, price.minor.toDouble(), changeBps.toDouble(), seq.toDouble())

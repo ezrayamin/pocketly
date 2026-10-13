@@ -1,4 +1,4 @@
-import { pbkdf2, randomBytes, timingSafeEqual } from 'react-native-quick-crypto';
+import { Buffer, pbkdf2, randomBytes, timingSafeEqual, verify } from 'react-native-quick-crypto';
 import type { PinCrypto } from './pinCrypto';
 
 /**
@@ -16,5 +16,12 @@ export function quickCryptoPinCrypto(): PinCrypto {
         });
       }),
     timingSafeEqual: (a, b) => timingSafeEqual(a, b),
+    verifyP256: (publicKey, message, signature) => {
+      try {
+        return verify('sha256', message, { key: Buffer.from(publicKey), format: 'der', type: 'spki', dsaEncoding: 'der' }, signature);
+      } catch {
+        return false;
+      }
+    },
   };
 }

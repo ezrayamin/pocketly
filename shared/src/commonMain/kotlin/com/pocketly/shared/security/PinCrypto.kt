@@ -1,7 +1,7 @@
 package com.pocketly.shared.security
 
 /**
- * The crypto primitives the PIN needs (ADR-0010), from the platform: javax.crypto on Android
+ * The crypto primitives the PIN (ADR-0010) and biometric verification (ADR-0012) need, from the platform: javax.crypto on Android
  * and the JVM, CommonCrypto and SecRandomCopyBytes on iOS.
  * Counterpart of packages/core-js/src/security/pinCrypto.ts.
  */
@@ -11,6 +11,12 @@ interface PinCrypto {
 
     /** PBKDF2-HMAC-SHA256. Blocks for as long as the work factor says: never call it on the JS thread. */
     fun pbkdf2Sha256(password: ByteArray, salt: ByteArray, iterations: Int, keyLength: Int): ByteArray
+
+    /**
+     * ADR-0012: ECDSA P-256 / SHA-256. [publicKey] is SubjectPublicKeyInfo DER, [signature] DER.
+     * False for anything that doesn't verify, including malformed keys or signatures.
+     */
+    fun verifyP256(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean
 }
 
 expect fun platformPinCrypto(): PinCrypto

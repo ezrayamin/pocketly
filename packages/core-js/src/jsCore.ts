@@ -8,6 +8,10 @@ import {
 } from '@pocketly/core-contract';
 import type {
   AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   Core,
   DatasetConfig,
   ErrorCode,
@@ -34,6 +38,8 @@ import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { parseAndValidate } from './data/transactionIngestor';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { BiometricAuth } from './security/biometricAuth';
+import type { BiometricSigner } from './security/biometricSigner';
 import { PinAuth } from './security/pinAuth';
 import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
@@ -60,6 +66,8 @@ export interface JsCoreOptions {
   /** Secrets (ADR-0010): Keystore / Keychain in the app. */
   secure: SecureStore;
   crypto: PinCrypto;
+  /** ADR-0012: the strong-biometric-bound signing key. */
+  biometrics: BiometricSigner;
   /** Device clock for PIN lockouts. Tests only. */
   clock?: () => number;
   /** PBKDF2 work factor for new PIN records. Tests only; default PIN_PBKDF2_ITERATIONS. */
@@ -83,6 +91,7 @@ export class JsCore implements Core {
   /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
   private stagedPayload: string | undefined;
   private readonly pin: PinAuth;
+  private readonly biometric: BiometricAuth;
 
   constructor(options: JsCoreOptions) {
     const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
@@ -111,6 +120,7 @@ export class JsCore implements Core {
       clock: options.clock,
       iterations: options.pinIterations,
     });
+    this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
   }
 
   async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -239,7 +249,23 @@ export class JsCore implements Core {
   }
 
   resetAuth(): Promise<void> {
-    return this.pin.resetAuth();
+    return this.biometric.reset();
+  }
+
+  getBiometricStatus(): Promise<BiometricStatus> {
+    return this.biometric.status();
+  }
+
+  enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult> {
+    return this.biometric.enable(pin, prompt);
+  }
+
+  disableBiometrics(): Promise<void> {
+    return this.biometric.disable();
+  }
+
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> {
+    return this.biometric.unlock(prompt);
   }
 
   getAutoLockTimeout(): Promise<number> {

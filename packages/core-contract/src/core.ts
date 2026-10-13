@@ -1,5 +1,9 @@
 import type {
   AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   DatasetConfig,
   IngestResult,
   MinorUnits,
@@ -117,6 +121,21 @@ export interface Core {
   getAutoLockTimeout(): Promise<number>;
   /** 0..MAX_AUTO_LOCK_MS, whole milliseconds; anything else is INVALID_ARGUMENT. */
   setAutoLockTimeout(ms: number): Promise<void>;
+
+  // ── Biometrics (FR-AUTH-04; ADR-0012) ─────────────────────────────────
+  // One primitive for every use: a strong-biometric-bound P-256 key signs bytes the core chose,
+  // and the core verifies the signature. Unlock signs a single-use challenge; slice 6 will sign
+  // transfers (a different, versioned message, fixtures/biometric.json).
+  getBiometricStatus(): Promise<BiometricStatus>;
+  /**
+   * Checks the PIN first (counted like verifyPin), then creates the key and confirms it with
+   * one scan. Anything short of ENABLED leaves biometrics off.
+   */
+  enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult>;
+  /** Deletes the key and its public key. resetAuth does the same. */
+  disableBiometrics(): Promise<void>;
+  /** NOT_FOUND if biometric unlock isn't enabled. Never changes the PIN counter. */
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
 
   // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
   /**

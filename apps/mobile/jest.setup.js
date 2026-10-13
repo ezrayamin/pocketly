@@ -70,7 +70,7 @@ jest.mock('@op-engineering/op-sqlite', () => {
   };
 });
 // jsCore's PIN crypto (ADR-0010) on Node's crypto, which is OpenSSL too.
-jest.mock('react-native-quick-crypto', () => require('node:crypto'));
+jest.mock('react-native-quick-crypto', () => ({ ...require('node:crypto'), Buffer: require('node:buffer').Buffer }));
 // jsCore's secure storage (ADR-0010) in memory. Only what core-js/src/security/sensitiveInfoStore.ts uses.
 jest.mock('react-native-sensitive-info', () => {
   const items = new Map();
@@ -83,5 +83,38 @@ jest.mock('react-native-sensitive-info', () => {
     clearService: async () => items.clear(),
     isKeyInvalidatedError: () => false,
     isIntegrityViolationError: () => false,
+  };
+});
+// jsCore's biometric key (ADR-0012): a software P-256 key. Tests script scans through `__scans`
+// ('MATCH' | 'CANCEL' | 'LOCKOUT' | 'INVALIDATED') and hardware through `__state`.
+jest.mock('@sbaiahmed1/react-native-biometrics', () => {
+  const crypto = require('node:crypto');
+  const { Buffer } = require('node:buffer');
+  const state = { available: true, key: undefined };
+  const scans = [];
+  return {
+    __state: state,
+    __scans: scans,
+    BiometricStrength: { Strong: 'strong', Weak: 'weak' },
+    InputEncoding: { UTF8: 'utf8', Base64: 'base64' },
+    isSensorAvailable: async () =>
+      state.available ? { available: true, biometryType: 'TouchID' } : { available: false, errorCode: 'BiometricErrorNoneEnrolled' },
+    createKeysWithOptions: async () => {
+      const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+      state.key = pair.privateKey;
+      return { publicKey: pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
+    },
+    deleteKeys: async () => {
+      state.key = undefined;
+      return { success: true };
+    },
+    signWithOptions: async ({ data }) => {
+      const scan = scans.shift() ?? 'MATCH';
+      if (scan === 'CANCEL') return { success: false, errorCode: 'USER_CANCELED' };
+      if (scan === 'LOCKOUT') return { success: false, errorCode: 'BIOMETRIC_LOCKOUT' };
+      if (scan === 'INVALIDATED' || !state.key) return { success: false, errorCode: 'KEY_INVALIDATED' };
+      const signature = crypto.sign('sha256', Buffer.from(data, 'base64'), { key: state.key, dsaEncoding: 'der' });
+      return { success: true, signature: signature.toString('base64') };
+    },
   };
 });

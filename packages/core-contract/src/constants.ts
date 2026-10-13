@@ -58,3 +58,9 @@ export const PIN_LOCKOUT_MS = 5 * 60_000;
 export const DEFAULT_AUTO_LOCK_MS = 60_000;
 /** Longest auto-lock timeout either core accepts. 0 = lock every time the app leaves the foreground. */
 export const MAX_AUTO_LOCK_MS = 60 * 60_000;
+
+// ── Biometrics (ADR-0012). Kotlin: shared/.../security/BiometricPolicy.kt ──
+
+/** A biometric unlock challenge must be signed within this long, once. */
+export const BIOMETRIC_CHALLENGE_TTL_MS = 60_000;
+export const BIOMETRIC_NONCE_BYTES = 32;

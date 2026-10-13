@@ -8,6 +8,7 @@ import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.Cancellable
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.AndroidDatabaseDrivers
+import com.pocketly.shared.security.AndroidBiometricSigner
 import com.pocketly.shared.security.AndroidSecureStore
 
 /**
@@ -23,6 +24,7 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
         AndroidDatabaseDrivers(NitroModules.applicationContext!!),
         AndroidSecureStore(NitroModules.applicationContext!!),
         com.pocketly.shared.domain.DatasetConfig.LIVE,
+        AndroidBiometricSigner(NitroModules.applicationContext!!) { NitroModules.applicationContext?.currentActivity },
     )
 
     override fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit> =
@@ -70,6 +72,16 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun resetAuth(): Promise<Unit> = Promise.async { core.resetAuth() }
 
     override fun getAutoLockTimeout(): Promise<Double> = Promise.async { core.getAutoLockTimeout().toDouble() }
+
+    override fun getBiometricStatus(): Promise<BiometricStatus> = Promise.async { core.getBiometricStatus().toNitro() }
+
+    override fun enableBiometrics(pin: String, prompt: BiometricPromptText): Promise<BiometricEnableResult> =
+        Promise.async { core.enableBiometrics(pin, prompt.toDomain()).toNitro() }
+
+    override fun disableBiometrics(): Promise<Unit> = Promise.async { core.disableBiometrics() }
+
+    override fun unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> =
+        Promise.async { core.unlockWithBiometrics(prompt.toDomain()).toNitro() }
 
     // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
     override fun setAutoLockTimeout(ms: Double): Promise<Unit> =

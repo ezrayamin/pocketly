@@ -1,7 +1,10 @@
 package com.pocketly.shared.security
 
 import android.util.Log
+import java.security.KeyFactory
 import java.security.NoSuchAlgorithmException
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.SecretKeyFactory
@@ -46,6 +49,18 @@ internal object JavaPinCrypto : PinCrypto {
     }
 
     private fun java.security.Provider.describe() = "$name (${javaClass.name})"
+
+    override fun verifyP256(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean =
+        try {
+            val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(publicKey))
+            Signature.getInstance("SHA256withECDSA").run {
+                initVerify(key)
+                update(message)
+                verify(signature)
+            }
+        } catch (_: Exception) {
+            false // malformed key or signature
+        }
 
     /** RFC 8018 §5.2 over HmacSHA256, for platforms without the PBKDF2 factory. */
     private fun pbkdf2WithMac(password: ByteArray, salt: ByteArray, iterations: Int, keyLength: Int): ByteArray {

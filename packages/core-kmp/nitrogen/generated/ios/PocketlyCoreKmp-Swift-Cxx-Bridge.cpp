@@ -111,6 +111,30 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const BiometricStatus& /* result */)>
+  Func_void_BiometricStatus create_Func_void_BiometricStatus(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricStatus::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricStatus& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const BiometricEnableResult& /* result */)>
+  Func_void_BiometricEnableResult create_Func_void_BiometricEnableResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricEnableResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricEnableResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const BiometricUnlockResult& /* result */)>
+  Func_void_BiometricUnlockResult create_Func_void_BiometricUnlockResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricUnlockResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricUnlockResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::function<void(const std::vector<PriceTick>& /* ticks */)>
   Func_void_std__vector_PriceTick_ create_Func_void_std__vector_PriceTick_(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_PriceTick_::fromUnsafe(swiftClosureWrapper);

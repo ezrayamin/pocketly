@@ -463,6 +463,82 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func getBiometricStatus() -> bridge.Result_std__shared_ptr_Promise_BiometricStatus___ {
+    do {
+      let __result = try self.__implementation.getBiometricStatus()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricStatus__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricStatus__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricStatus__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricStatus___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricStatus___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func enableBiometrics(pin: std.string, prompt: BiometricPromptText) -> bridge.Result_std__shared_ptr_Promise_BiometricEnableResult___ {
+    do {
+      let __result = try self.__implementation.enableBiometrics(pin: String(pin), prompt: prompt)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricEnableResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricEnableResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricEnableResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricEnableResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricEnableResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func disableBiometrics() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.disableBiometrics()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func unlockWithBiometrics(prompt: BiometricPromptText) -> bridge.Result_std__shared_ptr_Promise_BiometricUnlockResult___ {
+    do {
+      let __result = try self.__implementation.unlockWithBiometrics(prompt: prompt)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricUnlockResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricUnlockResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricUnlockResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func echo(value: Double) -> bridge.Result_double_ {
     do {
       let __result = try self.__implementation.echo(value: value)

@@ -32,6 +32,10 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func resetAuth() throws -> Promise<Void>
   func getAutoLockTimeout() throws -> Promise<Double>
   func setAutoLockTimeout(ms: Double) throws -> Promise<Void>
+  func getBiometricStatus() throws -> Promise<BiometricStatus>
+  func enableBiometrics(pin: String, prompt: BiometricPromptText) throws -> Promise<BiometricEnableResult>
+  func disableBiometrics() throws -> Promise<Void>
+  func unlockWithBiometrics(prompt: BiometricPromptText) throws -> Promise<BiometricUnlockResult>
   func echo(value: Double) throws -> Double
   func formatMoney(minor: Double) throws -> String
   func formatMoneyBatch(minors: [Double]) throws -> [String]

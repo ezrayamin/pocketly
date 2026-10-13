@@ -64,6 +64,22 @@ namespace margelo::nitro::pocketly { struct UnlockResult; }
 namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnavailableReason; }
+// Forward declaration of `BiometricKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricEnableOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
+// Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -103,6 +119,14 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "UnlockResult.hpp"
 #include "UnlockOutcome.hpp"
 #include "AuthState.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricUnavailableReason.hpp"
+#include "BiometricKind.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricEnableOutcome.hpp"
+#include "BiometricPromptText.hpp"
+#include "BiometricUnlockResult.hpp"
+#include "BiometricUnlockOutcome.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -302,6 +326,38 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override {
       auto __result = _swiftPart.setAutoLockTimeout(std::forward<decltype(ms)>(ms));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() override {
+      auto __result = _swiftPart.getBiometricStatus();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) override {
+      auto __result = _swiftPart.enableBiometrics(pin, std::forward<decltype(prompt)>(prompt));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> disableBiometrics() override {
+      auto __result = _swiftPart.disableBiometrics();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override {
+      auto __result = _swiftPart.unlockWithBiometrics(std::forward<decltype(prompt)>(prompt));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

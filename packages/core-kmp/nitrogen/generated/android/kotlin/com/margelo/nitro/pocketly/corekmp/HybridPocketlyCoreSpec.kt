@@ -108,6 +108,22 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun getBiometricStatus(): Promise<BiometricStatus>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun enableBiometrics(pin: String, prompt: BiometricPromptText): Promise<BiometricEnableResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun disableBiometrics(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>
+  
+  @DoNotStrip
+  @Keep
   abstract fun echo(value: Double): Double
   
   @DoNotStrip

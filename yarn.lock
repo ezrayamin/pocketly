@@ -1925,6 +1925,11 @@
   dependencies:
     nanoid "^3.3.11"
 
+"@sbaiahmed1/react-native-biometrics@0.16.1":
+  version "0.16.1"
+  resolved "https://registry.yarnpkg.com/@sbaiahmed1/react-native-biometrics/-/react-native-biometrics-0.16.1.tgz#1df89a203c17ea167e7bb8ef2f73819a5469597b"
+  integrity sha512-uHIncnxHvLvjbNuacneC2tXzmKauHaesRr3sJxvv0MlUcDS9j/uKy5Sxbh/a1u6d1CaLWPWaCzMMcEuntiXzQg==
+
 "@shopify/flash-list@2.3.3":
   version "2.3.3"
   resolved "https://registry.yarnpkg.com/@shopify/flash-list/-/flash-list-2.3.3.tgz#84592b01debb70bce9cbb48f6306ddd0e75ede6f"

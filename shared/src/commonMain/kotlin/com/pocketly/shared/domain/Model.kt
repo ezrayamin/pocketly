@@ -164,3 +164,27 @@ enum class UnlockOutcome { UNLOCKED, WRONG_PIN, LOCKED_OUT }
 data class UnlockResult(val outcome: UnlockOutcome, val attemptsLeft: Int, val lockedUntil: EpochMillis? = null)
 
 data class AuthState(val pinSet: Boolean, val failedAttempts: Int, val lockedUntil: EpochMillis? = null)
+
+// ── Biometrics (FR-AUTH-04; ADR-0012) ────────────────────────────────────
+
+enum class BiometricKind { FINGERPRINT, FACE, IRIS, OTHER }
+
+/** Only strong (Class 3) biometrics count. */
+enum class BiometricUnavailableReason { NO_HARDWARE, NOT_ENROLLED, NOT_STRONG, TEMPORARILY_UNAVAILABLE }
+
+data class BiometricStatus(
+    val available: Boolean,
+    val reason: BiometricUnavailableReason?,
+    val kind: BiometricKind?,
+    val enabled: Boolean,
+)
+
+data class BiometricPromptText(val title: String, val subtitle: String?, val cancel: String)
+
+enum class BiometricEnableOutcome { ENABLED, WRONG_PIN, PIN_LOCKED_OUT, CANCELLED, BIOMETRIC_LOCKED_OUT, NOT_AVAILABLE, UNAVAILABLE }
+
+data class BiometricEnableResult(val outcome: BiometricEnableOutcome, val attemptsLeft: Int? = null, val lockedUntil: EpochMillis? = null)
+
+enum class BiometricUnlockOutcome { UNLOCKED, CANCELLED, BIOMETRIC_LOCKED_OUT, KEY_INVALIDATED, FAILED, UNAVAILABLE }
+
+data class BiometricUnlockResult(val outcome: BiometricUnlockOutcome, val pinLockedOut: Boolean)

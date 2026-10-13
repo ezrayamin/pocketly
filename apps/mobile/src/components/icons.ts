@@ -21,6 +21,7 @@ export { default as CreditCard } from 'lucide-react-native/icons/credit-card';
 export { default as Delete } from 'lucide-react-native/icons/delete';
 export { default as Eye } from 'lucide-react-native/icons/eye';
 export { default as EyeOff } from 'lucide-react-native/icons/eye-off';
+export { default as Fingerprint } from 'lucide-react-native/icons/fingerprint-pattern';
 export { default as History } from 'lucide-react-native/icons/rotate-ccw-clock';
 export { default as House } from 'lucide-react-native/icons/house';
 export { default as Inbox } from 'lucide-react-native/icons/inbox';

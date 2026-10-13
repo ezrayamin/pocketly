@@ -12,6 +12,20 @@
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BalanceCheck; }
+// Forward declaration of `BiometricEnableOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnavailableReason; }
+// Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `CategoryTotal` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct CategoryTotal; }
 // Forward declaration of `Category` to properly resolve imports.
@@ -76,6 +90,13 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 // Include C++ defined types
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
+#include "BiometricEnableOutcome.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricKind.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricUnavailableReason.hpp"
+#include "BiometricUnlockOutcome.hpp"
+#include "BiometricUnlockResult.hpp"
 #include "Category.hpp"
 #include "CategoryTotal.hpp"
 #include "Counterparty.hpp"
@@ -669,6 +690,138 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Func_void_double_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::optional<BiometricUnavailableReason>
+  /**
+   * Specialized version of `std::optional<BiometricUnavailableReason>`.
+   */
+  using std__optional_BiometricUnavailableReason_ = std::optional<BiometricUnavailableReason>;
+  inline std::optional<BiometricUnavailableReason> create_std__optional_BiometricUnavailableReason_(const BiometricUnavailableReason& value) noexcept {
+    return std::optional<BiometricUnavailableReason>(value);
+  }
+  inline bool has_value_std__optional_BiometricUnavailableReason_(const std::optional<BiometricUnavailableReason>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline BiometricUnavailableReason get_std__optional_BiometricUnavailableReason_(const std::optional<BiometricUnavailableReason>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<BiometricKind>
+  /**
+   * Specialized version of `std::optional<BiometricKind>`.
+   */
+  using std__optional_BiometricKind_ = std::optional<BiometricKind>;
+  inline std::optional<BiometricKind> create_std__optional_BiometricKind_(const BiometricKind& value) noexcept {
+    return std::optional<BiometricKind>(value);
+  }
+  inline bool has_value_std__optional_BiometricKind_(const std::optional<BiometricKind>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline BiometricKind get_std__optional_BiometricKind_(const std::optional<BiometricKind>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<BiometricStatus>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<BiometricStatus>>`.
+   */
+  using std__shared_ptr_Promise_BiometricStatus__ = std::shared_ptr<Promise<BiometricStatus>>;
+  inline std::shared_ptr<Promise<BiometricStatus>> create_std__shared_ptr_Promise_BiometricStatus__() noexcept {
+    return Promise<BiometricStatus>::create();
+  }
+  inline PromiseHolder<BiometricStatus> wrap_std__shared_ptr_Promise_BiometricStatus__(std::shared_ptr<Promise<BiometricStatus>> promise) noexcept {
+    return PromiseHolder<BiometricStatus>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const BiometricStatus& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const BiometricStatus&)>`.
+   */
+  using Func_void_BiometricStatus = std::function<void(const BiometricStatus& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const BiometricStatus& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_BiometricStatus_Wrapper final {
+  public:
+    explicit Func_void_BiometricStatus_Wrapper(std::function<void(const BiometricStatus& /* result */)>&& func): _function(std::make_unique<std::function<void(const BiometricStatus& /* result */)>>(std::move(func))) {}
+    inline void call(BiometricStatus result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const BiometricStatus& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_BiometricStatus create_Func_void_BiometricStatus(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_BiometricStatus_Wrapper wrap_Func_void_BiometricStatus(Func_void_BiometricStatus value) noexcept {
+    return Func_void_BiometricStatus_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<BiometricEnableResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<BiometricEnableResult>>`.
+   */
+  using std__shared_ptr_Promise_BiometricEnableResult__ = std::shared_ptr<Promise<BiometricEnableResult>>;
+  inline std::shared_ptr<Promise<BiometricEnableResult>> create_std__shared_ptr_Promise_BiometricEnableResult__() noexcept {
+    return Promise<BiometricEnableResult>::create();
+  }
+  inline PromiseHolder<BiometricEnableResult> wrap_std__shared_ptr_Promise_BiometricEnableResult__(std::shared_ptr<Promise<BiometricEnableResult>> promise) noexcept {
+    return PromiseHolder<BiometricEnableResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const BiometricEnableResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const BiometricEnableResult&)>`.
+   */
+  using Func_void_BiometricEnableResult = std::function<void(const BiometricEnableResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const BiometricEnableResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_BiometricEnableResult_Wrapper final {
+  public:
+    explicit Func_void_BiometricEnableResult_Wrapper(std::function<void(const BiometricEnableResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const BiometricEnableResult& /* result */)>>(std::move(func))) {}
+    inline void call(BiometricEnableResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const BiometricEnableResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_BiometricEnableResult create_Func_void_BiometricEnableResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_BiometricEnableResult_Wrapper wrap_Func_void_BiometricEnableResult(Func_void_BiometricEnableResult value) noexcept {
+    return Func_void_BiometricEnableResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<BiometricUnlockResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<BiometricUnlockResult>>`.
+   */
+  using std__shared_ptr_Promise_BiometricUnlockResult__ = std::shared_ptr<Promise<BiometricUnlockResult>>;
+  inline std::shared_ptr<Promise<BiometricUnlockResult>> create_std__shared_ptr_Promise_BiometricUnlockResult__() noexcept {
+    return Promise<BiometricUnlockResult>::create();
+  }
+  inline PromiseHolder<BiometricUnlockResult> wrap_std__shared_ptr_Promise_BiometricUnlockResult__(std::shared_ptr<Promise<BiometricUnlockResult>> promise) noexcept {
+    return PromiseHolder<BiometricUnlockResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const BiometricUnlockResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const BiometricUnlockResult&)>`.
+   */
+  using Func_void_BiometricUnlockResult = std::function<void(const BiometricUnlockResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const BiometricUnlockResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_BiometricUnlockResult_Wrapper final {
+  public:
+    explicit Func_void_BiometricUnlockResult_Wrapper(std::function<void(const BiometricUnlockResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const BiometricUnlockResult& /* result */)>>(std::move(func))) {}
+    inline void call(BiometricUnlockResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const BiometricUnlockResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_BiometricUnlockResult create_Func_void_BiometricUnlockResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_BiometricUnlockResult_Wrapper wrap_Func_void_BiometricUnlockResult(Func_void_BiometricUnlockResult value) noexcept {
+    return Func_void_BiometricUnlockResult_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::vector<std::string>
   /**
    * Specialized version of `std::vector<std::string>`.
@@ -848,6 +1001,33 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<double>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<BiometricStatus>>>
+  using Result_std__shared_ptr_Promise_BiometricStatus___ = Result<std::shared_ptr<Promise<BiometricStatus>>>;
+  inline Result_std__shared_ptr_Promise_BiometricStatus___ create_Result_std__shared_ptr_Promise_BiometricStatus___(const std::shared_ptr<Promise<BiometricStatus>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricStatus>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_BiometricStatus___ create_Result_std__shared_ptr_Promise_BiometricStatus___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricStatus>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<BiometricEnableResult>>>
+  using Result_std__shared_ptr_Promise_BiometricEnableResult___ = Result<std::shared_ptr<Promise<BiometricEnableResult>>>;
+  inline Result_std__shared_ptr_Promise_BiometricEnableResult___ create_Result_std__shared_ptr_Promise_BiometricEnableResult___(const std::shared_ptr<Promise<BiometricEnableResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricEnableResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_BiometricEnableResult___ create_Result_std__shared_ptr_Promise_BiometricEnableResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricEnableResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<BiometricUnlockResult>>>
+  using Result_std__shared_ptr_Promise_BiometricUnlockResult___ = Result<std::shared_ptr<Promise<BiometricUnlockResult>>>;
+  inline Result_std__shared_ptr_Promise_BiometricUnlockResult___ create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(const std::shared_ptr<Promise<BiometricUnlockResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricUnlockResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_BiometricUnlockResult___ create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<BiometricUnlockResult>>>::withError(error);
   }
   
   // pragma MARK: Result<double>

@@ -288,3 +288,76 @@ export interface AuthState {
   /** Set while a lockout is running. */
   lockedUntil?: EpochMillis;
 }
+
+// ── Biometrics (FR-AUTH-04, later FR-TRF-04; ADR-0012) ──────────────────
+
+export type BiometricKind = 'FINGERPRINT' | 'FACE' | 'IRIS' | 'OTHER';
+
+/** Why biometrics can't be used. Only strong (Class 3) biometrics count. */
+export type BiometricUnavailableReason = 'NO_HARDWARE' | 'NOT_ENROLLED' | 'NOT_STRONG' | 'TEMPORARILY_UNAVAILABLE';
+
+export interface BiometricStatus {
+  /** The device can sign with a strong biometric right now. */
+  available: boolean;
+  reason?: BiometricUnavailableReason;
+  kind?: BiometricKind;
+  /** The user turned biometric unlock on (a key and its public key exist). */
+  enabled: boolean;
+}
+
+/** What the system prompt says. The cancel button is how the user gets to the PIN. */
+export interface BiometricPromptText {
+  title: string;
+  subtitle?: string;
+  cancel: string;
+}
+
+/**
+ * enableBiometrics. WRONG_PIN / PIN_LOCKED_OUT: the PIN check failed (counted like verifyPin).
+ * CANCELLED / BIOMETRIC_LOCKED_OUT / UNAVAILABLE: the confirming scan didn't happen; nothing
+ * was enabled. NOT_AVAILABLE: no strong biometric on this device.
+ */
+export type BiometricEnableOutcome =
+  | 'ENABLED'
+  | 'WRONG_PIN'
+  | 'PIN_LOCKED_OUT'
+  | 'CANCELLED'
+  | 'BIOMETRIC_LOCKED_OUT'
+  | 'NOT_AVAILABLE'
+  | 'UNAVAILABLE';
+
+export interface BiometricEnableResult {
+  outcome: BiometricEnableOutcome;
+  /** WRONG_PIN only. */
+  attemptsLeft?: number;
+  /** PIN_LOCKED_OUT only. */
+  lockedUntil?: EpochMillis;
+}
+
+/**
+ * unlockWithBiometrics.
+ * - UNLOCKED: a fresh challenge was signed by the biometric key and verified.
+ * - CANCELLED: the user chose the PIN (or the system dismissed the prompt).
+ * - BIOMETRIC_LOCKED_OUT: the OS locked biometrics after failed scans; use the PIN.
+ * - KEY_INVALIDATED: biometrics changed (enrolled, removed, screen lock removed); biometric
+ *   unlock was turned off and the PIN is needed to turn it on again.
+ * - FAILED: the signature didn't verify (an old or forged answer): turned off. Also an answer
+ *   that came after BIOMETRIC_CHALLENGE_TTL_MS: left on, since that's a slow user.
+ * - UNAVAILABLE: temporarily can't be used (e.g. device locked); nothing changed.
+ */
+export type BiometricUnlockOutcome =
+  | 'UNLOCKED'
+  | 'CANCELLED'
+  | 'BIOMETRIC_LOCKED_OUT'
+  | 'KEY_INVALIDATED'
+  | 'FAILED'
+  | 'UNAVAILABLE';
+
+export interface BiometricUnlockResult {
+  outcome: BiometricUnlockOutcome;
+  /**
+   * UNLOCKED during a PIN lockout. The lockout and its counter stay as they are; the app tells
+   * the user someone entered wrong PINs.
+   */
+  pinLockedOut: boolean;
+}

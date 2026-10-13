@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSecureScreen } from '@pocketly/native-secure-screen';
 import { LockKeyhole } from '../../components/icons';
@@ -24,6 +24,8 @@ export function PinScreen(props: {
   onDigit: (digit: string) => void;
   onErase: () => void;
   action?: PinPadAction;
+  /** A link under the message, e.g. "Use fingerprint". */
+  secondaryAction?: PinPadAction;
   testID: string;
 }) {
   useSecureScreen();
@@ -47,6 +49,16 @@ export function PinScreen(props: {
         >
           {message?.text ?? ' '}
         </Text>
+        {props.secondaryAction && (
+          <Pressable
+            onPress={props.secondaryAction.onPress}
+            accessibilityRole="button"
+            hitSlop={12}
+            testID={props.secondaryAction.testID}
+          >
+            <Text style={styles.link}>{props.secondaryAction.label}</Text>
+          </Pressable>
+        )}
       </View>
       <PinPad
         onDigit={props.onDigit}
@@ -73,4 +85,5 @@ const styles = StyleSheet.create({
   subtitle: { ...type.caption, color: colors.textSecondary, textAlign: 'center' },
   message: { ...type.caption, color: colors.textSecondary, textAlign: 'center', minHeight: 32 },
   error: { color: colors.danger },
+  link: { ...type.body, color: colors.primary },
 });

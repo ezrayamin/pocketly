@@ -1,6 +1,7 @@
 import type { DatasetConfig } from '@pocketly/core-contract';
 import { JsCore } from '../src/jsCore';
 import { MemorySecureStore, type SecureStore } from '../src/security/secureStore';
+import { FakeBiometricSigner } from './fakeBiometricSigner';
 import { nodePinCrypto } from './nodePinCrypto';
 import { nodeSqliteDriver } from './nodeSqliteDriver';
 
@@ -13,6 +14,7 @@ export function testCore(
     secure?: SecureStore;
     clock?: () => number;
     pinIterations?: number;
+    biometrics?: FakeBiometricSigner;
   } = {},
 ): JsCore {
   return new JsCore({
@@ -21,6 +23,7 @@ export function testCore(
     dataset: options.dataset,
     secure: options.secure ?? new MemorySecureStore(),
     crypto: nodePinCrypto,
+    biometrics: options.biometrics ?? new FakeBiometricSigner(),
     clock: options.clock,
     pinIterations: options.pinIterations,
   });

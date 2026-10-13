@@ -15,7 +15,9 @@ const patchesDir = path.join(root, 'patches');
 for (const file of fs.readdirSync(patchesDir).filter((f) => f.endsWith('.patch')).sort()) {
   const match = /^(.+)\+([^+]+)\.patch$/.exec(file);
   if (!match) throw new Error(`patches/${file}: expected <package>+<version>.patch`);
-  const [, name, version] = match;
+  const [, fileName, version] = match;
+  // Scoped packages: "@scope+name" in the file name stands for "@scope/name".
+  const name = fileName.startsWith('@') ? fileName.replace('+', '/') : fileName;
   const pkgDir = path.join(root, 'node_modules', name);
   const installed = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).version;
   if (installed !== version) {

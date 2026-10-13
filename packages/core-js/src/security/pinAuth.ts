@@ -27,6 +27,8 @@ export const SECURE_KEYS = {
   lockout: 'lockout',
   installId: 'installId',
   autoLockMs: 'autoLockMs',
+  /** ADR-0012: the biometric key's public key (SPKI DER, hex). Present = biometric unlock on. */
+  biometricPublicKey: 'biometricPublicKey',
 } as const;
 
 /**
@@ -171,6 +173,17 @@ export class PinAuth {
       await this.store.clear();
       await this.store.set(SECURE_KEYS.installId, (await this.marker.get())!);
     });
+  }
+
+  /** Biometrics (biometricAuth.ts): `work` on the guarded store, in this queue, bound to this install. */
+  withStore<T>(work: (store: SecureStore) => Promise<T>): Promise<T> {
+    return this.serial(() => work(this.store));
+  }
+
+  /** Biometrics: whether a PIN lockout is running (read inside withStore). */
+  async lockedOutNow(): Promise<boolean> {
+    const now = this.clock();
+    return (await this.readLockout(now, true)).lockedUntil > now;
   }
 
   /** Runs `work` after every earlier call has settled, bound to this install. */

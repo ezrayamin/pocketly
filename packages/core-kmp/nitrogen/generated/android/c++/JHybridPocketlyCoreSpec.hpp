@@ -73,6 +73,10 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<void>> resetAuth() override;
     std::shared_ptr<Promise<double>> getAutoLockTimeout() override;
     std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override;
+    std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() override;
+    std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) override;
+    std::shared_ptr<Promise<void>> disableBiometrics() override;
+    std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override;
     double echo(double value) override;
     std::string formatMoney(double minor) override;
     std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;

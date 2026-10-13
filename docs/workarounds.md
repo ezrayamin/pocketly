@@ -12,6 +12,7 @@ react-native-svg, Nitro, Xcode or the test device.
 | 4 | BM-02: `adb` swipes instead of Maestro (vivo) | `benchmarks/scripts/bm-02-scroll.sh` | Maestro's driver works on this device |
 | 5 | Nitro `resetData(DatasetSeed, Transaction[])` instead of `resetData(DatasetConfig)` | `packages/core-kmp/src/specs/PocketlyCore.nitro.ts`, `src/index.ts` | Swift's C++ interop handles an optional array of structs inside a struct |
 | 6 | react-native-sensitive-info patched: iOS `WhenUnlockedThisDeviceOnly`, Android `commit()` | `patches/react-native-sensitive-info+6.1.5.patch`, applied by `scripts/apply-patches.js` (root `postinstall`) | The library offers both itself (an accessibility option for unprompted items, synchronous writes) |
+| 7 | @sbaiahmed1/react-native-biometrics patched: Android `KEY_INVALIDATED` error code | `patches/@sbaiahmed1+react-native-biometrics+0.16.1.patch`, applied by `scripts/apply-patches.js` | The library reports `KeyPermanentlyInvalidatedException` with its own code |
 
 ## 1. `androidx.collection` 1.4.4 (Android, both builds)
 
@@ -95,6 +96,18 @@ and fails the install if the installed version differs from the file name.
 `ios/Internal/Security/AccessControlResolver.swift` (the `.none` policy's `accessible`) and
 `android/.../internal/storage/SecureStorage.kt` (`apply` vs `commit`). Drop each change once the
 library does the same, delete the patch, and re-check ADR-0010 §4.
+
+## 7. @sbaiahmed1/react-native-biometrics 0.16.1: a code for invalidated keys
+
+**Why.** ADR-0012 routes every permanent loss of the biometric key (biometrics enrolled or
+removed, screen lock removed) to "biometrics off, PIN, offer again", and treats everything else
+as temporary. On Android, 0.16.1 reports `KeyPermanentlyInvalidatedException` (thrown by
+`initSign`) as a generic `SIGNATURE_CREATION_FAILED`, indistinguishable from other failures. The
+patch gives it the code `KEY_INVALIDATED` (in `verifyKeySignature`'s outer catch).
+
+**Check before removing.** On a library upgrade, look at `ReactNativeBiometricsSharedImpl.kt`'s
+`verifyKeySignature` error handling. Drop the patch once a permanently invalidated key gets its
+own code, and update `INVALIDATED` in `packages/core-js/src/security/rnBiometricsSigner.ts`.
 
 ## Not a workaround: the Hermes engine swap (local only)
 

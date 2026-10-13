@@ -11,6 +11,10 @@ import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
 import com.pocketly.shared.domain.AuthState
+import com.pocketly.shared.domain.BiometricEnableResult
+import com.pocketly.shared.domain.BiometricPromptText
+import com.pocketly.shared.domain.BiometricStatus
+import com.pocketly.shared.domain.BiometricUnlockResult
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -29,7 +33,10 @@ import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
 import com.pocketly.shared.domain.UnlockResult
 import com.pocketly.shared.domain.Wallet
+import com.pocketly.shared.security.BiometricAuthenticator
+import com.pocketly.shared.security.BiometricSigner
 import com.pocketly.shared.security.InstallMarker
+import com.pocketly.shared.security.NoBiometricSigner
 import com.pocketly.shared.security.PinAuthenticator
 import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
@@ -69,6 +76,8 @@ class PocketlyCore internal constructor(
     private val db: CoroutineDispatcher,
     /** Builds the PIN logic (ADR-0010) around this core's install marker (the replica's cache_meta). */
     pin: (InstallMarker) -> PinAuthenticator,
+    /** Builds biometric unlock (ADR-0012) on top of the PIN logic. */
+    biometric: (PinAuthenticator) -> BiometricAuthenticator,
 ) {
     private val streamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ledgerSync = LedgerSync(api, cache)
@@ -82,6 +91,8 @@ class PocketlyCore internal constructor(
             onDb { cache.setInstallId(id) }
         }
     })
+
+    private val biometric = biometric(this.pin)
 
     @Volatile
     private var computeMs = 0.0
@@ -207,13 +218,27 @@ class PocketlyCore internal constructor(
     suspend fun getAuthState(): AuthState = pin.getAuthState()
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun resetAuth() = pin.resetAuth()
+    suspend fun resetAuth() = biometric.reset()
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getAutoLockTimeout(): Long = pin.getAutoLockTimeout()
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun setAutoLockTimeout(ms: Long) = pin.setAutoLockTimeout(ms)
+
+    // ── Biometrics (FR-AUTH-04; ADR-0012) ──────────────────────────────────
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getBiometricStatus(): BiometricStatus = biometric.status()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun enableBiometrics(pin: String, prompt: BiometricPromptText): BiometricEnableResult = biometric.enable(pin, prompt)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun disableBiometrics() = biometric.disable()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun unlockWithBiometrics(prompt: BiometricPromptText): BiometricUnlockResult = biometric.unlock(prompt)
 
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
@@ -278,8 +303,12 @@ class PocketlyCore internal constructor(
          * [dataset] only if its database is empty. Native adapters pass the platform drivers and
          * store, and [DatasetConfig.LIVE].
          */
-        fun create(drivers: DatabaseDrivers, secureStore: SecureStore, dataset: DatasetConfig = DatasetConfig.DEFAULT): PocketlyCore =
-            create(drivers, dataset, singleThread(), secureStore)
+        fun create(
+            drivers: DatabaseDrivers,
+            secureStore: SecureStore,
+            dataset: DatasetConfig = DatasetConfig.DEFAULT,
+            biometricSigner: BiometricSigner = NoBiometricSigner,
+        ): PocketlyCore = create(drivers, dataset, singleThread(), secureStore, biometricSigner = biometricSigner)
 
         internal fun create(
             drivers: DatabaseDrivers,
@@ -289,10 +318,12 @@ class PocketlyCore internal constructor(
             crypto: PinCrypto = platformPinCrypto(),
             clock: () -> Long = ::currentTimeMillis,
             pinIterations: Int = PinPolicy.ITERATIONS,
+            biometricSigner: BiometricSigner = NoBiometricSigner,
         ): PocketlyCore {
             // PBKDF2 blocks for hundreds of ms: off the database thread, which other calls share.
             val pin = { marker: InstallMarker -> PinAuthenticator(secureStore, crypto, marker, Dispatchers.Default, clock, pinIterations) }
-            return koinApplication { modules(coreModule(drivers, dataset, db, pin)) }.koin.get()
+            val biometric = { auth: PinAuthenticator -> BiometricAuthenticator(auth, biometricSigner, crypto, clock) }
+            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric)) }.koin.get()
         }
 
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

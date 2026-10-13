@@ -33,6 +33,10 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("resetAuth", &HybridPocketlyCoreSpec::resetAuth);
       prototype.registerHybridMethod("getAutoLockTimeout", &HybridPocketlyCoreSpec::getAutoLockTimeout);
       prototype.registerHybridMethod("setAutoLockTimeout", &HybridPocketlyCoreSpec::setAutoLockTimeout);
+      prototype.registerHybridMethod("getBiometricStatus", &HybridPocketlyCoreSpec::getBiometricStatus);
+      prototype.registerHybridMethod("enableBiometrics", &HybridPocketlyCoreSpec::enableBiometrics);
+      prototype.registerHybridMethod("disableBiometrics", &HybridPocketlyCoreSpec::disableBiometrics);
+      prototype.registerHybridMethod("unlockWithBiometrics", &HybridPocketlyCoreSpec::unlockWithBiometrics);
       prototype.registerHybridMethod("echo", &HybridPocketlyCoreSpec::echo);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("formatMoneyBatch", &HybridPocketlyCoreSpec::formatMoneyBatch);

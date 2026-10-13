@@ -7,6 +7,10 @@ import {
 } from '@pocketly/core-contract';
 import type {
   AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   Core,
   DatasetConfig,
   IngestResult,
@@ -124,6 +128,24 @@ export class KmpCore implements Core {
     return this.native.setAutoLockTimeout(ms).catch(rethrow);
   }
 
+  async getBiometricStatus(): Promise<BiometricStatus> {
+    const s = await this.native.getBiometricStatus().catch(rethrow);
+    return withoutUndefined({ available: s.available, reason: s.reason, kind: s.kind, enabled: s.enabled });
+  }
+
+  async enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult> {
+    const r = await this.native.enableBiometrics(pin, prompt).catch(rethrow);
+    return withoutUndefined({ outcome: r.outcome, attemptsLeft: r.attemptsLeft, lockedUntil: r.lockedUntil });
+  }
+
+  disableBiometrics(): Promise<void> {
+    return this.native.disableBiometrics().catch(rethrow);
+  }
+
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> {
+    return this.native.unlockWithBiometrics(prompt).catch(rethrow);
+  }
+
   // Straight through: it can't throw, and BM-06 times exactly this path.
   echo(value: number): number {
     return this.native.echo(value);
@@ -170,6 +192,11 @@ export class KmpCore implements Core {
   lastStorageMs(): number {
     return this.native.lastStorageMs();
   }
+}
+
+/** Optional struct fields arrive as explicit `undefined`; the contract omits them (as jsCore does). */
+function withoutUndefined<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
 function rethrow(e: unknown): never {

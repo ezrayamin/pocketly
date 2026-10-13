@@ -3,6 +3,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
   AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   DatasetSeed,
   IngestResult,
   MoneyParseResult,
@@ -59,6 +63,10 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   resetAuth(): Promise<void>;
   getAutoLockTimeout(): Promise<number>;
   setAutoLockTimeout(ms: number): Promise<void>;
+  getBiometricStatus(): Promise<BiometricStatus>;
+  enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult>;
+  disableBiometrics(): Promise<void>;
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
 
   echo(value: number): number;
   formatMoney(minor: number): string;

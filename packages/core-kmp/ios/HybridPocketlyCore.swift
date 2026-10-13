@@ -17,7 +17,8 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   private let core = PocketlyShared.PocketlyCore.companion.create(
     drivers: PocketlyShared.IosDatabaseDrivers(),
     secureStore: PocketlyShared.IosSecureStore(service: PocketlyShared.IosSecureStore.companion.SERVICE),
-    dataset: PocketlyShared.DatasetConfig.companion.LIVE
+    dataset: PocketlyShared.DatasetConfig.companion.LIVE,
+    biometricSigner: PocketlyShared.IosBiometricSigner(tag: "com.pocketly.biometric.v1")
   )
   private let convert = PocketlyShared.BridgeConversions.shared
 
@@ -156,6 +157,42 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
 
   func getAutoLockTimeout() throws -> Promise<Double> {
     return Promise.async { [core] in Double(try await core.getAutoLockTimeout().int64Value) }
+  }
+
+  func getBiometricStatus() throws -> Promise<BiometricStatus> {
+    return Promise.async { [core] in
+      let s = try await core.getBiometricStatus()
+      return BiometricStatus(
+        available: s.available,
+        reason: s.reason.map { BiometricUnavailableReason(fromString: $0.name)! },
+        kind: s.kind.map { BiometricKind(fromString: $0.name)! },
+        enabled: s.enabled
+      )
+    }
+  }
+
+  func enableBiometrics(pin: String, prompt: BiometricPromptText) throws -> Promise<BiometricEnableResult> {
+    let kPrompt = PocketlyShared.BiometricPromptText(title: prompt.title, subtitle: prompt.subtitle, cancel: prompt.cancel)
+    return Promise.async { [core] in
+      let r = try await core.enableBiometrics(pin: pin, prompt: kPrompt)
+      return BiometricEnableResult(
+        outcome: BiometricEnableOutcome(fromString: r.outcome.name)!,
+        attemptsLeft: r.attemptsLeft.map { Double($0.int32Value) },
+        lockedUntil: r.lockedUntil.map { Double($0.int64Value) }
+      )
+    }
+  }
+
+  func disableBiometrics() throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.disableBiometrics() }
+  }
+
+  func unlockWithBiometrics(prompt: BiometricPromptText) throws -> Promise<BiometricUnlockResult> {
+    let kPrompt = PocketlyShared.BiometricPromptText(title: prompt.title, subtitle: prompt.subtitle, cancel: prompt.cancel)
+    return Promise.async { [core] in
+      let r = try await core.unlockWithBiometrics(prompt: kPrompt)
+      return BiometricUnlockResult(outcome: BiometricUnlockOutcome(fromString: r.outcome.name)!, pinLockedOut: r.pinLockedOut)
+    }
   }
 
   // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
