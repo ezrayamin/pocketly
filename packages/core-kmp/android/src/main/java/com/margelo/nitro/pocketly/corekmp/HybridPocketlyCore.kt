@@ -71,6 +71,8 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun resetAuth(): Promise<Unit> = Promise.async { core.resetAuth() }
 
+    override fun logout(): Promise<Unit> = Promise.async { core.logout() }
+
     override fun getAutoLockTimeout(): Promise<Double> = Promise.async { core.getAutoLockTimeout().toDouble() }
 
     override fun checkPhone(nationalNumber: String): PhoneCheck = core.checkPhone(nationalNumber).toNitro()

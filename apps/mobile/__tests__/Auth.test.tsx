@@ -61,6 +61,17 @@ async function enter(tree: Tree, pin: string) {
   await until(tree, () => !has(tree, 'pin-busy'));
 }
 
+/** NFR-SEC-05: with the server out of reach, there is nothing cached to show. */
+async function expectNothingCached() {
+  core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+  try {
+    await expect(core.getTransactions()).rejects.toMatchObject({ code: 'NETWORK_UNAVAILABLE' });
+    await expect(core.getWallet()).rejects.toMatchObject({ code: 'NETWORK_UNAVAILABLE' });
+  } finally {
+    core.setNetworkSimulation({ mode: 'NORMAL', failureRatePercent: 0 });
+  }
+}
+
 /** The biometrics library mock (jest.setup.js): sensor state and scripted scans. */
 const biometrics = jest.requireMock<{ __state: { available: boolean }; __scans: string[] }>('@sbaiahmed1/react-native-biometrics');
 
@@ -256,16 +267,18 @@ describe('later launches: unlock (FR-LOCK-01/04)', () => {
     again.unmount();
   });
 
-  it('"Forgot PIN" deletes the PIN and the verified phone: onboarding starts at the phone (ADR-0013)', async () => {
+  it('"Forgot PIN" logs out: PIN, verified phone and cached history go; onboarding starts at the phone (ADR-0013, NFR-SEC-05)', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
     });
+    await core.getTransactions(); // something cached
     const tree = await launch();
     await ReactTestRenderer.act(async () => {
       tree.root.findByProps({ testID: 'pin-forgot' }).props.onPress();
     });
     await until(tree, () => has(tree, 'onboarding-phone'));
     expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+    await expectNothingCached();
     alert.mockRestore();
     tree.unmount();
   });
@@ -494,6 +507,25 @@ describe('biometric unlock (FR-AUTH-04)', () => {
     await ReactTestRenderer.act(async () => sw().props.onValueChange(false));
     await until(tree, () => sw()?.props.value === false);
     expect((await core.getBiometricStatus()).enabled).toBe(false);
+    tree.unmount();
+  });
+
+  it('Profile → Log out removes the PIN and the cached history, then starts onboarding (NFR-SEC-05)', async () => {
+    await core.setPin(GOOD);
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await press(tree, 'tab-profile');
+    await until(tree, () => has(tree, 'profile-logout'));
+    const confirm = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    await press(tree, 'profile-logout');
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    expect(has(tree, 'balance')).toBe(false);
+    expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+    await expectNothingCached();
+    confirm.mockRestore();
     tree.unmount();
   });
 

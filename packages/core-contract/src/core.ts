@@ -116,8 +116,18 @@ export interface Core {
    */
   verifyPin(pin: string): Promise<UnlockResult>;
   getAuthState(): Promise<AuthState>;
-  /** Logout / "reset onboarding": deletes every secret the core holds. */
+  /**
+   * "Reset onboarding" (developer menu, BM-11): deletes every secret the core holds. The local
+   * replica stays; use {@link logout} when a person leaves the app.
+   */
   resetAuth(): Promise<void>;
+  /**
+   * NFR-SEC-05 logout, also "Forgot PIN": clears the local replica (history, wallet, sync
+   * state), then does resetAuth. A sync or fetch still in flight writes nothing afterwards.
+   * The install id stays (ADR-0010). If secure storage fails, the replica is already empty and
+   * the secrets are untouched: retry.
+   */
+  logout(): Promise<void>;
   /**
    * FR-LOCK-02: how long the app may stay in the background before it locks again. Kept in
    * secure storage with the PIN (ADR-0005); DEFAULT_AUTO_LOCK_MS until set, and after resetAuth.

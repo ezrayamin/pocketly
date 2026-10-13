@@ -132,6 +132,7 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) = 0;
       virtual std::shared_ptr<Promise<AuthState>> getAuthState() = 0;
       virtual std::shared_ptr<Promise<void>> resetAuth() = 0;
+      virtual std::shared_ptr<Promise<void>> logout() = 0;
       virtual std::shared_ptr<Promise<double>> getAutoLockTimeout() = 0;
       virtual std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) = 0;
       virtual PhoneCheck checkPhone(const std::string& nationalNumber) = 0;

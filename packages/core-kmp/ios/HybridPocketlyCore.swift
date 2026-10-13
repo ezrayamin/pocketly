@@ -179,6 +179,10 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.resetAuth() }
   }
 
+  func logout() throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.logout() }
+  }
+
   func getAutoLockTimeout() throws -> Promise<Double> {
     return Promise.async { [core] in Double(try await core.getAutoLockTimeout().int64Value) }
   }

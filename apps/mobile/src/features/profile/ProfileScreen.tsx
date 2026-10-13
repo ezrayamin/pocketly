@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Pressable, StatusBar, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StatusBar, StyleSheet, Switch, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BiometricStatus } from '@pocketly/core-contract';
@@ -12,6 +12,7 @@ import { version } from '../../../package.json';
 
 import { DEV_TOOLS_ENABLED } from '../../devtools';
 import type { RootStackParamList } from '../../navigation';
+import { useAuthControls } from '../auth/AuthGate';
 import { biometricNoun, capitalized } from '../auth/biometricCopy';
 import { formatPhone } from '../auth/phoneFormat';
 import { toUserError } from '../errors';
@@ -76,8 +77,34 @@ function SecuritySection() {
   );
 }
 
+/** NFR-SEC-05: logging out removes the cached history with the secrets. */
+function LogoutButton() {
+  const auth = useAuthControls();
+  const [error, setError] = useState<string | null>(null);
+  const confirm = () =>
+    Alert.alert('Log out?', "Your PIN and your history on this phone are removed. You'll set Pocketly up again.", [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: () => {
+          setError(null);
+          auth.logout().catch((e: unknown) => setError(toUserError(e).message));
+        },
+      },
+    ]);
+  return (
+    <View style={styles.section}>
+      <Pressable style={styles.row} onPress={confirm} accessibilityRole="button" testID="profile-logout">
+        <Text style={styles.logout}>Log out</Text>
+      </Pressable>
+      {error && <Text style={styles.caption}>{error}</Text>}
+    </View>
+  );
+}
+
 /**
- * Profile: identity, Security (biometric unlock), app version. Settings and My QR arrive with
+ * Profile: identity, Security (biometric unlock), log out, app version. Settings and My QR arrive with
  * their features. Tapping the version 7× opens the Developer Menu (FR-DEV-01).
  */
 export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDevMenu: () => void; lockSkipped?: boolean }) {
@@ -122,6 +149,7 @@ export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDe
           </View>
         </View>
         {!lockSkipped && <SecuritySection />}
+        {!lockSkipped && <LogoutButton />}
         <Text style={styles.soon}>Settings and My QR arrive with their features.</Text>
         <Pressable onPress={onVersionPress} style={styles.versionRow} accessibilityRole="text" testID="app-version">
           <Text style={styles.caption}>App version</Text>
@@ -167,4 +195,5 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   rowText: { flex: 1, gap: spacing.xs },
+  logout: { ...type.body, color: colors.danger },
 });

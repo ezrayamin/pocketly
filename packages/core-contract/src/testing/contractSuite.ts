@@ -440,7 +440,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect((await core.getAuthState()).phone).toBeUndefined();
       });
 
-      it('resetAuth forgets the verified phone ("Forgot PIN" starts over at the phone)', async () => {
+      it('resetAuth forgets the verified phone (onboarding starts over at the phone)', async () => {
         await verifyTestPhone(core);
         await core.resetAuth();
         expect((await core.getAuthState()).phone).toBeUndefined();
@@ -540,6 +540,59 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 1 });
         await core.resetAuth();
         expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 }); // the phone goes too
+      });
+    });
+
+    describe('logout (NFR-SEC-05)', () => {
+      const PIN = '482915';
+      const OFFLINE: NetworkSimulation = { mode: 'OFFLINE', failureRatePercent: 0 };
+
+      /** Nothing is cached: with the server out of reach, there is nothing to show. */
+      async function expectReplicaEmpty() {
+        core.setNetworkSimulation(OFFLINE);
+        await expectCoreError(core.getWallet(), 'NETWORK_UNAVAILABLE');
+        await expectCoreError(core.getTransactions(), 'NETWORK_UNAVAILABLE');
+        expect((await core.computeSpendingSummary('2026-09')).transactionCount).toBe(0);
+        core.setNetworkSimulation(NETWORK_NORMAL);
+      }
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+        await core.getWallet();
+        await core.getTransactions();
+      });
+
+      it('clears the replica and every secret; the server keeps the account', async () => {
+        await core.setAutoLockTimeout(5000);
+        await core.logout();
+        expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+        expect(await core.getAutoLockTimeout()).toBe(DEFAULT_AUTO_LOCK_MS);
+        await expectReplicaEmpty();
+        // The next sync starts from scratch.
+        expect((await readAllTransactions(core)).map((t) => t.id)).toEqual(golden.defaultDataset.allIds);
+      });
+
+      it('a sync or fetch still in flight writes nothing afterwards', async () => {
+        core.setNetworkSimulation({ ...NETWORK_NORMAL, normalLatencyMs: 200 });
+        const page = core.getTransactions();
+        const wallet = core.getWallet();
+        await core.logout();
+        // They still answer the caller; the cleared replica just isn't refilled.
+        await expect(page).resolves.toMatchObject({ items: [] });
+        await expect(wallet).resolves.toBeDefined();
+        await expectReplicaEmpty();
+      });
+
+      it('the next person can onboard on the same install', async () => {
+        const NEXT_PHONE = '+6285712345678';
+        await core.logout();
+        await expectCoreError(core.setPin(PIN), 'NOT_FOUND');
+        await verifyTestPhone(core, NEXT_PHONE);
+        await core.setPin('731048');
+        expect(await core.getAuthState()).toEqual({ phone: NEXT_PHONE, pinSet: true, failedAttempts: 0 });
+        expect((await core.verifyPin('731048')).outcome).toBe('UNLOCKED');
       });
     });
   });

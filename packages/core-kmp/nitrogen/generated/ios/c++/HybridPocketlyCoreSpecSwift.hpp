@@ -334,6 +334,14 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<Promise<void>> logout() override {
+      auto __result = _swiftPart.logout();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline std::shared_ptr<Promise<double>> getAutoLockTimeout() override {
       auto __result = _swiftPart.getAutoLockTimeout();
       if (__result.hasError()) [[unlikely]] {

@@ -134,7 +134,7 @@ export class JsCore implements Core {
     await this.cache.clear();
     try {
       await this.ledgerSync.sync();
-      await this.cache.upsertWallet(await this.api.getWallet(), Date.now());
+      await this.fetchWallet();
     } catch (e) {
       if (!STALEABLE.has(toCoreError(e).code)) throw e; // offline reset: replica stays empty
     }
@@ -143,15 +143,21 @@ export class JsCore implements Core {
   async getWallet(): Promise<Wallet> {
     await this.ready;
     try {
-      const wallet = await this.api.getWallet();
-      await this.cache.upsertWallet(wallet, Date.now());
-      return wallet;
+      return await this.fetchWallet();
     } catch (e) {
       const error = toCoreError(e);
       const cached = STALEABLE.has(error.code) ? await this.cache.getWallet() : undefined;
       if (cached === undefined) throw error;
       return { ...cached.wallet, stale: { reason: error.code, cachedAt: cached.cachedAt } };
     }
+  }
+
+  /** From the server into the replica, unless the replica was cleared meanwhile (logout). */
+  private async fetchWallet(): Promise<Wallet> {
+    const generation = this.cache.generation;
+    const wallet = await this.api.getWallet();
+    if (this.cache.generation === generation) await this.cache.upsertWallet(wallet, Date.now());
+    return wallet;
   }
 
   async getTransactions(
@@ -255,6 +261,13 @@ export class JsCore implements Core {
 
   resetAuth(): Promise<void> {
     return this.biometric.reset();
+  }
+
+  async logout(): Promise<void> {
+    // The replica first: if the secrets then fail to go, nothing of the history is left behind.
+    await this.ready;
+    await this.cache.clear();
+    await this.biometric.reset();
   }
 
   checkPhone(nationalNumber: string): PhoneCheck {

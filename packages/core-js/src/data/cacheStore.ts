@@ -19,13 +19,24 @@ function filterList(values: readonly string[] | undefined): string {
  * fake backend. Mirrors shared/.../data/CacheStore.kt.
  */
 export class CacheStore {
+  private cleared = 0;
+
   constructor(private readonly db: SqlDriver) {}
+
+  /**
+   * Changes with every clear(). Work that fetched from the server before a clear (logout,
+   * NFR-SEC-05) compares it before writing, so it can't put the old data back.
+   */
+  get generation(): number {
+    return this.cleared;
+  }
 
   init(): Promise<void> {
     return migrate(this.db, CACHE_SCHEMA);
   }
 
   async clear(): Promise<void> {
+    this.cleared++;
     await this.db.run(CACHE_SQL.deleteAllTransactions.sql, []);
     await this.db.run(CACHE_SQL.deleteWallet.sql, []);
     await this.db.run(CACHE_SQL.deleteSyncMeta.sql, []);
@@ -110,9 +121,11 @@ export class CacheStore {
     return v === undefined ? undefined : Number(v);
   }
 
+  /** One write, so a clear() can't land between the token and the time. */
   async markSynced(token: string | undefined, at: number): Promise<void> {
-    if (token !== undefined) await this.setMeta(META_SYNC_TOKEN, token);
-    await this.setMeta(META_LAST_SYNCED_AT, String(at));
+    const rows: string[][] = [[META_LAST_SYNCED_AT, String(at)]];
+    if (token !== undefined) rows.unshift([META_SYNC_TOKEN, token]);
+    await this.db.runMany(CACHE_SQL.setMeta.sql, rows);
   }
 
   /** ADR-0010: identifies this install. clear() keeps it; only uninstalling the app removes it. */

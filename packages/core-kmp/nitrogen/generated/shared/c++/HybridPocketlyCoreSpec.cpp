@@ -31,6 +31,7 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("verifyPin", &HybridPocketlyCoreSpec::verifyPin);
       prototype.registerHybridMethod("getAuthState", &HybridPocketlyCoreSpec::getAuthState);
       prototype.registerHybridMethod("resetAuth", &HybridPocketlyCoreSpec::resetAuth);
+      prototype.registerHybridMethod("logout", &HybridPocketlyCoreSpec::logout);
       prototype.registerHybridMethod("getAutoLockTimeout", &HybridPocketlyCoreSpec::getAutoLockTimeout);
       prototype.registerHybridMethod("setAutoLockTimeout", &HybridPocketlyCoreSpec::setAutoLockTimeout);
       prototype.registerHybridMethod("checkPhone", &HybridPocketlyCoreSpec::checkPhone);

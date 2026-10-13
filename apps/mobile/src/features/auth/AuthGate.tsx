@@ -32,8 +32,10 @@ type Gate =
 export interface AuthControls {
   /** True while the lock screen or the privacy cover is over the app. */
   locked: boolean;
-  /** Developer menu: delete every secret and start onboarding again. */
+  /** Developer menu: delete every secret and start onboarding again. The wallet data stays. */
   resetOnboarding(): Promise<void>;
+  /** NFR-SEC-05 (Profile): delete the cached history and every secret, then onboarding. */
+  logout(): Promise<void>;
   autoLockMs: number;
   /** Developer menu (FR-LOCK-02 "configurable"): saved in the core, used from the next background. */
   setAutoLockTimeout(ms: number): Promise<void>;
@@ -168,7 +170,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     open();
   }, [open]);
 
-  /** "Forgot PIN", reset onboarding: every secret is gone, the verified phone too, so: the phone. */
+  /** Logout, "Forgot PIN", reset onboarding: every secret is gone, the verified phone too, so: the phone. */
   const reset = useCallback(() => {
     setAppMounted(false);
     setGate({ kind: 'phone' });
@@ -206,6 +208,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       autoLockMs,
       resetOnboarding: async () => {
         await core.resetAuth();
+        reset();
+      },
+      logout: async () => {
+        await core.logout();
         reset();
       },
       setAutoLockTimeout: async (ms) => {

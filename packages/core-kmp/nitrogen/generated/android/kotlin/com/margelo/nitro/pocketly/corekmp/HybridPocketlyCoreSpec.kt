@@ -100,6 +100,10 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun logout(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun getAutoLockTimeout(): Promise<Double>
   
   @DoNotStrip

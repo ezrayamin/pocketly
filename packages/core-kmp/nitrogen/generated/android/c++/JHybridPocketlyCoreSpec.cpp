@@ -459,6 +459,21 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::logout() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("logout");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
   std::shared_ptr<Promise<double>> JHybridPocketlyCoreSpec::getAutoLockTimeout() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getAutoLockTimeout");
     auto __result = method(_javaPart);

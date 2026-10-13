@@ -120,7 +120,7 @@ export function UnlockScreen({
   const forgot = () =>
     Alert.alert(
       'Forgot your PIN?',
-      "Pocketly will forget this phone's PIN and you'll set Pocketly up again.",
+      "Pocketly will forget your PIN and remove your history from this phone. You'll set Pocketly up again.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -128,7 +128,7 @@ export function UnlockScreen({
           style: 'destructive',
           onPress: async () => {
             try {
-              await core.resetAuth();
+              await core.logout(); // NFR-SEC-05: whoever onboards next mustn't see this history
               onReset();
             } catch (e) {
               setMessage({ tone: 'warning', text: toUserError(e).message });

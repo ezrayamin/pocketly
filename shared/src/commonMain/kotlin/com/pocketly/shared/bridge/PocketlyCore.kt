@@ -115,7 +115,7 @@ class PocketlyCore internal constructor(
         cache.clear()
         try {
             ledgerSync.sync()
-            cache.upsertWallet(api.getWallet(), currentTimeMillis())
+            fetchWallet()
         } catch (e: CoreException) {
             if (e.code !in STALEABLE) throw e // offline reset: replica stays empty
         }
@@ -124,11 +124,17 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getWallet(): Wallet = onDb {
         try {
-            api.getWallet().also { cache.upsertWallet(it, currentTimeMillis()) }
+            fetchWallet()
         } catch (e: CoreException) {
             val cached = if (e.code in STALEABLE) cache.getWallet() else null
             cached?.let { (wallet, cachedAt) -> wallet.copy(stale = StaleInfo(e.code, cachedAt)) } ?: throw e
         }
+    }
+
+    /** From the server into the replica, unless the replica was cleared meanwhile (logout). */
+    private suspend fun fetchWallet(): Wallet {
+        val generation = cache.generation
+        return api.getWallet().also { if (cache.generation == generation) cache.upsertWallet(it, currentTimeMillis()) }
     }
 
     @Throws(CoreException::class, CancellationException::class)
@@ -224,6 +230,13 @@ class PocketlyCore internal constructor(
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun resetAuth() = biometric.reset()
+
+    /** NFR-SEC-05. The replica first: if the secrets then fail to go, none of the history is left. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun logout() {
+        onDb { cache.clear() }
+        biometric.reset()
+    }
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getAutoLockTimeout(): Long = pin.getAutoLockTimeout()

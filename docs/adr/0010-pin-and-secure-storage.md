@@ -104,7 +104,7 @@ it to check a PIN. Biometrics (step 4 of slice 5) protect a separate secret.
 | iOS: readable only when unlocked | `WhenUnlocked…` | **No:** `AfterFirstUnlock`, readable while locked once unlocked after boot | **Yes** (patch) |
 | iOS: this device only | `…ThisDeviceOnly` | **No:** can travel in an encrypted backup to another device | **Yes** (patch) |
 | iOS: no iCloud Keychain sync | no `kSecAttrSynchronizable` | yes (`iosSynchronizable` defaults to false; we pass `false` explicitly) | Yes |
-| Wiped on logout / "reset onboarding" | `resetAuth` → `clear()`: deletes the values and the Keystore key | `resetAuth` → `clearService` | Yes |
+| Wiped on logout / "reset onboarding" | `resetAuth` → `clear()`: deletes the values and the Keystore key (`logout` clears the replica first, §7) | `resetAuth` → `clearService` | Yes |
 | Wiped when the app is reinstalled | Android: yes (OS). iOS: **Keychain survives uninstall** → install marker, below | Same | Yes |
 | The counter is on disk before hashing starts | `commit()` / `SecItemUpdate` | **No:** Android `apply()` writes asynchronously; iOS deletes then re-adds an item | **Yes**: `commit()` (patch); the iOS gap is covered by "missing counter fails closed" |
 
@@ -123,7 +123,7 @@ installed version, so upgrading the library means re-checking this table.
   iOS `Library/Application Support/databases/` (kmpCore, SQLiter) and `Library/` (jsCore,
   op-sqlite), neither of which iOS purges. (Read from the libraries' sources, 2026-10-12.) If they differ, or the replica has
   none, everything in secure storage is from an earlier install and is wiped. `resetData`
-  and logout clear the replica but keep the install id (`deleteSyncMeta`).
+  and `logout` clear the replica but keep the install id (`deleteSyncMeta`).
 - **Android backups:** `allowBackup="false"` and `dataExtractionRules` that exclude everything
   from cloud backup and from device-to-device transfer (Android 12+ ignores `allowBackup` for
   the latter). Keystore keys never leave the device anyway; a value that can't be decrypted is
@@ -140,6 +140,24 @@ Android autolinking is off for both, and the jsCore flavor links them by hand
 **Known gap:** `react-native-quick-base64` (quick-crypto's required peer) is a codegen Turbo
 Module in the app's generated C++ autolinking, so on Android it stays in both flavors, like the
 Nitro runtime. BM-08 lists its size separately.
+
+### 7. Logout (NFR-SEC-05)
+
+`logout()` ends a session for good: Profile → "Log out", and "Forgot PIN" on the lock screen
+(whoever onboards next must not see this history). `resetAuth` stays for the developer menu's
+"Reset onboarding" and for BM-11, which keep the wallet data.
+
+- **Order: the replica, then the secrets.** If secure storage then fails
+  (SECURE_STORAGE_UNAVAILABLE), the history is already gone and the PIN still works: the user
+  stays signed in and can retry. The other order could leave history behind a finished logout.
+- **Work in flight can't refill it.** A sync or wallet fetch that was waiting on the server when
+  logout ran would otherwise write its answer into the empty replica. The replica has a
+  generation that `clear()` changes; sync and fetch compare it before each write and drop the
+  answer if it changed (in kmpCore the writes don't suspend, so one check after the server call
+  is enough; jsCore checks before each write, and `markSynced` is now one statement). Both
+  cores test this with a 200 ms server (contract suite, `LogoutTest.kt`).
+- **What stays:** the install id (§5), the fake server's data (it is the account), the network
+  simulation and a staged BM-04b payload (developer and benchmark state, not user data).
 
 ## Limits we accept
 

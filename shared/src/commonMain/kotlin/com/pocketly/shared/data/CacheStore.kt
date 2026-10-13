@@ -19,7 +19,15 @@ internal class CacheStore(driver: SqlDriver) {
     private val db = CacheDatabase(driver)
     private val q = db.cacheQueries
 
+    /**
+     * Changes with every [clear]. Work that fetched from the server before a clear (logout,
+     * NFR-SEC-05) compares it before writing, so it can't put the old data back.
+     */
+    var generation = 0
+        private set
+
     fun clear() = db.transaction {
+        generation++
         q.deleteAllTransactions()
         q.deleteWallet()
         q.deleteSyncMeta()

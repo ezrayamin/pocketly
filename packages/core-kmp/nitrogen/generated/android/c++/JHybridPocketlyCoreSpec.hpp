@@ -71,6 +71,7 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override;
     std::shared_ptr<Promise<AuthState>> getAuthState() override;
     std::shared_ptr<Promise<void>> resetAuth() override;
+    std::shared_ptr<Promise<void>> logout() override;
     std::shared_ptr<Promise<double>> getAutoLockTimeout() override;
     std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override;
     PhoneCheck checkPhone(const std::string& nationalNumber) override;

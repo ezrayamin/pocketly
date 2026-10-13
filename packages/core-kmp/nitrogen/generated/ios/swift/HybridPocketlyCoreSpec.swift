@@ -30,6 +30,7 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func verifyPin(pin: String) throws -> Promise<UnlockResult>
   func getAuthState() throws -> Promise<AuthState>
   func resetAuth() throws -> Promise<Void>
+  func logout() throws -> Promise<Void>
   func getAutoLockTimeout() throws -> Promise<Double>
   func setAutoLockTimeout(ms: Double) throws -> Promise<Void>
   func checkPhone(nationalNumber: String) throws -> PhoneCheck

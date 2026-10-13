@@ -123,6 +123,10 @@ export class KmpCore implements Core {
     return this.native.resetAuth().catch(rethrow);
   }
 
+  logout(): Promise<void> {
+    return this.native.logout().catch(rethrow);
+  }
+
   getAutoLockTimeout(): Promise<number> {
     return this.native.getAutoLockTimeout().catch(rethrow);
   }
