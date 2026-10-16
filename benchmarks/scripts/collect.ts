@@ -426,7 +426,16 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   const data = JSON.parse(readFileSync(file, 'utf8'));
   const one = (v: number): Stats => ({ n: 1, median: v, p90: v, p25: v, p75: v, iqr: 0, mean: v, cv: 0, min: v, max: v });
 
-  type Apk = { build: Build; abi: string; fileBytes: number; groups: Record<string, number>; nativeLibs: Record<string, number>; jsBundleUncompressed: number };
+  type OpensslShare = { lib: string; opensslBytes: number; cppBytes: number; opensslFraction: number; libGzippedBytes: number };
+  type Apk = {
+    build: Build;
+    abi: string;
+    fileBytes: number;
+    groups: Record<string, number>;
+    nativeLibs: Record<string, number>;
+    jsBundleUncompressed: number;
+    openssl?: OpensslShare;
+  };
   const apks: Apk[] = data.apks;
   for (const apk of apks) {
     rows.push({ scenario: 'BM-08', metric: `apkFile[${apk.abi}]`, build: apk.build, unit: 'bytes', stats: one(apk.fileBytes) });
@@ -452,12 +461,17 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   for (const lib of libs.filter((l) => /nitro|pocketly/i.test(l) || (js.nativeLibs[l] ?? 0) !== (kmp.nativeLibs[l] ?? 0))) {
     extra.push(`| ${lib} | ${js.nativeLibs[lib] ? kb(js.nativeLibs[lib]) : '—'} | ${kmp.nativeLibs[lib] ? kb(kmp.nativeLibs[lib]) : '—'} |`);
   }
-  // Two effects mix in the total (ADR-0009): the KMP architecture itself, and the storage
-  // choice (op-sqlite bundles its own SQLite into jsCore; kmpCore uses the platform's).
+  // Three effects mix in the total: the KMP architecture itself; the storage choice (ADR-0009:
+  // op-sqlite bundles its own SQLite into jsCore, kmpCore uses the platform's); and the PIN
+  // crypto choice (ADR-0010 §8: quick-crypto links OpenSSL statically into jsCore, kmpCore uses
+  // the platform's crypto).
+  const libDelta = (libs: string[]) => libs.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
   const STORAGE_LIBS = ['libop-sqlite.so'];
-  const storage = STORAGE_LIBS.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
+  const CRYPTO_LIBS = ['libQuickCrypto.so'];
+  const storage = libDelta(STORAGE_LIBS);
+  const crypto = libDelta(CRYPTO_LIBS);
   const total = kmp.fileBytes - js.fileBytes;
-  if (storage !== 0) {
+  if (storage !== 0 || crypto !== 0) {
     extra.push(
       '',
       '### BM-08 split, arm64-v8a APK (kmpCore − jsCore)',
@@ -465,10 +479,22 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
       '| Effect | Δ |',
       '|---|---:|',
       `| Storage choice (${STORAGE_LIBS.join(', ')}, bundled in jsCore only) | ${delta(storage)} |`,
-      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | ${delta(total - storage)} |`,
+      `| PIN crypto choice (${CRYPTO_LIBS.join(', ')}: quick-crypto with OpenSSL linked in, jsCore only) | ${delta(crypto)} |`,
+    );
+    const share = js.openssl;
+    if (share) {
+      extra.push(
+        `| ↳ of which OpenSSL, estimated (${(share.opensslFraction * 100).toFixed(0)}% of the library's sized symbols) | ${delta(Math.round(crypto * share.opensslFraction))} |`,
+        `| ↳ the library gzipped (-9), estimating its share of the download | ${delta(-share.libGzippedBytes)} |`,
+      );
+    }
+    extra.push(
+      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle, the RN auth libraries jsCore needs) | ${delta(total - storage - crypto)} |`,
       `| Total | ${delta(total)} |`,
     );
-    verdicts.push(`BM-08 arm64-v8a APK split: architecture ${delta(total - storage)}, storage choice ${delta(storage)} → total ${delta(total)}`);
+    verdicts.push(
+      `BM-08 arm64-v8a APK split: architecture ${delta(total - storage - crypto)}, storage choice ${delta(storage)}, PIN crypto choice ${delta(crypto)} → total ${delta(total)}`,
+    );
   }
   const kept = data.keptClassesByOrigin;
   if (kept?.kmpCore) {

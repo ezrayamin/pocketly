@@ -159,6 +159,44 @@ Nitro runtime. BM-08 lists its size separately.
 - **What stays:** the install id (§5), the fake server's data (it is the account), the network
   simulation and a staged BM-04b payload (developer and benchmark state, not user data).
 
+### 8. jsCore keeps quick-crypto, OpenSSL included (decided 2026-10-16)
+
+quick-crypto links OpenSSL 3.6.2 statically into `libQuickCrypto.so`: 9.35 MB stored in the
+arm64 APK (native libraries are stored uncompressed), about 3.4 MB gzipped. Its symbols put
+OpenSSL at ~83% of the library's code and data; the rest is quick-crypto, Nitro and libc++.
+jsCore uses it for four jobs:
+
+| Job | Needs native code? |
+|---|---|
+| PBKDF2 (§2) | Yes, for speed: 600,000 iterations |
+| ECDSA P-256 verification (ADR-0012: biometric unlock now, transfers in slice 6) | Practically yes (a pure-JS verify is possible but slow and a new dependency) |
+| Secure random bytes | No |
+| Constant-time comparison | No |
+
+**Considered: a small native module in jsCore that calls the platform's crypto** (javax.crypto /
+`java.security.Signature` on Android, CommonCrypto / Security on iOS). Both cores would then use
+the same crypto on each platform: OpenSSL would leave jsCore, BM-11 would lose its library gap
+(unlock ~554 ms in both builds on the vivo, still under 1 s), and BM-08 would compare
+architectures more cleanly. The cost: custom native code in jsCore for two jobs, on two
+platforms, which is the kind of glue a typical React Native team avoids by taking a library.
+
+**Chosen: keep quick-crypto.** It is what a React Native team would realistically ship, it needs
+no crypto code of ours, and it is fast (201 ms unlock). The project measures architectures as
+teams build them, and library choices are part of that, as op-sqlite is for storage (ADR-0009).
+The price is that two results carry a library effect, so the report states it each time:
+
+- **BM-08:** OpenSSL gets its own line. `apk-size.ts` keeps libQuickCrypto.so out of the
+  "KMP architecture" row ("PIN crypto choice", next to the storage choice) and estimates
+  OpenSSL's share of it from the release build's symbols. bundletool's download size covers the
+  whole app, so for the library alone the script also records its gzipped size, an estimate of
+  what it adds to the download.
+- **BM-11:** jsCore is faster because of OpenSSL's C PBKDF2 against BouncyCastle in Java (§3),
+  not because of the architecture. BM-10 measures the same work without the libraries.
+
+**Revisit** if the download size of jsCore becomes a constraint, or if a platform's crypto
+changes the comparison (e.g. a faster native PBKDF2 on Android). The native module above is the
+fallback; nothing outside `quickCryptoPinCrypto()` would change, since the core only sees `PinCrypto`.
+
 ## Limits we accept
 
 - **Lockouts use the device clock.** Moving the clock forward shortens a lockout. A monotonic,
