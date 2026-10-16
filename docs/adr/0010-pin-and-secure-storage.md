@@ -225,6 +225,9 @@ fallback; nothing outside `quickCryptoPinCrypto()` would change, since the core 
 - **Benchmarks vs the lock screen:** done in step 2. `pocketly.skipLock=true` (perf builds only)
   skips the gate; BM-01 moved to perf builds (benchmarking.md §5.3). Re-lock and the app-switcher
   cover: ADR-0011.
-- **BM-10 (optional what-if, clearly labelled):** "the cost of keeping crypto in JS".
-  @noble/hashes in jsCore against a pure-Kotlin PBKDF2 in kmpCore (not platform crypto), the
-  same iteration count, identical hashes checked first. The shipped design stays as above.
+- **BM-10 (what-if, clearly labelled), built 2026-10-16:** "the cost of keeping crypto in the
+  core's language". `pbkdf2WhatIf`: @noble/hashes 1.8.0 in jsCore, a PBKDF2 loop over KotlinCrypto
+  0.8.0's pure-Kotlin HMAC in kmpCore, every hash checked against pin.json. Run at 60,000
+  iterations and scaled ×10: at 600,000 one jsCore run takes ~2 minutes on the vivo
+  (benchmarking.md, BM-10). Benchmark-only: the PIN never uses it, and both libraries ship in the app only for
+  it (small; BM-08 shows them in the JS bundle and the dex). The shipped design stays as above.

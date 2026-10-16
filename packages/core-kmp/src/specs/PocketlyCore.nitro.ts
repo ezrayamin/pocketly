@@ -89,4 +89,5 @@ export interface PocketlyCore extends HybridObject<Platforms> {
 
   lastComputeMs(): number;
   lastStorageMs(): number;
+  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string>;
 }

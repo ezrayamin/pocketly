@@ -663,5 +663,21 @@ namespace margelo::nitro::pocketly {
     auto __result = method(_javaPart);
     return __result;
   }
+  std::shared_ptr<Promise<std::string>> JHybridPocketlyCoreSpec::pbkdf2WhatIf(const std::string& password, const std::string& saltHex, double iterations) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* password */, jni::alias_ref<jni::JString> /* saltHex */, double /* iterations */)>("pbkdf2WhatIf");
+    auto __result = method(_javaPart, jni::make_jstring(password), jni::make_jstring(saltHex), iterations);
+    return [&]() {
+      auto __promise = Promise<std::string>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<jni::JString>(__boxedResult);
+        __promise->resolve(__result->toStdString());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
 
 } // namespace margelo::nitro::pocketly

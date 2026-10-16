@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# In-app harness runs (BM-03, BM-04, BM-04b, BM-06, BM-11; docs/benchmarking.md §5.2, §6).
+# In-app harness runs (BM-03, BM-04, BM-04b, BM-06, BM-10, BM-11; docs/benchmarking.md §5.2, §6).
 #
-#   benchmarks/scripts/bm-harness.sh <results-dir> <BM-03|BM-04|BM-04b|BM-06|BM-11> [rounds=5] [runs=10] [warmup=5]
+#   benchmarks/scripts/bm-harness.sh <results-dir> <BM-03|BM-04|BM-04b|BM-06|BM-10|BM-11> [rounds=5] [runs=10] [warmup=5]
 #
 # - Needs the perf APKs installed (launch arguments, §5.3).
 # - Each round cold-starts each build once with `pocketly.bench=<scenario>`; the app runs
@@ -23,8 +23,8 @@
 #   epoch times (to line markers up with samples). Timings from these rounds aren't used.
 set -euo pipefail
 
-OUT_DIR="${1:?usage: bm-harness.sh <results-dir> <BM-03|BM-04|BM-04b|BM-06|BM-11> [rounds] [runs] [warmup]}"
-SCENARIO="${2:?scenario BM-03|BM-04|BM-04b|BM-06|BM-11}"
+OUT_DIR="${1:?usage: bm-harness.sh <results-dir> <BM-03|BM-04|BM-04b|BM-06|BM-10|BM-11> [rounds] [runs] [warmup]}"
+SCENARIO="${2:?scenario BM-03|BM-04|BM-04b|BM-06|BM-10|BM-11}"
 ROUNDS="${3:-5}"
 RUNS="${4:-10}"
 WARMUP="${5:-5}"

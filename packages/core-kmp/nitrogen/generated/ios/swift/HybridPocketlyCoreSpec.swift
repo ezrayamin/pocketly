@@ -47,6 +47,7 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)
   func lastComputeMs() throws -> Double
   func lastStorageMs() throws -> Double
+  func pbkdf2WhatIf(password: String, saltHex: String, iterations: Double) throws -> Promise<String>
 }
 
 public extension HybridPocketlyCoreSpec_protocol {

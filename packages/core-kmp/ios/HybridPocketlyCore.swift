@@ -261,6 +261,13 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   func lastStorageMs() throws -> Double {
     return core.lastStorageMs()
   }
+
+  func pbkdf2WhatIf(password: String, saltHex: String, iterations: Double) throws -> Promise<String> {
+    let iterations = try convert.toIntExact(value: iterations, field: "iterations")
+    return Promise.async { [core] in
+      try await core.pbkdf2WhatIf(password: password, saltHex: saltHex, iterations: iterations)
+    }
+  }
 }
 
 final class HybridPriceSubscription: HybridPriceSubscriptionSpec {

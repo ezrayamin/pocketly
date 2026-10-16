@@ -45,6 +45,7 @@ import com.pocketly.shared.security.PhonePolicy
 import com.pocketly.shared.security.PinAuthenticator
 import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
+import com.pocketly.shared.security.PurePbkdf2
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.security.platformPinCrypto
 import com.pocketly.shared.sync.LedgerSync
@@ -316,6 +317,11 @@ class PocketlyCore internal constructor(
 
     /** Database time of the same call; the engines differ between builds (ADR-0009). */
     fun lastStorageMs(): Double = storageMs
+
+    /** BM-10 what-if (ADR-0010 §8): pure-Kotlin PBKDF2, off the caller's thread. Never the PIN. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Int): String =
+        withContext(Dispatchers.Default) { PurePbkdf2.sha256Hex(password, saltHex, iterations) }
 
     private suspend fun <T> onDb(block: suspend () -> T): T = withContext(db) {
         ready.await()

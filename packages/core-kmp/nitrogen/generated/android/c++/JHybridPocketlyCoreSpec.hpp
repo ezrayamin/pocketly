@@ -88,6 +88,7 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;
     double lastComputeMs() override;
     double lastStorageMs() override;
+    std::shared_ptr<Promise<std::string>> pbkdf2WhatIf(const std::string& password, const std::string& saltHex, double iterations) override;
 
   private:
     jni::global_ref<JHybridPocketlyCoreSpec::JavaPart> _javaPart;

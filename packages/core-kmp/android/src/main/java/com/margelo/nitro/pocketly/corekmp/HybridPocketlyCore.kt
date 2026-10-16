@@ -122,6 +122,9 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun lastComputeMs(): Double = core.lastComputeMs()
 
     override fun lastStorageMs(): Double = core.lastStorageMs()
+
+    override fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Double): Promise<String> =
+        Promise.async { core.pbkdf2WhatIf(password, saltHex, BridgeConversions.toIntExact(iterations, "iterations")) }
 }
 
 @DoNotStrip

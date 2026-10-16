@@ -36,6 +36,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.koin.core)
             implementation(libs.sqldelight.runtime)
+            implementation(libs.kotlincrypto.hmac.sha2) // BM-10 what-if only, never the PIN (ADR-0010 §8)
         }
         androidMain.dependencies {
             implementation(libs.sqldelight.android.driver) // system SQLite (ADR-0009)

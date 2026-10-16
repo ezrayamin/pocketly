@@ -10,6 +10,7 @@
  * Uses Jest globals; never import this from app code.
  */
 import {
+  BM10_MAX_ITERATIONS,
   DEFAULT_AUTO_LOCK_MS,
   FAKE_OTP_CODE,
   OTP_COOLDOWN_MS,
@@ -540,6 +541,23 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(await core.getAuthState()).toEqual({ phone: TEST_PHONE, pinSet: true, failedAttempts: 1 });
         await core.resetAuth();
         expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 }); // the phone goes too
+      });
+    });
+
+    describe('pbkdf2WhatIf (BM-10, ADR-0010 §8)', () => {
+      it.each(pin.pbkdf2)('matches fixtures/pin.json: $pin, $iterations iterations', async ({ pin: password, saltHex, iterations, hashHex }) => {
+        expect(await core.pbkdf2WhatIf(password, saltHex, iterations)).toBe(hashHex);
+      }, 60_000);
+
+      it.each([
+        ['non-ASCII password', '４８２９１５', '00', 1],
+        ['uppercase salt', '482915', 'AB', 1],
+        ['odd-length salt', '482915', 'abc', 1],
+        ['zero iterations', '482915', '00', 0],
+        ['fractional iterations', '482915', '00', 1.5],
+        ['too many iterations', '482915', '00', BM10_MAX_ITERATIONS + 1],
+      ])('%s is INVALID_ARGUMENT', async (_name, password, saltHex, iterations) => {
+        await expectCoreError(core.pbkdf2WhatIf(password as string, saltHex as string, iterations as number), 'INVALID_ARGUMENT');
       });
     });
 

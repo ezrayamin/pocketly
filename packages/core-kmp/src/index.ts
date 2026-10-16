@@ -213,6 +213,10 @@ export class KmpCore implements Core {
   lastStorageMs(): number {
     return this.native.lastStorageMs();
   }
+
+  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string> {
+    return this.native.pbkdf2WhatIf(password, saltHex, iterations).catch(rethrow);
+  }
 }
 
 /** Optional struct fields arrive as explicit `undefined`; the contract omits them (as jsCore does). */

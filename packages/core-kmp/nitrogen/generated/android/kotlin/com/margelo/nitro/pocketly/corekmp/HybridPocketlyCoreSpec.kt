@@ -170,6 +170,10 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun lastStorageMs(): Double
+  
+  @DoNotStrip
+  @Keep
+  abstract fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Double): Promise<String>
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

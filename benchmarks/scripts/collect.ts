@@ -214,7 +214,7 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
 }
 
 /**
- * In-app harness (BM-03, BM-04, BM-06, BM-11): <scenario>/<round>-<build>.json, each holding the
+ * In-app harness (BM-03, BM-04, BM-04b, BM-06, BM-10, BM-11): <scenario>/<round>-<build>.json, each holding the
  * measured runs of one cold start. Adds the bridge overhead per run: end-to-end − compute −
  * storage (BM-03/04), batch end-to-end − batch compute (BM-06). Checks that both builds
  * saw the same input and produced the same output (checksums).
@@ -225,6 +225,9 @@ type HarnessResult = {
   input: { checksum: string };
   output: { checksum: string };
 };
+
+/** BM-10: 600,000 (the PIN's iterations) / 60,000 (BM-10's). */
+const BM10_SCALE = 10;
 
 function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: string[]) {
   const raw = join(dir, scenario.toLowerCase());
@@ -239,6 +242,8 @@ function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: st
       const derived: Record<string, number> = { ...run };
       if ('endToEndMs' in run) derived.overheadMs = run.endToEndMs - run.computeMs - run.storageMs;
       if ('batchEndToEndMs' in run) derived.batchOverheadMs = run.batchEndToEndMs - run.batchComputeMs;
+      // BM-10 runs at a tenth of the PIN's iterations; PBKDF2 is linear in them (benchmarking.md).
+      if (scenario === 'BM-10' && 'hashMs' in run) derived.hashMsAt600k = run.hashMs * BM10_SCALE;
       for (const [metric, v] of Object.entries(derived)) {
         values[metric] ??= { jsCore: [], kmpCore: [] };
         values[metric][build].push(v);
@@ -541,7 +546,7 @@ function main() {
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
-  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-11']) {
+  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
   }

@@ -191,5 +191,13 @@ export interface Core {
    * ingest). Reported separately because the two builds use different SQLite engines (ADR-0009).
    */
   lastStorageMs(): number;
+  /**
+   * BM-10 what-if (ADR-0010 §8), never used by the PIN: PBKDF2-HMAC-SHA256 (32 bytes) written in
+   * the core's own language with no native crypto library. jsCore: @noble/hashes, on the JS
+   * thread. kmpCore: KotlinCrypto's pure-Kotlin HMAC, off the JS thread. `password` is ASCII,
+   * `saltHex` lowercase hex, `iterations` 1..BM10_MAX_ITERATIONS, else INVALID_ARGUMENT.
+   * Returns the hash as lowercase hex.
+   */
+  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string>;
 }
 

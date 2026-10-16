@@ -159,6 +159,14 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPocketlyCoreSpec>
   std::shared_ptr<HybridPocketlyCoreSpec> create_std__shared_ptr_HybridPocketlyCoreSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     PocketlyCoreKmp::HybridPocketlyCoreSpec_cxx swiftPart = PocketlyCoreKmp::HybridPocketlyCoreSpec_cxx::fromUnsafe(swiftUnsafePointer);

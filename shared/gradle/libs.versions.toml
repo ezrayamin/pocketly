@@ -10,6 +10,8 @@ koin = "4.1.1"
 sqldelight = "2.2.1"
 # The same version @sbaiahmed1/react-native-biometrics pulls into the app (ADR-0012), so one copy ships.
 biometric = "1.4.0-alpha04"
+# BM-10 only (ADR-0010 §8): pure-Kotlin HMAC-SHA256, the counterpart of @noble/hashes in jsCore.
+kotlincrypto-macs = "0.8.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -21,6 +23,7 @@ sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", ver
 sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+kotlincrypto-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto-macs" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

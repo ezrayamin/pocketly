@@ -48,6 +48,7 @@ import { PinAuth } from './security/pinAuth';
 import { checkPhone, isValidE164 } from './security/phonePolicy';
 import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
+import { purePbkdf2Sha256 } from './security/purePbkdf2';
 import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
@@ -346,6 +347,10 @@ export class JsCore implements Core {
 
   lastStorageMs(): number {
     return this.storageMs;
+  }
+
+  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string> {
+    return purePbkdf2Sha256(password, saltHex, iterations);
   }
 
   private timed<T>(work: () => T): T {

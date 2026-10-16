@@ -470,6 +470,14 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::shared_ptr<Promise<std::string>> pbkdf2WhatIf(const std::string& password, const std::string& saltHex, double iterations) override {
+      auto __result = _swiftPart.pbkdf2WhatIf(password, saltHex, std::forward<decltype(iterations)>(iterations));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
 
   private:
     PocketlyCoreKmp::HybridPocketlyCoreSpec_cxx _swiftPart;

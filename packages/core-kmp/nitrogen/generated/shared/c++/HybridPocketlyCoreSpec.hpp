@@ -149,6 +149,7 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;
       virtual double lastComputeMs() = 0;
       virtual double lastStorageMs() = 0;
+      virtual std::shared_ptr<Promise<std::string>> pbkdf2WhatIf(const std::string& password, const std::string& saltHex, double iterations) = 0;
 
     protected:
       // Hybrid Setup
