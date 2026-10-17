@@ -466,17 +466,20 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   for (const lib of libs.filter((l) => /nitro|pocketly/i.test(l) || (js.nativeLibs[l] ?? 0) !== (kmp.nativeLibs[l] ?? 0))) {
     extra.push(`| ${lib} | ${js.nativeLibs[lib] ? kb(js.nativeLibs[lib]) : '—'} | ${kmp.nativeLibs[lib] ? kb(kmp.nativeLibs[lib]) : '—'} |`);
   }
-  // Three effects mix in the total: the KMP architecture itself; the storage choice (ADR-0009:
-  // op-sqlite bundles its own SQLite into jsCore, kmpCore uses the platform's); and the PIN
-  // crypto choice (ADR-0010 §8: quick-crypto links OpenSSL statically into jsCore, kmpCore uses
-  // the platform's crypto).
+  // Four effects mix in the total: the KMP architecture itself; the storage choice (ADR-0009:
+  // op-sqlite bundles its own SQLite into jsCore, kmpCore uses the platform's); the PIN crypto
+  // choice (ADR-0010 §8: quick-crypto links OpenSSL statically into jsCore, kmpCore uses the
+  // platform's crypto); and the secure-storage library (ADR-0010 §3: sensitive-info in jsCore,
+  // kmpCore's own Keystore code, a few classes in its Kotlin dex).
   const libDelta = (libs: string[]) => libs.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
   const STORAGE_LIBS = ['libop-sqlite.so'];
   const CRYPTO_LIBS = ['libQuickCrypto.so'];
+  const SECURE_STORE_LIBS = ['libSensitiveInfo.so'];
   const storage = libDelta(STORAGE_LIBS);
   const crypto = libDelta(CRYPTO_LIBS);
+  const secureStore = libDelta(SECURE_STORE_LIBS);
   const total = kmp.fileBytes - js.fileBytes;
-  if (storage !== 0 || crypto !== 0) {
+  if (storage !== 0 || crypto !== 0 || secureStore !== 0) {
     extra.push(
       '',
       '### BM-08 split, arm64-v8a APK (kmpCore − jsCore)',
@@ -493,12 +496,14 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
         `| ↳ the library gzipped (-9), estimating its share of the download | ${delta(-share.libGzippedBytes)} |`,
       );
     }
+    const architecture = total - storage - crypto - secureStore;
     extra.push(
-      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle, the RN auth libraries jsCore needs) | ${delta(total - storage - crypto)} |`,
+      `| Secure-storage library (${SECURE_STORE_LIBS.join(', ')}: react-native-sensitive-info, jsCore only) | ${delta(secureStore)} |`,
+      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | ${delta(architecture)} |`,
       `| Total | ${delta(total)} |`,
     );
     verdicts.push(
-      `BM-08 arm64-v8a APK split: architecture ${delta(total - storage - crypto)}, storage choice ${delta(storage)}, PIN crypto choice ${delta(crypto)} → total ${delta(total)}`,
+      `BM-08 arm64-v8a APK split: architecture ${delta(architecture)}, storage choice ${delta(storage)}, PIN crypto choice ${delta(crypto)}, secure-storage library ${delta(secureStore)} → total ${delta(total)}`,
     );
   }
   const kept = data.keptClassesByOrigin;

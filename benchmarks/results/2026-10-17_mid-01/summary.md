@@ -34,7 +34,7 @@ Shift = Hodges–Lehmann estimate (median of all pairwise differences); 95% CI i
 - BM-08 armeabi-v7a: kmpCore 18447.7 KB vs jsCore 25851.0 KB → -7403.2 KB (-28.6%)
 - BM-08 x86_64: kmpCore 24909.6 KB vs jsCore 36152.8 KB → -11243.2 KB (-31.1%)
 - BM-08 x86: kmpCore 25082.0 KB vs jsCore 34661.2 KB → -9579.2 KB (-27.6%)
-- BM-08 arm64-v8a APK split: architecture +220.2 KB, storage choice -1563.6 KB, PIN crypto choice -9131.9 KB → total -10475.2 KB
+- BM-08 arm64-v8a APK split: architecture +942.7 KB, storage choice -1563.6 KB, PIN crypto choice -9131.9 KB, secure-storage library -722.5 KB → total -10475.2 KB
 - BM-08 download arm64-v8a: kmpCore 8837.9 KB vs jsCore 12827.0 KB → -3989.1 KB (-31.1%)
 
 ### BM-08 breakdown, arm64-v8a (compressed bytes in APK)
@@ -64,7 +64,8 @@ Shift = Hodges–Lehmann estimate (median of all pairwise differences); 95% CI i
 | PIN crypto choice (libQuickCrypto.so: quick-crypto with OpenSSL linked in, jsCore only) | -9131.9 KB |
 | ↳ of which OpenSSL, estimated (83% of the library's sized symbols) | -7565.1 KB |
 | ↳ the library gzipped (-9), estimating its share of the download | -3366.8 KB |
-| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle, the RN auth libraries jsCore needs) | +220.2 KB |
+| Secure-storage library (libSensitiveInfo.so: react-native-sensitive-info, jsCore only) | -722.5 KB |
+| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | +942.7 KB |
 | Total | -10475.2 KB |
 
 Classes kept by R8, by origin (from mapping.txt; counts, not bytes):

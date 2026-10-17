@@ -27,16 +27,43 @@ with OpenSSL on its own line, bundletool download size). Raw files are never edi
 
 All CVs ≤ 6.0%; no relaunches, no excluded runs.
 
-- **BM-01-lock is what users see first, and kmpCore gets there ~120 ms sooner.** Before the lock
-  screen can show, each core reads its auth state from secure storage. Not explained yet;
-  candidates to check (not tested here): jsCore's extra native libraries loading at startup
-  (`libQuickCrypto.so`, 9.1 MB with OpenSSL; `libSensitiveInfo.so`), and sensitive-info's
-  Keystore + SharedPreferences read vs kmpCore's own store. A trace of the cold start would tell.
+- **BM-01-lock is what users see first, and kmpCore gets there ~120 ms sooner.** Explained by
+  one trace per build, below.
 - **BM-01 vs the last session (2026-10-05_mid-02: 527.5 / 511 ms):** both builds now take ~100 ms
   longer to draw Home. Not comparable as a regression: that session used release builds with
   no lock screen; this one uses perf builds with `skipLock`, plus slice 5's code (AuthGate and
   the auth libraries) on the startup path. The gap between the builds stays small (−17 then,
   −21 ms now).
+
+## Why kmpCore reaches the lock screen sooner (one trace per build)
+
+`traces/bm-01-lock-{jsCore,kmpCore}.atrace.txt.gz`: one cold start each, `adb shell atrace -t 7
+-a <pkg> sched am wm view gfx dalvik bionic binder_driver aidl res ss disk`, perf builds without
+launch arguments (the same lock screen as release, but profileable), taken after this session's
+runs. This phone runs `traced` without `traced_probes`, so Perfetto records nothing; atrace's text
+output is parsed by `benchmarks/scripts/trace/` (`threads.py`, `binder.py`). n = 1 per build, so
+the split below is indicative; the traced lock screens drew at 710 vs 581 ms (atrace adds load).
+
+| bindApplication → lock screen fully drawn | jsCore | kmpCore | Δ |
+|---|---:|---:|---:|
+| Window | 582 ms | 463 ms | **+119 ms** |
+| Blocking calls to `keystore2` (pid 1104 that boot) | 52 calls, 169.3 ms | 30 calls, 91.6 ms | **+22 calls, +78 ms** |
+| App library loads (`dlopen`) | 31.0 ms | 23.2 ms | +8 ms (`libQuickCrypto.so` 8.4, `libSensitiveInfo.so` 1.9, op-sqlite 2.4 vs `libPocketlyCoreKmp.so` 6.4) |
+| JS thread on CPU | 134.4 ms | 121.8 ms | +13 ms (jsCore's JS bundle is 0.7 MB larger) |
+| All app threads on CPU | 450 ms | 431 ms | +19 ms |
+
+- **Most of the gap is waiting, not computing.** CPU time differs by 19 ms; the window by 119 ms.
+  The wait is the Keystore: both cores read the same auth state from secure storage before the
+  lock screen (`getAuthState`), on a background thread (`DefaultDispatch`), but jsCore needs 22
+  more round trips to `keystore2`.
+- **Why more round trips:** on every read, react-native-sensitive-info 6.1.5 also verifies an
+  HMAC-SHA256 tag over the entry's metadata with a second, Keystore-bound key
+  (`MetadataIntegrity.kt`), on top of the AES-GCM decrypt. kmpCore's `AndroidSecureStore` does
+  only the AES-GCM decrypt (key name as AAD, ADR-0010 §3). So this is a library design choice
+  (extra tamper detection) with a startup cost, not the architecture.
+- Accounted for: ~78 + 8 + 13 ≈ 99 ms of the 119 ms; the rest is within one trace's noise.
+- Not changed: the shipped design stays as ADR-0010 decides. Fewer startup reads (e.g. one record
+  instead of several keys) would shrink this in both cores; noted for a later slice, not done.
 
 ## BM-08 (arm64-v8a)
 
@@ -46,10 +73,27 @@ All CVs ≤ 6.0%; no relaunches, no excluded runs.
 | Download (bundletool, max) | 12,827 KB | 8,838 KB | **−3,989 KB (−31.1%)** |
 | 2026-10-05_mid-02 download, for reference | 8,914 KB | 8,491 KB | −423 KB (−4.7%) |
 
-APK split (`summary.md`): storage choice (op-sqlite) −1,564 KB, **PIN crypto choice
-(libQuickCrypto.so) −9,132 KB, of which OpenSSL ≈ 7,565 KB** (83% of the library's sized
-symbols), the library gzipped ≈ 3,367 KB, and **the KMP architecture itself +220 KB**. Since
-slice 4, jsCore's download grew ~3.9 MB, almost all quick-crypto; kmpCore's grew ~0.35 MB. Both
-include BM-10's what-if libraries (@noble/hashes in the JS bundle, KotlinCrypto in the dex),
-which are small. As ADR-0010 §8 says, the size gap is mostly a library choice, not the
-architecture.
+APK split (`summary.md`, kmpCore − jsCore):
+
+| Effect | Δ |
+|---|---:|
+| Storage choice (op-sqlite, jsCore only) | −1,564 KB |
+| PIN crypto choice (libQuickCrypto.so, jsCore only) | **−9,132 KB**, of which OpenSSL ≈ 7,565 KB (83% of its sized symbols); gzipped ≈ 3,367 KB |
+| Secure-storage library (libSensitiveInfo.so, jsCore only; kmpCore's store is a few Kotlin classes) | −723 KB |
+| KMP architecture (Nitro bridge library, Kotlin dex, smaller JS bundle) | **+943 KB** |
+
+(The split was refined after this session's first write-up: sensitive-info used to sit inside
+the architecture row, which then read +220 KB. Same data, recomputed by `collect.ts`.)
+
+- **The bridge grows with the contract.** kmpCore's Nitro bridge library `libPocketlyCoreKmp.so`
+  went from 749 KB (2026-10-03) to 864 KB (2026-10-05_mid-02, slice 4) to **1,540 KB** now:
+  **+676 KB (+78%) since slice 4**, while the Nitro spec went from 19 to 35 methods (auth, phone,
+  biometrics, logout, BM-10) plus their structs. That is ~42 KB of generated C++/JNI per method
+  on arm64, and it is most of the architecture row: without it the row would be −597 KB (the
+  smaller JS bundle outweighs the Kotlin dex). jsCore has no equivalent cost: its contract
+  methods are plain JS. Gzipped the bridge library is smaller, but it scales with the API, so a
+  wide, chatty contract costs kmpCore size as well as call overhead (BM-06).
+- Since slice 4, jsCore's download grew ~3.9 MB, almost all quick-crypto; kmpCore's grew ~0.35 MB
+  (mostly the bridge). Both include BM-10's what-if libraries (@noble/hashes in the JS bundle,
+  KotlinCrypto in the dex), which are small. As ADR-0010 §8 says, the size gap is mostly library
+  choices, not the architecture.
