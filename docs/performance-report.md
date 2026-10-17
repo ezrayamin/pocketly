@@ -51,13 +51,15 @@
   entries, in two sessions: frame rate, CPU per thread, peak RAM and now janky frames (0.8% vs
   0.9%) all within the noise, none meaningful. The setup is fair, so differences found in other
   scenarios can be trusted.
-- **A real user flow is the same where it matters, and secure storage and crypto decide the rest
-  (BM-07).** Sending money (Home → recipient → amount → review → PIN → result): the same 58.4 fps
-  in both builds. The app's own step time is 2.20 s in kmpCore vs 1.97 s in jsCore (+12%), all of
-  it the PIN: PBKDF2 × 600,000 takes ~390 ms longer with javax.crypto than with quick-crypto's
-  OpenSSL. kmpCore is ~80–90 ms faster on each step that reads secure storage, probably
-  react-native-sensitive-info's extra Keystore round trips (seen at startup in BM-01-lock).
-  Neither difference is about where the logic runs; both are library choices.
+- **In a real user flow, the app's call pattern mattered more than where the core runs (BM-07).**
+  Sending money (Home → recipient → amount → review → PIN → result) runs at the same ~58 fps in
+  both builds. The first session found two library effects: kmpCore ~80–90 ms faster on each step
+  that read secure storage (react-native-sensitive-info's extra Keystore round trips), and ~390 ms
+  slower on the PIN (javax.crypto vs quick-crypto's OpenSSL). Keeping the user's phone in memory
+  and making the amount step's two backend calls in parallel cut the app's step time by **26%
+  in jsCore (1.97 → 1.46 s) and 19% in kmpCore (2.20 → 1.79 s)**, and the secure-storage
+  difference disappeared (5 and 13 ms, not meaningful). What's left is the PIN (+344 ms), a crypto
+  library choice, and kmpCore's process starting ~26 MB larger after the PIN unlock.
 - **Still open:** streams (BM-05), where KMP should keep the JS thread free.
 
 ## Setup
@@ -315,6 +317,23 @@ The extra CPU is kmpCore's own coroutine pool (`DefaultDispatch`, +4.5 points), 
 hash, which costs ~600 ms of JVM work per flow where quick-crypto spends ~50 ms of CPU (its
 201 ms in BM-11 is mostly waiting on secure storage); GC adds +0.3 points. Per-thread totals
 account for all of Flashlight's +4.1 points.
+
+**Measured, then fixed** (session `2026-10-17_mid-04`, same method, unlocking on the lock
+screen before each flow, ADR-0014 §6). The two steps that read secure storage now read the
+phone from memory, and the amount step's backend calls run in parallel:
+
+| Step (median) | jsCore mid-03 → mid-04 | kmpCore mid-03 → mid-04 | kmpCore − jsCore |
+|---|---|---|---|
+| Send → recipients on screen | 521.5 → 362.1 ms | 440.8 → 355.5 ms | −78 → −5 ms (not meaningful) |
+| Contact → amount screen | 785.1 → 385.8 ms | 694.9 → 387.2 ms | −91 → −13 ms (not meaningful) |
+| PIN → result | 622.1 → 628.4 ms | 997.1 → 965.5 ms | +387 → +344 ms |
+| **Sum of steps** | **1,966.9 → 1,459.8 ms** | **2,198.3 → 1,787.2 ms** | +216 → +332 ms |
+
+The library difference on secure storage is gone; the PIN remains. Unlocking first also shows
+kmpCore's process ~26 MB larger during the flow (291.8 vs 265.3 MB peak RSS; equal in mid-03,
+which skipped the lock screen): the PIN check's JVM work grows the ART heap and it stays, as in
+BM-04's memory rounds. This session's CPU rows are not quoted: one disturbed kmpCore iteration
+pushed their CV over 10% (§4.3 asks for a rerun).
 
 **How the step times are taken.** Each "-shown" mark is the screen's first JS effect after its
 data arrived: after React commits, before the frame reaches the screen, like BM-01's original

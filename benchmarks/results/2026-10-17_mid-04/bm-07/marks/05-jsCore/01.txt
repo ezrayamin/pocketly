@@ -1,0 +1,10 @@
+flow-mark send-tap 770545.9
+flow-mark recipients-shown 770910.0
+flow-mark contact-tap 772178.8
+flow-mark amount-shown 772545.6
+flow-mark review-tap 774671.2
+flow-mark review-shown 774727.0
+flow-mark confirm-tap 776301.0
+flow-mark pin-shown 776341.4
+flow-mark pin-complete 779377.9
+flow-mark result-shown-SUCCESS 780010.3
