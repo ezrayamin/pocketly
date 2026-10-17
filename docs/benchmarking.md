@@ -172,6 +172,12 @@ Record each device's **model, chipset, RAM, Android version and build number** i
   or two of scheduling is a large share of 20–30 ms. The CV rule doesn't apply to them, and a
   difference is meaningful only if the shift is **at least one frame (16.7 ms)** with
   non-overlapping IQRs. Longer steps follow the normal rules.
+- **A difference becomes a finding only when it is meaningful in two sessions** (added
+  2026-10-17, after BM-07's `mid-04` and `mid-05`). One session that passes the rule above (>5%
+  with non-overlapping IQRs, or a special case) is reported as *open*, with both sessions' numbers,
+  until a second session on the same code (or a trace that explains it) agrees. Example: BM-07's
+  amount step, kmpCore −13 ms in `mid-04` (not meaningful) and −33 ms in `mid-05` (meaningful):
+  open. Results already confirmed across sessions (for instance BM-02's control) stay as they are.
 - **Keep every iteration that completed; exclude only failed ones**, and report how many were
   excluded. Flashlight: status `SUCCESS` is kept even if its trace lost events (that affects
   the frame-time trace of that iteration, not whether it ran). Harness: a cold start whose

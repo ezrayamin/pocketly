@@ -1,0 +1,69 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 2380164 Realtime: 2380164
+
+** MEMINFO in pid 31768 [com.pocketly.kmp] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap    27782    27708        0       48    29200    38376    32136     2612
+  Dalvik Heap    55262     8968    46212       95    56736    12993     6497     6496
+ Dalvik Other     1687     1612        0        1     2144                           
+        Stack      872      872        0        0      876                           
+       Ashmem       18        0        0        0     1168                           
+      Gfx dev     3224     3224        0        0     3228                           
+    Other dev      119        0       36        0     1120                           
+     .so mmap     3516      288       72        8    45852                           
+    .jar mmap     1803        0        0        0    47856                           
+    .apk mmap    16204      588    15192        0    18244                           
+    .ttf mmap      435        0       12        0     1312                           
+    .dex mmap     4406        4     4392        0     5184                           
+    .oat mmap      546        0        0        0    18796                           
+    .art mmap     1462      912       20      113    19708                           
+   Other mmap      151        4        4        0     1964                           
+   EGL mtrack    25350    25350        0        0    25350                           
+    GL mtrack      384      384        0        0      384                           
+      Unknown     9548     9296      196        4    10164                           
+        TOTAL   153038    79210    66136      269   289286    51369    38633     9108
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:     9900                          76444
+         Native Heap:    27708                          29200
+                Code:    20548                         137364
+               Stack:      872                            876
+            Graphics:    28958                          28962
+       Private Other:    57360
+              System:     7692
+             Unknown:                                   16440
+ 
+           TOTAL PSS:   153038            TOTAL RSS:   289286       TOTAL SWAP PSS:      269
+ 
+ Objects
+               Views:      267         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       48        AssetManagers:        0
+       Local Binders:       22        Proxy Binders:       77
+       Parcel memory:       10         Parcel count:       39
+    Death Recipients:        3             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+    Other (malloced):     3322                            316
+ Other (nonmalloced):      121                             89
+   Bitmap (malloced):       29                           2596
+ 
+ SQL
+         MEMORY_USED:      327
+  PAGECACHE_OVERFLOW:      178          MALLOC_SIZE:       46
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b) cache hits cache misses cache size  Dbname
+PER CONNECTION STATS
+         4       72            123   218    32    12  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db
+         4       80            110   236    30    12  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db
+POOL STATS
+     cache hits  cache misses    cache size  Dbname
+            218            33           251  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db
+            236            31           267  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db

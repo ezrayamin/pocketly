@@ -60,7 +60,7 @@
   in jsCore (1.97 → 1.48 s) and 19% in kmpCore (2.20 → 1.79 s)** (`2026-10-17_mid-05`, replicated
   by mid-04), and the secure-storage difference disappeared. What's left is the PIN (+340 ms), a
   crypto library choice, which also makes kmpCore's CPU +4 points and its process ~28 MB larger
-  after the unlock.
+  after the unlock (clean heap pages Android takes back on a memory trim, `2026-10-17_mid-07`).
 - **Still open:** streams (BM-05), where KMP should keep the JS thread free.
 
 ## Setup
@@ -337,8 +337,13 @@ The library difference on secure storage is gone; the PIN remains (+340 ms, the 
 quick-crypto gap of BM-11). The extra CPU is all kmpCore's coroutine pool (the PIN hash, +3.9)
 and GC (+0.4), less quick-crypto's thread (−0.4); JS, UI and Render threads are the same in both
 builds. Unlocking first (mid-03 skipped the lock screen) shows kmpCore's process ~28 MB larger
-during the flow: the PIN check's JVM work grows the ART heap and it stays, as in BM-04's memory
-rounds.
+during the flow (Flashlight's RSS). A follow-up check (`2026-10-17_mid-07`, `dumpsys meminfo`,
+n = 3) puts it in the Dalvik heap as **clean pages**: both builds hold the same ~6.3 MB of live
+Java objects after the unlock, but javax.crypto's PBKDF2 grew kmpCore's heap and left 45 MB of
+freed pages mapped. Android's `RUNNING_CRITICAL` trim returns all of it (kmpCore then 2.8 MB
+*below* jsCore, the same in the background). It's memory ART gives back when asked, as in
+BM-04's memory rounds, so it costs little; and it comes from the crypto library, not the
+architecture. Flashlight's RSS-based `ramMax` counts such pages, so it overstates this cost.
 
 **Replication.** mid-04, the first run after the fixes, gives the same picture: sum of steps
 1.46 vs 1.79 s, PIN +344 ms, peak RSS +25.9 MB, recipients −5 ms. Its CPU rows had a CV over 10%

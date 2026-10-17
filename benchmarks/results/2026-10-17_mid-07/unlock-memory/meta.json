@@ -1,0 +1,3 @@
+{ "check": "unlock memory (BM-07 follow-up)", "rounds": 3, "settleS": 5,
+  "states": ["A no-unlock (skipLock)", "B unlocked (lock-screen PIN)", "C after send-trim-memory RUNNING_CRITICAL", "D 10 s in the background"],
+  "tool": "adb shell dumpsys meminfo", "build": "perf", "at": "2026-10-17T15:36:01Z" }

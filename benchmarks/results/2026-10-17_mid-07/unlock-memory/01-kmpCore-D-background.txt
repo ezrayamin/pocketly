@@ -1,0 +1,68 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 2395900 Realtime: 2395900
+
+** MEMINFO in pid 31768 [com.pocketly.kmp] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap    14128    13856      204     9704    15532    35680    25888     6164
+  Dalvik Heap     7000     4608      152      431    10716    12593     6297     6296
+ Dalvik Other      415      320       16     1153      888                           
+        Stack      284      276        8      572      288                           
+       Ashmem       18        0        0        0     1168                           
+      Gfx dev        0        0        0        0        4                           
+    Other dev      119        0       36        0     1120                           
+     .so mmap     3299       48      104      216    45596                           
+    .jar mmap     1808        0        0        0    47920                           
+    .apk mmap    15716       12    15280      576    17756                           
+    .ttf mmap      435        0       12        0     1312                           
+    .dex mmap     4406        0     4396        0     5184                           
+    .oat mmap      544        0        0        0    18796                           
+    .art mmap     1980      188      268      561    21384                           
+   Other mmap      147        4        4        0     1956                           
+    GL mtrack      384      384        0        0      384                           
+      Unknown     4592     4380      156     4552     5208                           
+        TOTAL    73040    24076    20636    17765   195212    48273    32185    12460
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:     5064                          32100
+         Native Heap:    13856                          15532
+                Code:    19852                         136660
+               Stack:      276                            288
+            Graphics:      384                            388
+       Private Other:     5280
+              System:    28328
+             Unknown:                                   10244
+ 
+           TOTAL PSS:    73040            TOTAL RSS:   195212       TOTAL SWAP PSS:    17765
+ 
+ Objects
+               Views:      267         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       48        AssetManagers:        0
+       Local Binders:       21        Proxy Binders:       69
+       Parcel memory:       10         Parcel count:       42
+    Death Recipients:        3             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+    Other (malloced):     1925                            182
+ Other (nonmalloced):      115                             84
+   Bitmap (malloced):       26                           2547
+ 
+ SQL
+         MEMORY_USED:      327
+  PAGECACHE_OVERFLOW:      178          MALLOC_SIZE:       46
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b) cache hits cache misses cache size  Dbname
+PER CONNECTION STATS
+         4       72            123   218    38    12  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db
+         4       80            110   236    36    12  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db
+POOL STATS
+     cache hits  cache misses    cache size  Dbname
+            218            39           257  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db
+            236            37           273  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db
