@@ -5,8 +5,8 @@
 #
 # - Install the perf APKs first (launch arguments, §5.3), onboarded with the in-app test PIN,
 #   biometrics off.
-# - Each iteration: cold start with launch arguments (dataset reset, latency 300 ms) as
-#   Flashlight's --beforeEachCommand; the flow from the Send tap to the result as the measured
+# - Each iteration: cold start with launch arguments (dataset reset, latency 300 ms) and an unlock
+#   with the in-app PIN as Flashlight's --beforeEachCommand; the flow from the Send tap to the result as the measured
 #   --testCommand; the result check and the app's step marks as --afterEachCommand.
 # - Blocks alternate js, kmp, js, kmp… (§4.2); each waits until the battery is at most COOL_C °C
 #   (default 40), as BM-02. One calibration flow per build first (finds the controls; also the

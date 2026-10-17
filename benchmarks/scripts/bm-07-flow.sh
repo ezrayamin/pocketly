@@ -4,7 +4,8 @@
 # input. bm-07-run.sh runs it under Flashlight as three steps:
 #
 #   bm-07-flow.sh <package> prepare   cold start with launch arguments (dataset reset, 300 ms
-#                                     latency, no PIN gate), wait for Home
+#                                     latency), unlock with the in-app PIN as a user does, wait
+#                                     for Home
 #                                     (Flashlight --beforeEachCommand, not measured)
 #   bm-07-flow.sh <package> run       the flow (Flashlight --testCommand: the measured part)
 #   bm-07-flow.sh <package> verify    fails unless the result is Sent; saves the app's step marks
@@ -41,7 +42,7 @@ AMOUNT=150
 launch() {
   adb shell am force-stop "$PKG"
   adb shell input keyevent KEYCODE_WAKEUP
-  adb shell am start -W -n "$PKG/$ACTIVITY" -e pocketly.skipLock true \
+  adb shell am start -W -n "$PKG/$ACTIVITY" \
     --ei pocketly.seed 42 --ei pocketly.transactionCount 200 \
     -e pocketly.network.mode NORMAL -e pocketly.network.failureRatePercent 0 \
     -e pocketly.network.normalLatencyMs 300 >/dev/null
@@ -93,16 +94,28 @@ evidence() { # <why>: what the phone showed when an iteration failed
   echo "  evidence in $dir" >&2
 }
 
+unlock() { # the lock screen (FR-LOCK-01), like every real session; its keys from calibrate
+  : "${PIN:?PIN (the in-app test PIN) is required}"
+  wait_id pin-key-1 40
+  for d in $(echo "$PIN" | grep -o .); do tap "lock-key-$d"; sleep 0.15; done
+}
+
 prepare() {
   launch
-  wait_id balance
+  unlock
+  wait_id balance 40
   sleep 1 # Home's first render settles; a tap right after it was sometimes lost
 }
 
 calibrate() {
   : "${PIN:?PIN (the in-app test PIN) is required}"
   rm -f "$COORDS"
-  prepare
+  launch
+  wait_id pin-key-1 40
+  for d in $(echo "$PIN" | grep -o . | sort -u); do echo "lock-key-$d $(center "pin-key-$d")" >>"$COORDS"; done
+  for d in $(echo "$PIN" | grep -o .); do tap "lock-key-$d"; sleep 0.15; done
+  wait_id balance 40
+  sleep 1
   tap_id quick-send
   tap_id contact-u-01
   for d in $(echo "$AMOUNT" | grep -o .); do tap_id "amount-key-$d"; done

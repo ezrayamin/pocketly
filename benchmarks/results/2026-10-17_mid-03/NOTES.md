@@ -56,7 +56,27 @@ nothing about the cores; it is reported for completeness.
 - **The JS thread does slightly less in kmpCore** (−0.4 points), as expected with the core off it;
   at this flow's scale (a few calls per screen) it doesn't show in frames.
 
-## Limitations
+## Where kmpCore's extra CPU goes (added after the session, from the raw Flashlight files)
+
+Mean CPU per thread family over all 10 iterations (points of one core, kmpCore − jsCore):
+
+| Thread | jsCore | kmpCore | Δ |
+|---|---:|---:|---:|
+| `DefaultDispatch*` (Kotlin's coroutine pool: the core, its DB thread, PIN hashing) | 0.16 | 4.62 | **+4.47** |
+| `mqt_v_js` (the JS thread) | 4.76 | 4.25 | −0.51 |
+| `nitro-thread` (quick-crypto's PBKDF2) | 0.39 | 0.00 | −0.39 |
+| `HeapTaskDaemon` (ART garbage collection) | 0.29 | 0.59 | +0.30 |
+| everything else (UI, Render, binder, JIT, hwui…) | | | +0.2 |
+| **Sum (Flashlight's own total)** | 25.84 | 29.90 | **+4.06** |
+
+- No CPU is unaccounted for. The estimate above ("hashing ≈ 2.7 of the 3.8 points") was too low
+  because it took BM-11's *wall-time* gap (+353 ms) as CPU. jsCore's hash costs ~50 ms of CPU on
+  `nitro-thread` (0.39 points × 13 s): BM-11's 201 ms is mostly waiting (the PIN check's
+  secure-storage reads, served by the Keystore in another process, which isn't the app's CPU).
+  kmpCore's javax.crypto hash is real JVM work: `DefaultDispatch` spends ~600 ms of CPU per
+  iteration, most of it the ~550 ms hash, and its allocations show up as +0.3 points of GC.
+- Not traced: per-thread totals from Flashlight's 500 ms samples, read after the session.
+
 - **Checklist deviation:** screen timeout left at 10 minutes, not disabled. The runner taps every
   1.5 s and wakes the screen before each launch, and every iteration completed, so it had no
   effect.

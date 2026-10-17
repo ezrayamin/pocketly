@@ -143,7 +143,14 @@ function collectStartup(dir: string, scenario: string, rows: Row[], verdicts: st
   for (const [metric, byBuild] of Object.entries(values)) compare(scenario, metric, 'ms', byBuild, rows, verdicts);
 }
 
-/** Stats per build, kmpCore − jsCore shift, and the §4.3 verdict (>5% and non-overlapping IQRs). */
+/** §4.3: rates under 5% are judged in points; this many make a difference. */
+const RATE_MIN_POINTS = 1;
+/** §4.3: one frame at the 60 Hz the app renders at on the V2538 (BM-02 note). */
+const FRAME_MS = 1000 / 60;
+/** §4.3: BM-07 steps shorter than this (~3 frames) are frame-quantized. */
+const FRAME_QUANTIZED_MS = 50;
+
+/** Stats per build, kmpCore − jsCore shift, and the §4.3 verdict (>5% and non-overlapping IQRs, or a special case). */
 function compare(scenario: string, metric: string, unit: string, byBuild: Record<Build, number[]>, rows: Row[], verdicts: string[]) {
   const s = { jsCore: stats(byBuild.jsCore), kmpCore: stats(byBuild.kmpCore) };
   for (const build of BUILDS) rows.push({ scenario, metric, build, unit, stats: s[build] });
@@ -152,19 +159,33 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
   const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
   const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
   const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
-  // §4.3: for timings, the CV rule applies only above a 2 ms median (timer precision); rates
-  // under 5% (janky frames) are judged in percentage points, not by CV.
-  const noisy = BUILDS.filter(
-    (b) => s[b].cv > 0.1 && (unit !== 'ms' || s[b].median > 2) && (unit !== '%' || s[b].median >= 5),
-  );
-  const meaningful = Math.abs(diff) > 0.05 && !overlap;
+  // §4.3 special cases (both written down before the sessions that use them):
+  // - rates under 5% (janky frames, a thread's CPU): judged in percentage points, not relative
+  //   change or CV; meaningful at ≥ RATE_MIN_POINTS with non-overlapping IQRs.
+  // - BM-07 steps under FRAME_QUANTIZED_MS (~3 frames at 60 Hz): frame-quantized, so no CV rule;
+  //   meaningful at ≥ one frame with non-overlapping IQRs.
+  // - other timings: the CV rule applies only above a 2 ms median (timer precision).
+  const rate = unit === '%' && BUILDS.every((b) => s[b].median < 5);
+  const frames = unit === 'ms' && metric.startsWith('step') && BUILDS.every((b) => s[b].median < FRAME_QUANTIZED_MS);
+  const noisy = BUILDS.filter((b) => s[b].cv > 0.1 && !rate && !frames && (unit !== 'ms' || s[b].median > 2));
+  const delta = s.kmpCore.median - s.jsCore.median;
+  const meaningful = rate
+    ? Math.abs(delta) >= RATE_MIN_POINTS && !overlap
+    : frames
+      ? Math.abs(hl.shift) >= FRAME_MS && !overlap
+      : Math.abs(diff) > 0.05 && !overlap;
+  const rule = rate
+    ? `rate < 5%: ≥ ${RATE_MIN_POINTS} point and non-overlapping IQRs`
+    : frames
+      ? `step < ${FRAME_QUANTIZED_MS} ms: ≥ one frame (${FRAME_MS.toFixed(1)} ms) and non-overlapping IQRs`
+      : '>5% and non-overlapping IQRs';
   const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
   comparisons.push({ scenario, metric, unit, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });
   verdicts.push(
     `${scenario} ${metric}: kmpCore vs jsCore median ${diff >= 0 ? '+' : ''}${(diff * 100).toFixed(1)}%, ` +
       `shift ${signed(hl.shift)} ${unit} (95% CI ${signed(hl.low)} to ${signed(hl.high)} ${unit}), ` +
       `IQRs ${overlap ? 'overlap' : "don't overlap"}, Mann-Whitney p=${p.toFixed(3)} → ` +
-      `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: >5% and non-overlapping IQRs)` +
+      `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: ${rule})` +
       (noisy.length ? ` · ⚠ CV > 10% for ${noisy.join(', ')}: rerun per §4.3` : ''),
   );
 }

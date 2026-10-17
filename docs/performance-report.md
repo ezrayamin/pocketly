@@ -311,6 +311,16 @@ react-native-sensitive-info's extra Keystore round trips cost per read in BM-01-
 jsCore (ADR-0002: fewer, coarser calls). For a user, the difference is a PIN that feels ~0.4 s
 slower in kmpCore; with biometrics (the default once enabled), neither build hashes a PIN.
 
+The extra CPU is kmpCore's own coroutine pool (`DefaultDispatch`, +4.5 points), mostly the PIN
+hash, which costs ~600 ms of JVM work per flow where quick-crypto spends ~50 ms of CPU (its
+201 ms in BM-11 is mostly waiting on secure storage); GC adds +0.3 points. Per-thread totals
+account for all of Flashlight's +4.1 points.
+
+**How the step times are taken.** Each "-shown" mark is the screen's first JS effect after its
+data arrived: after React commits, before the frame reaches the screen, like BM-01's original
+marker. Both builds are measured at the same point, so the comparison is fair, but the absolute
+times understate what a user sees by roughly a frame or three (~20–50 ms at 60 Hz).
+
 ### BM-08: app size (arm64-v8a)
 Session `2026-10-05_mid-02` (slice 4: SQLite storage, History). Release builds, split per ABI.
 
