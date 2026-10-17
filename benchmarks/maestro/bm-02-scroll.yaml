@@ -10,6 +10,7 @@ appId: ${APP_ID}
     arguments:
       pocketly.tab: history
       pocketly.transactionCount: 1000
+      pocketly.skipLock: true
 - assertVisible:
     id: "history-list"
 - repeat:

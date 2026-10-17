@@ -3,6 +3,7 @@
  */
 
 import { checksum, logResult, runBench, type BenchResult } from '../src/bench/harness';
+import { core } from '../src/core';
 import { parseLaunchArgs } from '../src/launchArgs';
 
 const opts = { runs: 2, warmup: 1, scale: 0.02 };
@@ -33,6 +34,23 @@ describe('bench harness (benchmarking.md §5.2)', () => {
     expect(Object.keys(r.runs[0]).sort()).toEqual(['batchComputeMs', 'batchEndToEndMs', 'chattyEndToEndMs', 'echoEndToEndMs']);
     expect(r.output.checksum).not.toBe(checksum('MISMATCH'));
   });
+
+  it('BM-11 unlocks with the PIN it set, probes the JS thread, and leaves no PIN behind', async () => {
+    const r = await runBench('BM-11', opts);
+    expect(Object.keys(r.runs[0]).sort()).toEqual(['jsMaxGapMs', 'unlockMs']);
+    expect(r.output.checksum).toBe(checksum('UNLOCKED'));
+    expect((await core.getAuthState()).pinSet).toBe(false);
+  });
+
+  it('BM-10 hashes the pin.json vector in pure JS on the JS thread, which stalls it', async () => {
+    const r = await runBench('BM-10', opts);
+    expect(r.runs).toHaveLength(2);
+    expect(Object.keys(r.runs[0]).sort()).toEqual(['hashMs', 'jsMaxGapMs']);
+    expect(r.output.checksum).toBe(checksum('5ed91aec6f585f8500b02bba210ce6c72fb26e7feb10c75b8ee3bb85ed602519'));
+    // jsCore: noble only yields to microtasks, so the probe can't tick until the hash is done.
+    for (const run of r.runs) expect(run.jsMaxGapMs).toBeGreaterThan(run.hashMs * 0.9);
+    expect((await core.getAuthState()).pinSet).toBe(false); // what-if only: no secrets touched
+  }, 60_000);
 
   it('BM-04b ingests the same payload, staged in the core before each timed call', async () => {
     const plain = await runBench('BM-04', opts);

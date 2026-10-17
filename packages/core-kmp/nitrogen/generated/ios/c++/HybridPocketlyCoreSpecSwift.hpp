@@ -14,6 +14,14 @@ namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 
 // Forward declaration of `DatasetSeed` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct DatasetSeed; }
+// Forward declaration of `Wallet` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Wallet; }
+// Forward declaration of `StaleInfo` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `ErrorCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `TransactionPage` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `Transaction` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `TransactionType` to properly resolve imports.
@@ -26,14 +34,6 @@ namespace margelo::nitro::pocketly { struct Counterparty; }
 namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TransactionStatus; }
-// Forward declaration of `ErrorCode` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class ErrorCode; }
-// Forward declaration of `Wallet` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct Wallet; }
-// Forward declaration of `StaleInfo` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct StaleInfo; }
-// Forward declaration of `TransactionPage` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
@@ -48,12 +48,44 @@ namespace margelo::nitro::pocketly { struct CategoryTotal; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BalanceCheck; }
-// Forward declaration of `IngestResult` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestResult; }
-// Forward declaration of `IngestError` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestError; }
-// Forward declaration of `IngestRejectReason` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class IngestRejectReason; }
+// Forward declaration of `PinCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PinCheck; }
+// Forward declaration of `PinRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PinRejectReason; }
+// Forward declaration of `UnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct UnlockResult; }
+// Forward declaration of `UnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
+// Forward declaration of `AuthState` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnavailableReason; }
+// Forward declaration of `BiometricKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricEnableOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
+// Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -66,18 +98,18 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include <NitroModules/Promise.hpp>
 #include "DatasetSeed.hpp"
 #include <optional>
+#include "Wallet.hpp"
+#include <string>
+#include "StaleInfo.hpp"
+#include "ErrorCode.hpp"
+#include "TransactionPage.hpp"
 #include "Transaction.hpp"
 #include <vector>
-#include <string>
 #include "TransactionType.hpp"
 #include "Category.hpp"
 #include "Counterparty.hpp"
 #include "CounterpartyKind.hpp"
 #include "TransactionStatus.hpp"
-#include "ErrorCode.hpp"
-#include "Wallet.hpp"
-#include "StaleInfo.hpp"
-#include "TransactionPage.hpp"
 #include "TxFilter.hpp"
 #include "NetworkSimulation.hpp"
 #include "NetworkMode.hpp"
@@ -85,9 +117,25 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "CategoryTotal.hpp"
 #include "DayTotal.hpp"
 #include "BalanceCheck.hpp"
-#include "IngestResult.hpp"
-#include "IngestError.hpp"
-#include "IngestRejectReason.hpp"
+#include "PinCheck.hpp"
+#include "PinRejectReason.hpp"
+#include "UnlockResult.hpp"
+#include "UnlockOutcome.hpp"
+#include "AuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpSendOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "OtpVerifyOutcome.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricUnavailableReason.hpp"
+#include "BiometricKind.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricEnableOutcome.hpp"
+#include "BiometricPromptText.hpp"
+#include "BiometricUnlockResult.hpp"
+#include "BiometricUnlockOutcome.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -145,8 +193,8 @@ namespace margelo::nitro::pocketly {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) override {
-      auto __result = _swiftPart.resetData(std::forward<decltype(config)>(config), extraTransactions);
+    inline std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config) override {
+      auto __result = _swiftPart.resetData(std::forward<decltype(config)>(config));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -213,32 +261,120 @@ namespace margelo::nitro::pocketly {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override {
-      auto __result = _swiftPart.ingestTransactions(json);
+    inline PinCheck checkPin(const std::string& pin) override {
+      auto __result = _swiftPart.checkPin(pin);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override {
-      auto __result = _swiftPart.stageIngestPayload(json);
+    inline std::shared_ptr<Promise<void>> setPin(const std::string& pin) override {
+      auto __result = _swiftPart.setPin(pin);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<IngestResult>> ingestStaged() override {
-      auto __result = _swiftPart.ingestStaged();
+    inline std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override {
+      auto __result = _swiftPart.verifyPin(pin);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline double echo(double value) override {
-      auto __result = _swiftPart.echo(std::forward<decltype(value)>(value));
+    inline std::shared_ptr<Promise<AuthState>> getAuthState() override {
+      auto __result = _swiftPart.getAuthState();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> resetAuth() override {
+      auto __result = _swiftPart.resetAuth();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> logout() override {
+      auto __result = _swiftPart.logout();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<double>> getAutoLockTimeout() override {
+      auto __result = _swiftPart.getAutoLockTimeout();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override {
+      auto __result = _swiftPart.setAutoLockTimeout(std::forward<decltype(ms)>(ms));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline PhoneCheck checkPhone(const std::string& nationalNumber) override {
+      auto __result = _swiftPart.checkPhone(nationalNumber);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<OtpSendResult>> requestOtp(const std::string& phone) override {
+      auto __result = _swiftPart.requestOtp(phone);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<OtpVerifyResult>> verifyOtp(const std::string& phone, const std::string& code) override {
+      auto __result = _swiftPart.verifyOtp(phone, code);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() override {
+      auto __result = _swiftPart.getBiometricStatus();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) override {
+      auto __result = _swiftPart.enableBiometrics(pin, std::forward<decltype(prompt)>(prompt));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> disableBiometrics() override {
+      auto __result = _swiftPart.disableBiometrics();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override {
+      auto __result = _swiftPart.unlockWithBiometrics(std::forward<decltype(prompt)>(prompt));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -247,14 +383,6 @@ namespace margelo::nitro::pocketly {
     }
     inline std::string formatMoney(double minor) override {
       auto __result = _swiftPart.formatMoney(std::forward<decltype(minor)>(minor));
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-      auto __value = std::move(__result.value());
-      return __value;
-    }
-    inline std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override {
-      auto __result = _swiftPart.formatMoneyBatch(minors);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -271,22 +399,6 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override {
       auto __result = _swiftPart.subscribePrices(symbols, std::forward<decltype(intervalMs)>(intervalMs), std::forward<decltype(seed)>(seed), onTicks);
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-      auto __value = std::move(__result.value());
-      return __value;
-    }
-    inline double lastComputeMs() override {
-      auto __result = _swiftPart.lastComputeMs();
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-      auto __value = std::move(__result.value());
-      return __value;
-    }
-    inline double lastStorageMs() override {
-      auto __result = _swiftPart.lastStorageMs();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

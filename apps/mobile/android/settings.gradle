@@ -10,9 +10,19 @@ includeBuild('../../../node_modules/@react-native/gradle-plugin')
 // react-native.config.js) so only the kmpCore flavor depends on it.
 include ':pocketly_core-kmp'
 project(':pocketly_core-kmp').projectDir = new File(rootDir, '../../../packages/core-kmp/android')
+// kmpCorePerf only: the benchmark Nitro object (BenchCore), linked by app/build.gradle.
+include ':pocketly_core-kmp-bench'
+project(':pocketly_core-kmp-bench').projectDir = new File(rootDir, '../../../packages/core-kmp-bench/android')
 
 // The KMP module, as a composite build: "com.pocketly:pocketly-shared" resolves to it.
 includeBuild('../../../shared')
+
+// ── jsCore only (ADR-0010) ──────────────────────────────────────────────────
+// jsCore's secure storage and PIN crypto, linked by hand for the same reason, the other way round.
+include ':react-native-sensitive-info'
+project(':react-native-sensitive-info').projectDir = new File(rootDir, '../../../node_modules/react-native-sensitive-info/android')
+include ':react-native-quick-crypto'
+project(':react-native-quick-crypto').projectDir = new File(rootDir, '../../../node_modules/react-native-quick-crypto/android')
 
 // ── Benchmarks ──────────────────────────────────────────────────────────────
 include ':macrobenchmark'

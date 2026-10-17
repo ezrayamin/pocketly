@@ -1,6 +1,7 @@
 import { CoreError, LIVE_DATASET } from '@pocketly/core-contract';
 import type { DatasetConfig } from '@pocketly/core-contract';
-import { BENCH_SCENARIOS, type BenchScenario } from './bench/harness';
+import { BENCH_SCENARIOS } from '@pocketly/bench-app';
+import type { BenchScenario } from './bench/harness';
 import type { TabKey } from './components/TabBar';
 import { core } from './core';
 import { applyNetworkParams } from './features/devmenu/devLinks';
@@ -15,15 +16,20 @@ import { applyNetworkParams } from './features/devmenu/devLinks';
  *                                                            (unset fields: LIVE_DATASET's)
  *   network.mode, network.failureRatePercent, network.normalLatencyMs,
  *   network.readTimeoutMs, network.seed                      fake backend, as the dev link
- *   bench                  BM-03 | BM-04 | BM-04b | BM-06     run the in-app harness instead
+ *   bench                  BM-03 | BM-04 | BM-04b | BM-06 | BM-10 | BM-11   in-app harness instead
  *   benchRuns, benchWarmup integers (default 10, 5)           of the app (bench/harness.ts)
  *   benchMemory            true | false (default false)       memory round: log phase markers
+ *   skipLock               true | false (default false)       open the app without the PIN gate
+ *                                                            (FR-LOCK-01), so BM-01/BM-02 reach
+ *                                                            Home; recorded in the session NOTES
  *
  * Everything is applied before the first screen loads, so a cold start measures the
  * requested setup. Unknown keys are rejected: a typo must not silently benchmark defaults.
  */
 export interface LaunchArgs {
   tab?: TabKey;
+  /** Benchmarks only (perf builds pass launch arguments, release doesn't): no PIN gate. */
+  skipLock?: boolean;
   bench?: { scenario: BenchScenario; runs: number; warmup: number; memory: boolean };
   dataset?: DatasetConfig;
   network?: Record<string, string>;
@@ -64,6 +70,11 @@ export function parseLaunchArgs(raw: Readonly<Record<string, string>> | undefine
         throw new CoreError('INVALID_ARGUMENT', `launch argument benchMemory="${value}" must be true or false`);
       }
       benchMemory = value === 'true';
+    } else if (key === 'skipLock') {
+      if (value !== 'true' && value !== 'false') {
+        throw new CoreError('INVALID_ARGUMENT', `launch argument skipLock="${value}" must be true or false`);
+      }
+      args.skipLock = value === 'true';
     } else if (key === 'tab') {
       if (!(TABS as readonly string[]).includes(value)) {
         throw new CoreError('INVALID_ARGUMENT', `launch argument tab="${value}" must be one of ${TABS.join(', ')}`);

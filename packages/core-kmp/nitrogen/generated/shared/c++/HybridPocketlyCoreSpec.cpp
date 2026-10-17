@@ -23,16 +23,24 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("simulateIncomingTransfer", &HybridPocketlyCoreSpec::simulateIncomingTransfer);
       prototype.registerHybridMethod("setTimeZone", &HybridPocketlyCoreSpec::setTimeZone);
       prototype.registerHybridMethod("computeSpendingSummary", &HybridPocketlyCoreSpec::computeSpendingSummary);
-      prototype.registerHybridMethod("ingestTransactions", &HybridPocketlyCoreSpec::ingestTransactions);
-      prototype.registerHybridMethod("stageIngestPayload", &HybridPocketlyCoreSpec::stageIngestPayload);
-      prototype.registerHybridMethod("ingestStaged", &HybridPocketlyCoreSpec::ingestStaged);
-      prototype.registerHybridMethod("echo", &HybridPocketlyCoreSpec::echo);
+      prototype.registerHybridMethod("checkPin", &HybridPocketlyCoreSpec::checkPin);
+      prototype.registerHybridMethod("setPin", &HybridPocketlyCoreSpec::setPin);
+      prototype.registerHybridMethod("verifyPin", &HybridPocketlyCoreSpec::verifyPin);
+      prototype.registerHybridMethod("getAuthState", &HybridPocketlyCoreSpec::getAuthState);
+      prototype.registerHybridMethod("resetAuth", &HybridPocketlyCoreSpec::resetAuth);
+      prototype.registerHybridMethod("logout", &HybridPocketlyCoreSpec::logout);
+      prototype.registerHybridMethod("getAutoLockTimeout", &HybridPocketlyCoreSpec::getAutoLockTimeout);
+      prototype.registerHybridMethod("setAutoLockTimeout", &HybridPocketlyCoreSpec::setAutoLockTimeout);
+      prototype.registerHybridMethod("checkPhone", &HybridPocketlyCoreSpec::checkPhone);
+      prototype.registerHybridMethod("requestOtp", &HybridPocketlyCoreSpec::requestOtp);
+      prototype.registerHybridMethod("verifyOtp", &HybridPocketlyCoreSpec::verifyOtp);
+      prototype.registerHybridMethod("getBiometricStatus", &HybridPocketlyCoreSpec::getBiometricStatus);
+      prototype.registerHybridMethod("enableBiometrics", &HybridPocketlyCoreSpec::enableBiometrics);
+      prototype.registerHybridMethod("disableBiometrics", &HybridPocketlyCoreSpec::disableBiometrics);
+      prototype.registerHybridMethod("unlockWithBiometrics", &HybridPocketlyCoreSpec::unlockWithBiometrics);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
-      prototype.registerHybridMethod("formatMoneyBatch", &HybridPocketlyCoreSpec::formatMoneyBatch);
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);
       prototype.registerHybridMethod("subscribePrices", &HybridPocketlyCoreSpec::subscribePrices);
-      prototype.registerHybridMethod("lastComputeMs", &HybridPocketlyCoreSpec::lastComputeMs);
-      prototype.registerHybridMethod("lastStorageMs", &HybridPocketlyCoreSpec::lastStorageMs);
     });
   }
 

@@ -91,6 +91,8 @@ android {
         resValue "bool", "pocketly_dev_tools", project.hasProperty("productionBuild") ? "false" : "true"
         // Benchmark launch arguments (LaunchArgs.kt): read by perf builds only.
         resValue "bool", "pocketly_launch_args", "false"
+        // The benchmark Nitro object's package (MainApplication.kt): kmpCorePerf only, below.
+        buildConfigField "String", "BENCH_PACKAGE", "null"
     }
 
     // BM-08: one APK per ABI (≈ what a device downloads). Opt-in: -PsplitApksByAbi
@@ -152,6 +154,11 @@ android {
     }
 }
 
+// Variant (flavor + build type) dependency configurations must be declared before use.
+configurations {
+    kmpCorePerfImplementation
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
@@ -165,6 +172,11 @@ dependencies {
 
     // jsCore ships with no Kotlin core code (H5 / BM-08).
     kmpCoreImplementation project(":pocketly_core-kmp")
+    // Benchmark-only (BenchCore, BM-10's KotlinCrypto): kmpCorePerf alone.
+    kmpCorePerfImplementation project(":pocketly_core-kmp-bench")
+    // ...and kmpCore with none of jsCore's native helpers (ADR-0010).
+    jsCoreImplementation project(":react-native-sensitive-info")
+    jsCoreImplementation project(":react-native-quick-crypto")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
@@ -173,13 +185,29 @@ dependencies {
     }
 }
 
-// kmpCore bundles resolve `@pocketly/core-impl` to core-kmp (see metro.config.js).
-// Applied once the task graph is ready: the RN plugin `set()`s extraPackagerArgs when it
-// registers the task, which would overwrite a plain configureEach.
+// JS bundles also compile the workspace packages (packages/*/src) and depend on the Metro configs,
+// which the RN plugin doesn't track (it watches apps/mobile's sources). Without these inputs a
+// change made only in a package left createBundle* UP-TO-DATE and shipped a stale bundle.
+tasks.matching { it.name ==~ /createBundle.*JsAndAssets/ }.configureEach {
+    inputs.files(fileTree("../../../../packages") { include "*/src/**", "*/fixtures/**", "*/package.json" })
+        .withPropertyName("workspacePackages")
+    inputs.files(fileTree("../..") { include "metro*.config.js" }).withPropertyName("metroConfigs")
+}
+
+// Each bundle picks its Metro config (metro.config.js): kmpCore bundles resolve
+// `@pocketly/core-impl` to core-kmp, and only perf bundles include the benchmark harness and
+// BenchCore. Applied once the task graph is ready: the RN plugin `set()`s extraPackagerArgs when
+// it registers the task, which would overwrite a plain configureEach.
 gradle.taskGraph.whenReady { graph ->
     graph.allTasks
-        .findAll { it.project == project && it.name ==~ /createBundleKmpCore.*JsAndAssets/ }
-        .each { it.extraPackagerArgs.addAll(["--config", file("../../metro.kmp.config.js").absolutePath]) }
+        .findAll { it.project == project && it.name ==~ /createBundle(JsCore|KmpCore).*JsAndAssets/ }
+        .each { task ->
+            def kmp = task.name.startsWith("createBundleKmpCore")
+            def perf = task.name.contains("Perf")
+            def config = kmp ? (perf ? "metro.kmp.bench.config.js" : "metro.kmp.config.js")
+                             : (perf ? "metro.bench.config.js" : null)
+            if (config != null) task.extraPackagerArgs.addAll(["--config", file("../../$config").absolutePath])
+        }
 }
 
 // ADR-0009: op-sqlite (bundled SQLite) serves core-js only. Its Turbo Module glue must stay
@@ -188,5 +216,12 @@ gradle.taskGraph.whenReady { graph ->
 androidComponents {
     onVariants(selector().withFlavor(new kotlin.Pair("core", "kmpCore"))) { variant ->
         variant.packaging.jniLibs.excludes.add("**/libop-sqlite.so")
+    }
+    // Benchmark-only code (benchmarking.md §5.2) is in perf builds only. kmpCorePerf links the
+    // PocketlyBench Nitro object (packages/core-kmp-bench, below) and registers its package;
+    // jsCorePerf's bench is JS (core-js-bench, perf bundles). Release has none of it (CI checks).
+    onVariants(selector().withName("kmpCorePerf")) { variant ->
+        variant.buildConfigFields.put("BENCH_PACKAGE", new com.android.build.api.variant.BuildConfigField(
+            "String", "\"com.margelo.nitro.pocketly.bench.PocketlyCoreKmpBenchPackage\"", "PocketlyBench (perf only)"))
     }
 }

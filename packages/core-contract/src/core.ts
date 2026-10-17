@@ -1,9 +1,17 @@
 import type {
+  AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   DatasetConfig,
-  IngestResult,
   MinorUnits,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
+  PinCheck,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -11,6 +19,7 @@ import type {
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from './types';
 
@@ -20,7 +29,8 @@ export type CoreImpl = 'js' | 'kmp';
  * The business core. The UI talks to this and nothing else.
  *
  * Two implementations exist (`core-js`, `core-kmp`) and one is picked at bundle
- * time (`CORE_IMPL`). Both must pass `runContractSuite` (BM-PAR-01).
+ * time (`CORE_IMPL`). Both must pass `runContractSuite` (BM-PAR-01). Benchmark-only entry
+ * points are not here: they are `BenchCore` (bench.ts), in perf builds only.
  *
  * Async methods reject with a {@link CoreError}.
  */
@@ -65,37 +75,79 @@ export interface Core {
    */
   setTimeZone(zoneId: string): void;
 
-  // ── CPU-heavy work (BM-03, BM-04) ─────────────────────────────────────
+  // ── CPU-heavy work (BM-03) ────────────────────────────────────────────
   /**
    * Over the local replica. `month` is `YYYY-MM` in the core's time zone; byDay uses local
    * dates; balanceCheck compares the replica's ledger with the server balance last received.
    */
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
-  /**
-   * BM-04: parse a JSON array of transactions, validate each one and write the valid ones to
-   * the local replica (not the server: balances are unaffected). Existing ids are duplicates.
-   */
-  ingestTransactions(json: string): Promise<IngestResult>;
-  /**
-   * BM-04b: hands the core a payload to ingest later, as if it had arrived on the core's own
-   * side (in a real app, from the network). Not timed by the harness. Replaces any staged
-   * payload; resetData leaves it alone.
-   */
-  stageIngestPayload(json: string): Promise<void>;
-  /**
-   * BM-04b: ingestTransactions on the staged payload, so no data crosses into the core during
-   * the call. The payload stays staged. Throws INVALID_ARGUMENT if nothing is staged.
-   */
-  ingestStaged(): Promise<IngestResult>;
 
-  // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
+  // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
+  // Every async auth call rejects with SECURE_STORAGE_UNAVAILABLE when secure storage can't be
+  // used right now (device locked, Keystore busy). Nothing was wiped: stay locked, retry later.
+  /** FR-AUTH-03: six ASCII digits, not all the same, not a straight run (123456, 987654). */
+  checkPin(pin: string): PinCheck;
   /**
-   * Returns its argument and does nothing else: BM-06 times it to get the pure cost of a call
-   * (in kmpCore, one JS → Nitro → Kotlin round trip; in jsCore, a plain function call).
+   * FR-AUTH-03/05: stores a salted PBKDF2 record of the PIN in secure storage, replacing any
+   * previous one, and clears the attempt counter. Throws INVALID_ARGUMENT if checkPin refuses it,
+   * NOT_FOUND if no phone has been verified yet (verifyOtp).
    */
-  echo(value: number): number;
+  setPin(pin: string): Promise<void>;
+  /**
+   * FR-LOCK-01/04. The attempt is counted in secure storage *before* hashing, so force-closing
+   * the app mid-check can't undo it. Hashing runs off the JS thread. Throws NOT_FOUND if no PIN
+   * is set.
+   */
+  verifyPin(pin: string): Promise<UnlockResult>;
+  getAuthState(): Promise<AuthState>;
+  /**
+   * "Reset onboarding" (developer menu, BM-11): deletes every secret the core holds. The local
+   * replica stays; use {@link logout} when a person leaves the app.
+   */
+  resetAuth(): Promise<void>;
+  /**
+   * NFR-SEC-05 logout, also "Forgot PIN": clears the local replica (history, wallet, sync
+   * state), then does resetAuth. A sync or fetch still in flight writes nothing afterwards.
+   * The install id stays (ADR-0010). If secure storage fails, the replica is already empty and
+   * the secrets are untouched: retry.
+   */
+  logout(): Promise<void>;
+  /**
+   * FR-LOCK-02: how long the app may stay in the background before it locks again. Kept in
+   * secure storage with the PIN (ADR-0005); DEFAULT_AUTO_LOCK_MS until set, and after resetAuth.
+   */
+  getAutoLockTimeout(): Promise<number>;
+  /** 0..MAX_AUTO_LOCK_MS, whole milliseconds; anything else is INVALID_ARGUMENT. */
+  setAutoLockTimeout(ms: number): Promise<void>;
+
+  // ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ──────────────────
+  /** FR-AUTH-01: an Indonesian mobile number as typed (a leading 0 is allowed and dropped). */
+  checkPhone(nationalNumber: string): PhoneCheck;
+  /** Asks the (fake) server for a code. INVALID_ARGUMENT if checkPhone refuses the number. */
+  requestOtp(phone: string): Promise<OtpSendResult>;
+  /**
+   * FR-AUTH-02. On VERIFIED the phone becomes this install's verified phone (secure storage);
+   * setPin is refused (NOT_FOUND) until then. resetAuth forgets it, so "Forgot PIN" starts here.
+   */
+  verifyOtp(phone: string, code: string): Promise<OtpVerifyResult>;
+
+  // ── Biometrics (FR-AUTH-04; ADR-0012) ─────────────────────────────────
+  // One primitive for every use: a strong-biometric-bound P-256 key signs bytes the core chose,
+  // and the core verifies the signature. Unlock signs a single-use challenge; slice 6 will sign
+  // transfers (a different, versioned message, fixtures/biometric.json).
+  getBiometricStatus(): Promise<BiometricStatus>;
+  /**
+   * Checks the PIN first (counted like verifyPin), then creates the key and confirms it with
+   * one scan. Anything short of ENABLED leaves biometrics off.
+   */
+  enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult>;
+  /** Deletes the key and its public key. resetAuth does the same. */
+  disableBiometrics(): Promise<void>;
+  /** NOT_FOUND if biometric unlock isn't enabled. Never changes the PIN counter. */
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
+
+  // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;
-  formatMoneyBatch(minors: MinorUnits[]): string[];
   parseMoney(input: string): MoneyParseResult;
 
   // ── Streams (BM-05, NFR-ARCH-04) ──────────────────────────────────────
@@ -104,18 +156,5 @@ export interface Core {
     onTicks: (ticks: PriceTick[]) => void,
     options?: PriceStreamOptions,
   ): Subscription;
-
-  // ── Benchmark harness ─────────────────────────────────────────────────
-  /**
-   * Time spent *inside* the core by the most recent computeSpendingSummary,
-   * ingestTransactions or formatMoneyBatch call (benchmarking.md §5.2).
-   * For kmpCore, this is measured in Kotlin, so end-to-end minus this = bridge overhead.
-   */
-  lastComputeMs(): number;
-  /**
-   * Database time of that same call (reading the replica for a summary, writing it for an
-   * ingest). Reported separately because the two builds use different SQLite engines (ADR-0009).
-   */
-  lastStorageMs(): number;
 }
 

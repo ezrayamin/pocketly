@@ -8,6 +8,8 @@ import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.Cancellable
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.AndroidDatabaseDrivers
+import com.pocketly.shared.security.AndroidBiometricSigner
+import com.pocketly.shared.security.AndroidSecureStore
 
 /**
  * Nitro adapter over the KMP facade. No business logic lives here: it only converts
@@ -18,13 +20,25 @@ import com.pocketly.shared.data.db.AndroidDatabaseDrivers
 @DoNotStrip
 @Keep
 class HybridPocketlyCore : HybridPocketlyCoreSpec() {
+    companion object {
+        /**
+         * This process's core, for other Nitro objects that must work on the same instance (the
+         * perf-only `PocketlyBench`, packages/core-kmp-bench). Set once the core exists.
+         */
+        @Volatile
+        var current: PocketlyCore? = null
+            private set
+    }
+
     private val core: PocketlyCore = PocketlyCore.create(
         AndroidDatabaseDrivers(NitroModules.applicationContext!!),
+        AndroidSecureStore(NitroModules.applicationContext!!),
         com.pocketly.shared.domain.DatasetConfig.LIVE,
-    )
+        AndroidBiometricSigner(NitroModules.applicationContext!!) { NitroModules.applicationContext?.currentActivity },
+    ).also { current = it }
 
-    override fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit> =
-        Promise.async { core.resetData(config.toDomain(extraTransactions)) }
+    override fun resetData(config: DatasetSeed): Promise<Unit> =
+        Promise.async { core.resetData(config.toDomain()) }
 
     override fun getWallet(): Promise<Wallet> = Promise.async { core.getWallet().toNitro() }
 
@@ -48,21 +62,42 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun computeSpendingSummary(month: String): Promise<SpendingSummary> =
         Promise.async { core.computeSpendingSummary(month).toNitro() }
 
-    override fun ingestTransactions(json: String): Promise<IngestResult> =
-        Promise.async { core.ingestTransactions(json).toNitro() }
+    override fun checkPin(pin: String): PinCheck = core.checkPin(pin).toNitro()
 
-    override fun stageIngestPayload(json: String): Promise<Unit> =
-        Promise.async { core.stageIngestPayload(json) }
+    override fun setPin(pin: String): Promise<Unit> = Promise.async { core.setPin(pin) }
 
-    override fun ingestStaged(): Promise<IngestResult> =
-        Promise.async { core.ingestStaged().toNitro() }
+    override fun verifyPin(pin: String): Promise<UnlockResult> = Promise.async { core.verifyPin(pin).toNitro() }
 
-    override fun echo(value: Double): Double = core.echo(value)
+    override fun getAuthState(): Promise<AuthState> = Promise.async { core.getAuthState().toNitro() }
+
+    override fun resetAuth(): Promise<Unit> = Promise.async { core.resetAuth() }
+
+    override fun logout(): Promise<Unit> = Promise.async { core.logout() }
+
+    override fun getAutoLockTimeout(): Promise<Double> = Promise.async { core.getAutoLockTimeout().toDouble() }
+
+    override fun checkPhone(nationalNumber: String): PhoneCheck = core.checkPhone(nationalNumber).toNitro()
+
+    override fun requestOtp(phone: String): Promise<OtpSendResult> = Promise.async { core.requestOtp(phone).toNitro() }
+
+    override fun verifyOtp(phone: String, code: String): Promise<OtpVerifyResult> =
+        Promise.async { core.verifyOtp(phone, code).toNitro() }
+
+    override fun getBiometricStatus(): Promise<BiometricStatus> = Promise.async { core.getBiometricStatus().toNitro() }
+
+    override fun enableBiometrics(pin: String, prompt: BiometricPromptText): Promise<BiometricEnableResult> =
+        Promise.async { core.enableBiometrics(pin, prompt.toDomain()).toNitro() }
+
+    override fun disableBiometrics(): Promise<Unit> = Promise.async { core.disableBiometrics() }
+
+    override fun unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> =
+        Promise.async { core.unlockWithBiometrics(prompt.toDomain()).toNitro() }
+
+    // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+    override fun setAutoLockTimeout(ms: Double): Promise<Unit> =
+        Promise.async { core.setAutoLockTimeout(BridgeConversions.toLongExact(ms, "ms")) }
 
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
-
-    override fun formatMoneyBatch(minors: DoubleArray): Array<String> =
-        core.formatMoneyBatch(BridgeConversions.toLongArrayExact(minors)).toTypedArray()
 
     override fun parseMoney(input: String): MoneyParseResult = core.parseMoney(input).toNitro()
 
@@ -79,10 +114,6 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
         ) { ticks -> onTicks(Array(ticks.size) { ticks[it].toNitro() }) }
         return HybridPriceSubscription(cancellable)
     }
-
-    override fun lastComputeMs(): Double = core.lastComputeMs()
-
-    override fun lastStorageMs(): Double = core.lastStorageMs()
 }
 
 @DoNotStrip

@@ -44,6 +44,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Pocketly uses Face ID to unlock your wallet instead of your PIN.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>PocketlyDevTools</key>

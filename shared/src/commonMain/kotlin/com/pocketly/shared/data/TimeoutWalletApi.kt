@@ -2,6 +2,7 @@ package com.pocketly.shared.data
 
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
+import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.Transaction
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -24,6 +25,10 @@ internal class TimeoutWalletApi(
         withReadTimeout { inner.getChanges(afterToken, limit) }
 
     override suspend fun getTransaction(id: String): Transaction = withReadTimeout { inner.getTransaction(id) }
+
+    override suspend fun requestOtp(phone: String): OtpSendResult = withReadTimeout { inner.requestOtp(phone) }
+
+    override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify = withReadTimeout { inner.verifyOtp(phone, code) }
 
     private suspend fun <T> withReadTimeout(call: suspend () -> T): T {
         val timeout = timeoutMs()

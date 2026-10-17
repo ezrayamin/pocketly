@@ -13,6 +13,7 @@ const MESSAGES: Record<ErrorCode, string> = {
   IDEMPOTENCY_CONFLICT: 'Something went wrong. Please start a new transfer.',
   NOT_FOUND: "We couldn't find that.",
   INVALID_ARGUMENT: 'Something went wrong. Please try again.',
+  SECURE_STORAGE_UNAVAILABLE: 'Unlock your phone, then try again.',
 };
 
 export interface UserError {

@@ -148,3 +148,65 @@ data class NetworkSimulation(
         val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
     }
 }
+
+// ── Auth & App Lock (F1, F2; ADR-0010) ───────────────────────────────────
+
+/** FR-AUTH-03. */
+enum class PinRejectReason { NOT_DIGITS, WRONG_LENGTH, TOO_SIMPLE }
+
+data class PinCheck(val reason: PinRejectReason?) {
+    val ok: Boolean get() = reason == null
+}
+
+/** FR-LOCK-04. */
+enum class UnlockOutcome { UNLOCKED, WRONG_PIN, LOCKED_OUT }
+
+data class UnlockResult(val outcome: UnlockOutcome, val attemptsLeft: Int, val lockedUntil: EpochMillis? = null)
+
+data class AuthState(
+    val pinSet: Boolean,
+    val failedAttempts: Int,
+    val lockedUntil: EpochMillis? = null,
+    /** FR-AUTH-02: the phone verified by OTP on this install (E.164). */
+    val phone: String? = null,
+)
+
+// ── Biometrics (FR-AUTH-04; ADR-0012) ────────────────────────────────────
+
+enum class BiometricKind { FINGERPRINT, FACE, IRIS, OTHER }
+
+/** Only strong (Class 3) biometrics count. */
+enum class BiometricUnavailableReason { NO_HARDWARE, NOT_ENROLLED, NOT_STRONG, TEMPORARILY_UNAVAILABLE }
+
+data class BiometricStatus(
+    val available: Boolean,
+    val reason: BiometricUnavailableReason?,
+    val kind: BiometricKind?,
+    val enabled: Boolean,
+)
+
+data class BiometricPromptText(val title: String, val subtitle: String?, val cancel: String)
+
+enum class BiometricEnableOutcome { ENABLED, WRONG_PIN, PIN_LOCKED_OUT, CANCELLED, BIOMETRIC_LOCKED_OUT, NOT_AVAILABLE, UNAVAILABLE }
+
+data class BiometricEnableResult(val outcome: BiometricEnableOutcome, val attemptsLeft: Int? = null, val lockedUntil: EpochMillis? = null)
+
+enum class BiometricUnlockOutcome { UNLOCKED, CANCELLED, BIOMETRIC_LOCKED_OUT, KEY_INVALIDATED, FAILED, UNAVAILABLE }
+
+data class BiometricUnlockResult(val outcome: BiometricUnlockOutcome, val pinLockedOut: Boolean)
+
+// ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ─────────────────────
+
+enum class PhoneRejectReason { NOT_DIGITS, NOT_MOBILE, TOO_SHORT, TOO_LONG }
+
+data class PhoneCheck(val e164: String?, val reason: PhoneRejectReason?) {
+    val ok: Boolean get() = e164 != null
+}
+
+enum class OtpSendOutcome { SENT, TOO_SOON }
+
+data class OtpSendResult(val outcome: OtpSendOutcome, val resendAt: EpochMillis)
+
+enum class OtpVerifyOutcome { VERIFIED, WRONG_CODE, COOLDOWN, EXPIRED, NO_CODE }
+
+data class OtpVerifyResult(val outcome: OtpVerifyOutcome, val attemptsLeft: Int? = null, val retryAt: EpochMillis? = null)

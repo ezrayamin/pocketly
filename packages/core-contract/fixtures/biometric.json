@@ -1,0 +1,66 @@
+{
+  "_comment": "ADR-0012. Generated with Node's crypto and checked with the openssl CLI. Both cores must build these messages byte for byte and accept/reject exactly these signatures (ECDSA P-256, SHA-256, DER; public key = X.509 SubjectPublicKeyInfo, DER).",
+  "params": {
+    "curve": "P-256",
+    "hash": "SHA-256",
+    "signatureEncoding": "DER",
+    "publicKeyEncoding": "SPKI DER",
+    "nonceBytes": 32,
+    "challengeTtlMs": 60000
+  },
+  "publicKeyHex": "3059301306072a8648ce3d020106082a8648ce3d0301070342000441b8e6f52b29cb81f604ec54d7966b3e2fb3f2a1f8d1245462441af70436432a18e803aa186ae270686ed6cbbad8fc17422a2526f059466e8318f74c8bea63bf",
+  "unlock": {
+    "nonceHex": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064c"
+  },
+  "transfer": {
+    "amount": 12500,
+    "recipientId": "u_0042",
+    "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "message": "pocketly:transfer:v1\namount:12500\nrecipient:u_0042\nidempotencyKey:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "signatureHex": "3044022064859ecd6b3b92ea9c5fd04cc12626a8cdd912999a16ba233ff8a67b970b00f40220415be76fe124e0df8442478c7368c2f612c67e91588fdebaca5ff11bec511f22"
+  },
+  "rejected": [
+    {
+      "why": "tampered signature",
+      "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064d"
+    },
+    {
+      "why": "signed by another key",
+      "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "signatureHex": "30440220077fd0f4987af32102182f45c253780f9a0e3c6ea76970c71648e9bff79b42c602204eea5dc73c0ad242cb88e4d11e5b92133d317c9e05481ffc66590aa791d825f6"
+    },
+    {
+      "why": "an unlock signature is not a transfer approval",
+      "message": "pocketly:transfer:v1\namount:12500\nrecipient:u_0042\nidempotencyKey:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064c"
+    },
+    {
+      "why": "not a DER signature",
+      "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "signatureHex": "00"
+    }
+  ],
+  "invalidTransfers": [
+    {
+      "why": "amount not a positive whole number",
+      "amount": 0,
+      "recipientId": "u_0042",
+      "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    },
+    {
+      "why": "field contains a line break",
+      "amount": 100,
+      "recipientId": "u_0042\namount:1",
+      "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    },
+    {
+      "why": "empty recipient",
+      "amount": 100,
+      "recipientId": "",
+      "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    }
+  ]
+}

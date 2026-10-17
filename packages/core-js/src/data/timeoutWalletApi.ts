@@ -1,6 +1,6 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { Transaction, Wallet } from '@pocketly/core-contract';
-import type { ChangesPage, WalletApi } from './walletApi';
+import type { OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
+import type { ChangesPage, ServerOtpVerify, WalletApi } from './walletApi';
 
 /**
  * NFR-REL-01: every backend call has a timeout. Wraps any WalletApi (fake or real).
@@ -27,6 +27,14 @@ export class TimeoutWalletApi implements WalletApi {
 
   getTransaction(id: string): Promise<Transaction> {
     return this.withTimeout(() => this.inner.getTransaction(id));
+  }
+
+  requestOtp(phone: string): Promise<OtpSendResult> {
+    return this.withTimeout(() => this.inner.requestOtp(phone));
+  }
+
+  verifyOtp(phone: string, code: string): Promise<ServerOtpVerify> {
+    return this.withTimeout(() => this.inner.verifyOtp(phone, code));
   }
 
   private withTimeout<T>(call: () => Promise<T>): Promise<T> {

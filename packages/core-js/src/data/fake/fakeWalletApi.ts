@@ -1,12 +1,17 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { DatasetConfig, Transaction, Wallet } from '@pocketly/core-contract';
+import type { DatasetConfig, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
 import { localEpochDay, localMidnight } from '../../domain/zonedCalendar';
 import { validateTransaction } from '../transactionDtoValidator';
 import { DAILY_LIMIT, WALLET_ID, generateTransactions, simulatedIncomingTransfer } from '../seedData';
 import type { UserTimeZone } from '../timeZone';
-import type { ChangesPage, FakeBackendControls, WalletApi } from '../walletApi';
+import type { ChangesPage, FakeBackendControls, ServerOtpVerify, WalletApi } from '../walletApi';
 import { NetworkSimulator } from './networkSimulator';
+import { OtpServer } from './otpServer';
 import type { ServerStore } from './serverStore';
+
+
+/** A dataset plus extra seed rows: tests and benchmarks only (BenchCore.resetDataWithExtras). */
+export type ServerDataset = DatasetConfig & { extraTransactions?: readonly Transaction[] };
 
 /** Server-side page size cap for getChanges (sync). Same as Kotlin. */
 export const MAX_CHANGES_PAGE = 500;
@@ -26,10 +31,26 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   private frozenNow: number | undefined;
   private simulatedIncoming = 0;
 
+  private readonly otp: OtpServer;
+
   constructor(
     private readonly store: ServerStore,
     private readonly timeZone: () => UserTimeZone,
-  ) {}
+    /** The OTP side's clock (ADR-0013): the device's, not the dataset's frozen one. */
+    otpClock: () => number = Date.now,
+  ) {
+    this.otp = new OtpServer(otpClock);
+  }
+
+  async requestOtp(phone: string): Promise<OtpSendResult> {
+    await this.network.beforeCall();
+    return this.otp.send(phone);
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<ServerOtpVerify> {
+    await this.network.beforeCall();
+    return this.otp.verify(phone, code);
+  }
 
   now(): number {
     return this.frozenNow ?? Date.now();
@@ -47,7 +68,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     this.simulatedIncoming = Number((await this.store.getMeta(META_SIMULATED_INCOMING)) ?? 0);
   }
 
-  async reset(config: DatasetConfig): Promise<void> {
+  async reset(config: ServerDataset): Promise<void> {
     if (!Number.isSafeInteger(config.transactionCount) || config.transactionCount < 1) {
       throw new CoreError('INVALID_ARGUMENT', 'transactionCount must be >= 1');
     }

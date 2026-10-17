@@ -1,0 +1,558 @@
+/**
+ * @format
+ */
+
+import React from 'react';
+import { Alert, AppState, type AppStateStatus } from 'react-native';
+import ReactTestRenderer from 'react-test-renderer';
+import { PIN_LOCKOUT_MS, PIN_MAX_ATTEMPTS } from '@pocketly/core-contract';
+import { useSecureScreen } from '@pocketly/native-secure-screen';
+import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
+import App from '../App';
+import { core } from '../src/core';
+
+/** Slice 5 steps 2–3: PIN creation, unlock and the app-lock lifecycle through the real jsCore. */
+
+// Jest runs on Node; the app's TS config declares neither.
+declare const performance: { now(): number };
+declare const process: { hrtime: { bigint(): bigint } };
+
+const GOOD = '482915';
+const WRONG = '731048';
+
+type Tree = ReactTestRenderer.ReactTestRenderer;
+
+async function launch(): Promise<Tree> {
+  let tree!: Tree;
+  await ReactTestRenderer.act(async () => {
+    tree = ReactTestRenderer.create(<App />);
+  });
+  await until(tree, () => !has(tree, 'auth-checking'));
+  return tree;
+}
+
+function has(tree: Tree, testID: string): boolean {
+  return tree.root.findAll((n) => n.props.testID === testID).length > 0;
+}
+
+function text(tree: Tree, testID: string): string {
+  const node = tree.root.findAll((n) => n.props.testID === testID && typeof n.type === 'string')[0];
+  const c = node.props.children;
+  return Array.isArray(c) ? c.join('') : String(c);
+}
+
+/** Waits for async core work (PBKDF2 runs on libuv's thread pool) to land in the tree. */
+async function until(tree: Tree, condition: () => boolean, timeoutMs = 5_000) {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for the UI');
+    await ReactTestRenderer.act(async () => {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    });
+  }
+}
+
+async function enter(tree: Tree, pin: string) {
+  for (const digit of pin) {
+    await ReactTestRenderer.act(async () => {
+      tree.root.findByProps({ testID: `pin-key-${digit}` }).props.onPress();
+    });
+  }
+  await until(tree, () => !has(tree, 'pin-busy'));
+}
+
+/** NFR-SEC-05: with the server out of reach, there is nothing cached to show. */
+async function expectNothingCached() {
+  core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+  try {
+    await expect(core.getTransactions()).rejects.toMatchObject({ code: 'NETWORK_UNAVAILABLE' });
+    await expect(core.getWallet()).rejects.toMatchObject({ code: 'NETWORK_UNAVAILABLE' });
+  } finally {
+    core.setNetworkSimulation({ mode: 'NORMAL', failureRatePercent: 0 });
+  }
+}
+
+/** The biometrics library mock (jest.setup.js): sensor state and scripted scans. */
+const biometrics = jest.requireMock<{ __state: { available: boolean }; __scans: string[] }>('@sbaiahmed1/react-native-biometrics');
+
+/**
+ * ADR-0013: a PIN needs a phone verified by OTP. Each test verifies its own number: the fake
+ * server refuses a resend to the same number within 30 s, as a real one would.
+ */
+let phones = 0;
+const nextPhone = () => `+62812345${String(10000 + ++phones)}`;
+const verifyPhone = () => verifyTestPhone(core, nextPhone());
+
+beforeEach(async () => {
+  await core.resetAuth();
+  jest.mocked(useSecureScreen).mockClear();
+  // PIN-only unless a test turns the sensor on.
+  biometrics.__state.available = false;
+  biometrics.__scans.length = 0;
+});
+
+describe('onboarding: phone and OTP (FR-AUTH-01/02)', () => {
+  async function typeDigits(tree: Tree, digits: string) {
+    for (const digit of digits) {
+      await ReactTestRenderer.act(async () => {
+        tree.root.findByProps({ testID: `pin-key-${digit}` }).props.onPress();
+      });
+    }
+  }
+
+  async function tap(tree: Tree, testID: string) {
+    await ReactTestRenderer.act(async () => {
+      tree.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0].props.onPress();
+    });
+  }
+
+  const sendDisabled = (tree: Tree) =>
+    tree.root.findAll((n) => n.props.testID === 'phone-send' && typeof n.props.onPress === 'function')[0].props.disabled;
+
+  /** Phone screen → a number → "Send verification code" → OTP screen. Returns the E.164 number. */
+  async function toOtp(tree: Tree): Promise<string> {
+    const phone = nextPhone();
+    await typeDigits(tree, `0${phone.slice(3)}`); // as people type it: 0812…
+    expect(sendDisabled(tree)).toBe(false);
+    await tap(tree, 'phone-send');
+    await until(tree, () => has(tree, 'onboarding-otp'));
+    return phone;
+  }
+
+  it('a fresh install starts at the phone number, before anything financial', async () => {
+    const tree = await launch();
+    expect(has(tree, 'onboarding-phone')).toBe(true);
+    expect(has(tree, 'balance')).toBe(false);
+    expect(sendDisabled(tree)).toBe(true);
+    tree.unmount();
+  });
+
+  it('keeps "Send" off until the number is valid, and says why it isn\'t (FR-AUTH-01)', async () => {
+    const tree = await launch();
+    await typeDigits(tree, '0812');
+    expect(sendDisabled(tree)).toBe(true);
+    expect(text(tree, 'phone-message').trim()).toBe('');
+    await tap(tree, 'phone-clear');
+    await typeDigits(tree, '21');
+    expect(text(tree, 'phone-message')).toMatch(/start with 8/);
+    expect(sendDisabled(tree)).toBe(true);
+    tree.unmount();
+  });
+
+  it('shows the number it sent to; wrong codes count down to a cooldown (FR-AUTH-02)', async () => {
+    const tree = await launch();
+    const phone = await toOtp(tree);
+    expect(JSON.stringify(tree.toJSON())).toContain(`+62 ${phone.slice(3, 6)}-${phone.slice(6, 10)}-${phone.slice(10)}`);
+    expect(text(tree, 'otp-resend-countdown')).toMatch(/^Resend code in 0:[23]\d$/);
+    expect(useSecureScreen).toHaveBeenCalled();
+    await typeDigits(tree, '000000');
+    await tap(tree, 'otp-verify');
+    await until(tree, () => text(tree, 'otp-message').includes("isn't right"));
+    expect(text(tree, 'otp-message')).toBe("That code isn't right. 2 attempts left.");
+    for (let i = 0; i < 2; i++) {
+      await typeDigits(tree, '000000');
+      await tap(tree, 'otp-verify');
+      await until(tree, () => true);
+    }
+    await until(tree, () => text(tree, 'otp-message').startsWith('Too many wrong codes'));
+    expect(text(tree, 'otp-message')).toMatch(/^Too many wrong codes\. Try again in 0:[23]\d\.$/);
+    tree.unmount();
+  });
+
+  it('the right code leads to PIN setup; "Edit number" goes back', async () => {
+    const tree = await launch();
+    await toOtp(tree);
+    await tap(tree, 'otp-edit-number');
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    const phone = await toOtp(tree);
+    await typeDigits(tree, '123456');
+    await tap(tree, 'otp-verify');
+    await until(tree, () => has(tree, 'create-pin'));
+    expect((await core.getAuthState()).phone).toBe(phone);
+    tree.unmount();
+  });
+});
+
+describe('after the OTP: create a PIN (FR-AUTH-03)', () => {
+  beforeEach(verifyPhone);
+
+  it('shows the PIN setup before anything financial (FR-LOCK-01), with screenshots blocked', async () => {
+    const tree = await launch();
+    expect(has(tree, 'create-pin')).toBe(true);
+    expect(has(tree, 'balance')).toBe(false);
+    expect(useSecureScreen).toHaveBeenCalled();
+    tree.unmount();
+  });
+
+  it('refuses a trivial PIN with the reason, before asking to confirm it', async () => {
+    const tree = await launch();
+    await enter(tree, '123456');
+    expect(text(tree, 'pin-title')).toBe('Set up your PIN');
+    expect(text(tree, 'pin-message')).toBe('Too simple: avoid repeated or sequential digits.');
+    const rule = tree.root.findAll((n) => n.props.testID === 'pin-rule-simple' && typeof n.type === 'string')[0];
+    expect(rule.props.accessibilityLabel).toMatch(/not met$/);
+    tree.unmount();
+  });
+
+  it('starts over when the confirmation differs', async () => {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    expect(text(tree, 'pin-title')).toBe('Confirm your PIN');
+    await enter(tree, WRONG);
+    expect(text(tree, 'pin-title')).toBe('Set up your PIN');
+    expect(text(tree, 'pin-message')).toBe("The PINs didn't match. Choose your PIN again.");
+    expect((await core.getAuthState()).pinSet).toBe(false);
+    tree.unmount();
+  });
+
+  it('saves the PIN and opens the app', async () => {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getAuthState()).pinSet).toBe(true);
+    tree.unmount();
+  });
+
+  it('announces how many digits are in, never which', async () => {
+    const tree = await launch();
+    await ReactTestRenderer.act(async () => {
+      tree.root.findByProps({ testID: 'pin-key-4' }).props.onPress();
+      tree.root.findByProps({ testID: 'pin-key-8' }).props.onPress();
+    });
+    const dots = tree.root.findAll((n) => n.props.testID === 'pin-dots')[0];
+    expect(dots.props.accessibilityLabel).toBe('2 of 6 digits entered');
+    const shown = tree.root
+      .findAll((n) => (n.type as unknown) === 'Text')
+      .flatMap((n) => ([] as unknown[]).concat(n.props.children).filter((c): c is string => typeof c === 'string'));
+    expect(shown.filter((t) => t.includes('48'))).toEqual([]);
+    tree.unmount();
+  });
+});
+
+describe('later launches: unlock (FR-LOCK-01/04)', () => {
+  beforeEach(async () => {
+    await verifyPhone();
+    await core.setPin(GOOD);
+  });
+
+  it('asks for the PIN, counts wrong ones, and opens on the right one', async () => {
+    const tree = await launch();
+    expect(has(tree, 'unlock')).toBe(true);
+    expect(has(tree, 'balance')).toBe(false);
+    await enter(tree, WRONG);
+    expect(text(tree, 'pin-message')).toBe(`Wrong PIN entered (1/${PIN_MAX_ATTEMPTS})`);
+    expect(text(tree, 'pin-message-detail')).toBe(`${PIN_MAX_ATTEMPTS - 1} attempts left before a 5-minute security lockout.`);
+    expect(has(tree, 'pin-message-badge')).toBe(false);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    tree.unmount();
+  });
+
+  it('locks out after 5 wrong PINs with a live countdown, which a restart doesn\'t end', async () => {
+    const tree = await launch();
+    for (let i = 0; i < PIN_MAX_ATTEMPTS - 1; i++) await enter(tree, WRONG);
+    expect(text(tree, 'pin-message-detail')).toBe('1 attempt left before a 5-minute security lockout.');
+    expect(text(tree, 'pin-message-badge')).toBe('Final attempt');
+    await enter(tree, WRONG);
+    expect(text(tree, 'pin-message')).toBe('Too many wrong PINs');
+    expect(text(tree, 'pin-message-detail')).toMatch(/^Try again in [45]:\d\d\.$/);
+    expect(text(tree, 'pin-message-badge')).toBe('Locked');
+    expect(tree.root.findByProps({ testID: 'pin-key-1' }).props.disabled).toBe(true);
+    tree.unmount();
+
+    const again = await launch();
+    expect(text(again, 'pin-message-detail')).toMatch(/Try again in [45]:\d\d/);
+    expect((await core.getAuthState()).lockedUntil).toBeGreaterThan(Date.now() + PIN_LOCKOUT_MS - 60_000);
+    again.unmount();
+  });
+
+  it('"Forgot PIN" logs out: PIN, verified phone and cached history go; onboarding starts at the phone (ADR-0013, NFR-SEC-05)', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    await core.getTransactions(); // something cached
+    const tree = await launch();
+    await ReactTestRenderer.act(async () => {
+      tree.root.findByProps({ testID: 'pin-forgot' }).props.onPress();
+    });
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+    await expectNothingCached();
+    alert.mockRestore();
+    tree.unmount();
+  });
+
+  it('when secure storage is unavailable, stays locked without wiping, and retries', async () => {
+    // The object core-js calls (an `import * as` would get Babel's copy of it).
+    const sensitiveInfo = jest.requireMock<{ getItem: (...args: unknown[]) => Promise<unknown> }>('react-native-sensitive-info');
+    const getItem = jest.spyOn(sensitiveInfo, 'getItem').mockRejectedValue(new Error('device locked'));
+    const tree = await launch();
+    expect(has(tree, 'auth-unavailable')).toBe(true);
+    expect(has(tree, 'balance')).toBe(false);
+    getItem.mockRestore();
+    await ReactTestRenderer.act(async () => {
+      tree.root.findByProps({ testID: 'auth-retry' }).props.onPress();
+    });
+    await until(tree, () => has(tree, 'unlock'));
+    expect((await core.getAuthState()).pinSet).toBe(true);
+    tree.unmount();
+  });
+});
+
+describe('app lock lifecycle (FR-LOCK-02/03)', () => {
+  let listeners: ((state: AppStateStatus) => void)[];
+  let offsetMs: number;
+
+  /** Moves both clocks the gate reads (appLock.ts) forward. */
+  const advance = (ms: number) => {
+    offsetMs += ms;
+  };
+
+  async function appState(tree: Tree, state: AppStateStatus) {
+    await ReactTestRenderer.act(async () => {
+      for (const listener of [...listeners]) listener(state);
+    });
+    await until(tree, () => true);
+  }
+
+  /** The app behind the gate: mounted, and whether it can be touched. */
+  function appLayer(tree: Tree) {
+    const balance = tree.root.findAll((n) => n.props.testID === 'balance');
+    const blocked = tree.root.findAll((n) => n.props.pointerEvents === 'none' && n.props.importantForAccessibility === 'no-hide-descendants');
+    return { mounted: balance.length > 0, interactive: balance.length > 0 && blocked.length === 0 };
+  }
+
+  async function openApp(): Promise<Tree> {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await until(tree, () => true);
+    return tree;
+  }
+
+  beforeEach(async () => {
+    listeners = [];
+    offsetMs = 0;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void);
+      return { remove: () => listeners.splice(listeners.indexOf(listener as (state: AppStateStatus) => void), 1) };
+    });
+    const realNow = Date.now.bind(Date);
+    // A monotonic clock of our own: the preset's performance.now goes through the mocked Date.now.
+    const monoNow = () => Number(process.hrtime.bigint() / 1_000_000n);
+    jest.spyOn(Date, 'now').mockImplementation(() => realNow() + offsetMs);
+    jest.spyOn(performance, 'now').mockImplementation(() => monoNow() + offsetMs);
+    await verifyPhone();
+    await core.setPin(GOOD);
+    await core.setAutoLockTimeout(5_000);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('covers the app as soon as it leaves the foreground, and uncovers it on a quick return', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    expect(has(tree, 'privacy-cover')).toBe(true);
+    expect(appLayer(tree).interactive).toBe(false);
+    advance(4_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'privacy-cover')).toBe(false);
+    expect(has(tree, 'unlock')).toBe(false);
+    expect(appLayer(tree).interactive).toBe(true);
+    tree.unmount();
+  });
+
+  it('locks again after the timeout, over the still-mounted app, and the PIN opens it', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    advance(5_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
+    expect(has(tree, 'privacy-cover')).toBe(false);
+    expect(appLayer(tree)).toEqual({ mounted: true, interactive: false });
+    await enter(tree, GOOD);
+    await until(tree, () => !has(tree, 'unlock'));
+    expect(appLayer(tree)).toEqual({ mounted: true, interactive: true });
+    tree.unmount();
+  });
+
+  it('counts the larger of the two clocks: moving the wall clock back doesn\'t skip the lock', async () => {
+    const tree = await openApp();
+    await appState(tree, 'background');
+    const perfNow = performance.now as jest.Mock;
+    const base = perfNow();
+    perfNow.mockImplementation(() => base + 6_000); // 6 s awake in the background…
+    offsetMs = -60 * 60_000; // …while the wall clock was set back an hour
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
+    tree.unmount();
+  });
+
+  it('timeout 0 locks on every return; "inactive" alone (iOS app switcher) only covers', async () => {
+    await core.setAutoLockTimeout(0);
+    const tree = await openApp();
+    await appState(tree, 'inactive');
+    expect(has(tree, 'privacy-cover')).toBe(true);
+    advance(60 * 60_000);
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(false);
+    await appState(tree, 'background');
+    await appState(tree, 'active');
+    expect(has(tree, 'unlock')).toBe(true);
+    tree.unmount();
+  });
+});
+
+describe('biometric unlock (FR-AUTH-04)', () => {
+  let alert: jest.SpyInstance;
+
+  beforeEach(async () => {
+    await verifyPhone();
+    biometrics.__state.available = true;
+    alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => alert.mockRestore());
+
+  async function press(tree: Tree, testID: string) {
+    await ReactTestRenderer.act(async () => {
+      tree.root.findAll((n) => n.props.testID === testID && typeof n.props.onPress === 'function')[0].props.onPress();
+    });
+  }
+
+  async function setUpWithBiometrics(): Promise<void> {
+    const tree = await launch();
+    expect(tree.root.findAll((n) => n.props.children?.join?.('') === 'Step 1 of 2 · Create PIN').length).toBeGreaterThan(0);
+    await enter(tree, GOOD);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-enable');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    tree.unmount();
+  }
+
+  it('offers biometrics after the PIN is created; "Not now" opens the app with them off', async () => {
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-skip');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(false);
+    tree.unmount();
+  });
+
+  it('then asks for the fingerprint as soon as the lock screen appears, and opens on a match', async () => {
+    await setUpWithBiometrics();
+    const tree = await launch();
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getAuthState()).failedAttempts).toBe(0);
+    tree.unmount();
+  });
+
+  it('cancelling the prompt shows the keypad and an "Unlock with fingerprint" button that tries again', async () => {
+    await setUpWithBiometrics();
+    biometrics.__scans.push('CANCEL');
+    const tree = await launch();
+    await until(tree, () => has(tree, 'pin-use-biometrics'));
+    expect(has(tree, 'unlock')).toBe(true);
+    expect(has(tree, 'pin-message')).toBe(false);
+    expect(tree.root.findAll((n) => n.props.children === 'Unlock with fingerprint').length).toBeGreaterThan(0);
+    await press(tree, 'pin-use-biometrics');
+    await until(tree, () => has(tree, 'balance'));
+    tree.unmount();
+  });
+
+  it('an invalidated key falls back to the PIN, then offers to turn biometrics back on', async () => {
+    await setUpWithBiometrics();
+    biometrics.__scans.push('INVALIDATED');
+    const tree = await launch();
+    await until(tree, () => text(tree, 'pin-message').includes('turned off'));
+    expect(has(tree, 'pin-use-biometrics')).toBe(false);
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'biometric-offer'));
+    await press(tree, 'biometric-offer-enable');
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    tree.unmount();
+  });
+
+  it('during a PIN lockout the fingerprint still opens the app, and the user is told about the wrong PINs', async () => {
+    await setUpWithBiometrics();
+    for (let i = 0; i < PIN_MAX_ATTEMPTS; i++) await core.verifyPin(WRONG);
+    const tree = await launch();
+    await until(tree, () => has(tree, 'balance'));
+    expect(alert).toHaveBeenCalledWith('Wrong PIN attempts', expect.stringContaining('wrong PIN 5 times'));
+    expect((await core.getAuthState()).lockedUntil).toBeDefined();
+    tree.unmount();
+  });
+
+  it('Profile → Security turns biometrics on (PIN, then a scan) and off (FR-AUTH-04)', async () => {
+    await core.setPin(GOOD);
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await press(tree, 'tab-profile');
+    await until(tree, () => has(tree, 'profile-biometric-switch'));
+    const sw = () => tree.root.findAll((n) => n.props.testID === 'profile-biometric-switch' && n.props.onValueChange)[0];
+    expect(sw().props.value).toBe(false);
+    await ReactTestRenderer.act(async () => sw().props.onValueChange(true));
+    await until(tree, () => has(tree, 'biometric-setup'));
+    await enter(tree, GOOD);
+    await until(tree, () => !has(tree, 'biometric-setup'));
+    expect((await core.getBiometricStatus()).enabled).toBe(true);
+    await until(tree, () => sw()?.props.value === true);
+    await ReactTestRenderer.act(async () => sw().props.onValueChange(false));
+    await until(tree, () => sw()?.props.value === false);
+    expect((await core.getBiometricStatus()).enabled).toBe(false);
+    tree.unmount();
+  });
+
+  it('Profile → Log out removes the PIN and the cached history, then starts onboarding (NFR-SEC-05)', async () => {
+    await core.setPin(GOOD);
+    const tree = await launch();
+    await enter(tree, GOOD);
+    await until(tree, () => has(tree, 'balance'));
+    await press(tree, 'tab-profile');
+    await until(tree, () => has(tree, 'profile-logout'));
+    const confirm = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    await press(tree, 'profile-logout');
+    await until(tree, () => has(tree, 'onboarding-phone'));
+    expect(has(tree, 'balance')).toBe(false);
+    expect(await core.getAuthState()).toEqual({ pinSet: false, failedAttempts: 0 });
+    await expectNothingCached();
+    confirm.mockRestore();
+    tree.unmount();
+  });
+
+  it('a re-lock prompts for biometrics turned on since the last unlock', async () => {
+    await core.setPin(GOOD);
+    await core.setAutoLockTimeout(0);
+    const listeners: ((state: string) => void)[] = [];
+    const appState = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: string) => void);
+      return { remove: () => listeners.splice(listeners.indexOf(listener as (state: string) => void), 1) };
+    });
+    const tree = await launch();
+    await enter(tree, GOOD); // biometrics are off at this unlock
+    await until(tree, () => has(tree, 'balance'));
+    expect((await core.enableBiometrics(GOOD, { title: 't', cancel: 'c' })).outcome).toBe('ENABLED');
+    biometrics.__scans.push('CANCEL'); // so the re-lock screen stays up to look at
+    const emit = async (state: string) => {
+      await ReactTestRenderer.act(async () => {
+        for (const listener of [...listeners]) listener(state);
+      });
+      await until(tree, () => true);
+    };
+    await emit('background');
+    await emit('active');
+    await until(tree, () => has(tree, 'pin-use-biometrics'));
+    expect(biometrics.__scans).toEqual([]); // the CANCEL scan was used: the prompt was shown
+    appState.mockRestore();
+    tree.unmount();
+  });
+});

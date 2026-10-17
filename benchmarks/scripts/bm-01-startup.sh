@@ -10,19 +10,37 @@
 #
 #   benchmarks/scripts/bm-01-startup.sh <results-dir> [measured=20] [warmup=2] [compilation=none]
 #
-# - Fresh-installs both arm64 release APKs (build first:
-#   ./gradlew assembleJsCoreRelease assembleKmpCoreRelease -PsplitApksByAbi)
+# - Fresh-installs both arm64 perf APKs (build first:
+#   ./gradlew assembleJsCorePerf assembleKmpCorePerf -PsplitApksByAbi). perf = release plus
+#   launch arguments (benchmarking.md §5.3); since slice 5 every launch passes
+#   pocketly.skipLock=true, or the PIN gate (FR-LOCK-01) would keep Home from drawing.
 # - compilation=none: `cmd package compile -f -m verify` (no AOT, = Macrobenchmark CompilationMode.None)
 #   compilation=baselineProfile: speed-profile from the APK's baseline profile → BM-09
 # - Alternates js, kmp, js, kmp… (§4.2). Warm-up runs are recorded; collect.ts drops them.
 # - Page cache is NOT dropped between runs (needs root); identical for both builds.
+#
+# TARGET=lock: BM-01-lock, cold start → lock screen drawn, on RELEASE builds (benchmarking.md,
+# BM-01-lock). Release ignores launch arguments, so the lock screen shows, and it is the same
+# screen in both builds. Needs both builds already onboarded (PIN set, biometrics off): the
+# release APKs are installed over them (`adb install -r`, same ids and key), never uninstalled.
 set -euo pipefail
 
 OUT_DIR="${1:?usage: bm-01-startup.sh <results-dir> [measured] [warmup] [compilation]}"
 MEASURED="${2:-20}"
 WARMUP="${3:-2}"
 COMPILATION="${4:-none}"
+TARGET="${TARGET:-home}"
 SCENARIO=$([ "$COMPILATION" = "none" ] && echo "bm-01" || echo "bm-09")
+BUILD_TYPE=perf
+LAUNCH_ARGS=(-e pocketly.skipLock true)
+if [ "$TARGET" = lock ]; then
+  [ "$COMPILATION" = none ] || { echo "TARGET=lock runs with compilation=none only" >&2; exit 1; }
+  SCENARIO=bm-01-lock
+  BUILD_TYPE=release
+  LAUNCH_ARGS=()
+elif [ "$TARGET" != home ]; then
+  echo "TARGET must be home|lock" >&2; exit 1
+fi
 ACTIVITY="com.pocketly.MainActivity"
 SETTLE_SECONDS=2
 
@@ -46,11 +64,11 @@ adb_alive() {
   timeout 15 adb shell true >/dev/null 2>&1 || { echo "✗ adb lost the device" >&2; exit 1; }
 }
 
-install_apk() { # <apk>
+install_apk() { # <apk> [extra adb install flags]
   local attempt
   for attempt in 1 2 3; do
     adb_alive
-    timeout 120 adb install "$1" >/dev/null 2>&1 && return 0
+    timeout 120 adb install "${@:2}" "$1" >/dev/null 2>&1 && return 0
     echo "  install attempt $attempt failed, retrying" >&2
     sleep 5
   done
@@ -58,11 +76,15 @@ install_apk() { # <apk>
   exit 1
 }
 
-echo "▸ fresh install + compilation=$COMPILATION"
+echo "▸ $([ "$TARGET" = lock ] && echo "install over the onboarded app" || echo "fresh install") ($BUILD_TYPE) + compilation=$COMPILATION"
 for build in jsCore kmpCore; do
   pkg=$(pkg_of $build)
-  adb uninstall "$pkg" >/dev/null 2>&1 || true
-  install_apk "$APK_DIR/$build/release/app-$build-arm64-v8a-release.apk"
+  if [ "$TARGET" = lock ]; then
+    install_apk "$APK_DIR/$build/$BUILD_TYPE/app-$build-arm64-v8a-$BUILD_TYPE.apk" -r
+  else
+    adb uninstall "$pkg" >/dev/null 2>&1 || true
+    install_apk "$APK_DIR/$build/$BUILD_TYPE/app-$build-arm64-v8a-$BUILD_TYPE.apk"
+  fi
   case "$COMPILATION" in
     none) adb shell cmd package compile -f -m verify "$pkg" >/dev/null ;;
     baselineProfile)
@@ -89,7 +111,7 @@ run_one() { # <round> <build>
   adb logcat -c
 
   local am launch_state am_total
-  am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
+  am=$(adb shell am start -W -n "$pkg/$ACTIVITY" ${LAUNCH_ARGS[@]+"${LAUNCH_ARGS[@]}"} | tr -d '\r')
   launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
   if [ -z "$launch_state" ]; then
     # No output at all is an adb hiccup, not a slow launch: stop the app and launch it again.
@@ -97,7 +119,7 @@ run_one() { # <round> <build>
     adb shell am force-stop "$pkg"
     sleep "$SETTLE_SECONDS"
     adb logcat -c
-    am=$(adb shell am start -W -n "$pkg/$ACTIVITY" | tr -d '\r')
+    am=$(adb shell am start -W -n "$pkg/$ACTIVITY" ${LAUNCH_ARGS[@]+"${LAUNCH_ARGS[@]}"} | tr -d '\r')
     launch_state=$(awk -F': ' '/LaunchState/ {print $2}' <<<"$am")
   fi
   am_total=$(awk -F': ' '/TotalTime/ {print $2}' <<<"$am")
@@ -106,7 +128,7 @@ run_one() { # <round> <build>
     exit 1
   fi
 
-  # reportFullyDrawn() fires once Home data is rendered; wait up to 15s for it.
+  # reportFullyDrawn() fires once Home data (TARGET=lock: the lock screen) is drawn; wait up to 15s.
   local log displayed fully
   for _ in $(seq 1 30); do
     log=$(adb logcat -d -s ActivityTaskManager:I | tr -d '\r')
@@ -141,6 +163,8 @@ cat > "$RAW/meta.json" <<JSON
 { "scenario": "$(tr a-z A-Z <<<"$SCENARIO")", "warmup": $WARMUP, "measured": $MEASURED,
   "compilation": "$COMPILATION", "order": "alternating js,kmp per round",
   "tool": "am start -W + ActivityTaskManager Displayed/Fully drawn (platform startup logs)",
-  "settleSecondsBeforeLaunch": $SETTLE_SECONDS, "pageCacheDropped": false }
+  "settleSecondsBeforeLaunch": $SETTLE_SECONDS, "pageCacheDropped": false,
+  "build": "$BUILD_TYPE", "target": "$TARGET",
+  "launchArgs": $([ "$TARGET" = lock ] && echo '{}' || echo '{ "pocketly.skipLock": "true" }') }
 JSON
 echo "▸ raw results in $RAW"

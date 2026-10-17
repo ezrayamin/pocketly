@@ -214,7 +214,7 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
 }
 
 /**
- * In-app harness (BM-03, BM-04, BM-06): <scenario>/<round>-<build>.json, each holding the
+ * In-app harness (BM-03, BM-04, BM-04b, BM-06, BM-10, BM-11): <scenario>/<round>-<build>.json, each holding the
  * measured runs of one cold start. Adds the bridge overhead per run: end-to-end − compute −
  * storage (BM-03/04), batch end-to-end − batch compute (BM-06). Checks that both builds
  * saw the same input and produced the same output (checksums).
@@ -225,6 +225,9 @@ type HarnessResult = {
   input: { checksum: string };
   output: { checksum: string };
 };
+
+/** BM-10: 600,000 (the PIN's iterations) / 60,000 (BM-10's). */
+const BM10_SCALE = 10;
 
 function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: string[]) {
   const raw = join(dir, scenario.toLowerCase());
@@ -239,6 +242,8 @@ function collectHarness(dir: string, scenario: string, rows: Row[], verdicts: st
       const derived: Record<string, number> = { ...run };
       if ('endToEndMs' in run) derived.overheadMs = run.endToEndMs - run.computeMs - run.storageMs;
       if ('batchEndToEndMs' in run) derived.batchOverheadMs = run.batchEndToEndMs - run.batchComputeMs;
+      // BM-10 runs at a tenth of the PIN's iterations; PBKDF2 is linear in them (benchmarking.md).
+      if (scenario === 'BM-10' && 'hashMs' in run) derived.hashMsAt600k = run.hashMs * BM10_SCALE;
       for (const [metric, v] of Object.entries(derived)) {
         values[metric] ??= { jsCore: [], kmpCore: [] };
         values[metric][build].push(v);
@@ -426,7 +431,16 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   const data = JSON.parse(readFileSync(file, 'utf8'));
   const one = (v: number): Stats => ({ n: 1, median: v, p90: v, p25: v, p75: v, iqr: 0, mean: v, cv: 0, min: v, max: v });
 
-  type Apk = { build: Build; abi: string; fileBytes: number; groups: Record<string, number>; nativeLibs: Record<string, number>; jsBundleUncompressed: number };
+  type OpensslShare = { lib: string; opensslBytes: number; cppBytes: number; opensslFraction: number; libGzippedBytes: number };
+  type Apk = {
+    build: Build;
+    abi: string;
+    fileBytes: number;
+    groups: Record<string, number>;
+    nativeLibs: Record<string, number>;
+    jsBundleUncompressed: number;
+    openssl?: OpensslShare;
+  };
   const apks: Apk[] = data.apks;
   for (const apk of apks) {
     rows.push({ scenario: 'BM-08', metric: `apkFile[${apk.abi}]`, build: apk.build, unit: 'bytes', stats: one(apk.fileBytes) });
@@ -452,12 +466,20 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
   for (const lib of libs.filter((l) => /nitro|pocketly/i.test(l) || (js.nativeLibs[l] ?? 0) !== (kmp.nativeLibs[l] ?? 0))) {
     extra.push(`| ${lib} | ${js.nativeLibs[lib] ? kb(js.nativeLibs[lib]) : '—'} | ${kmp.nativeLibs[lib] ? kb(kmp.nativeLibs[lib]) : '—'} |`);
   }
-  // Two effects mix in the total (ADR-0009): the KMP architecture itself, and the storage
-  // choice (op-sqlite bundles its own SQLite into jsCore; kmpCore uses the platform's).
+  // Four effects mix in the total: the KMP architecture itself; the storage choice (ADR-0009:
+  // op-sqlite bundles its own SQLite into jsCore, kmpCore uses the platform's); the PIN crypto
+  // choice (ADR-0010 §8: quick-crypto links OpenSSL statically into jsCore, kmpCore uses the
+  // platform's crypto); and the secure-storage library (ADR-0010 §3: sensitive-info in jsCore,
+  // kmpCore's own Keystore code, a few classes in its Kotlin dex).
+  const libDelta = (libs: string[]) => libs.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
   const STORAGE_LIBS = ['libop-sqlite.so'];
-  const storage = STORAGE_LIBS.reduce((d, l) => d + (kmp.nativeLibs[l] ?? 0) - (js.nativeLibs[l] ?? 0), 0);
+  const CRYPTO_LIBS = ['libQuickCrypto.so'];
+  const SECURE_STORE_LIBS = ['libSensitiveInfo.so'];
+  const storage = libDelta(STORAGE_LIBS);
+  const crypto = libDelta(CRYPTO_LIBS);
+  const secureStore = libDelta(SECURE_STORE_LIBS);
   const total = kmp.fileBytes - js.fileBytes;
-  if (storage !== 0) {
+  if (storage !== 0 || crypto !== 0 || secureStore !== 0) {
     extra.push(
       '',
       '### BM-08 split, arm64-v8a APK (kmpCore − jsCore)',
@@ -465,10 +487,24 @@ function collectSize(dir: string, rows: Row[], verdicts: string[], extra: string
       '| Effect | Δ |',
       '|---|---:|',
       `| Storage choice (${STORAGE_LIBS.join(', ')}, bundled in jsCore only) | ${delta(storage)} |`,
-      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | ${delta(total - storage)} |`,
+      `| PIN crypto choice (${CRYPTO_LIBS.join(', ')}: quick-crypto with OpenSSL linked in, jsCore only) | ${delta(crypto)} |`,
+    );
+    const share = js.openssl;
+    if (share) {
+      extra.push(
+        `| ↳ of which OpenSSL, estimated (${(share.opensslFraction * 100).toFixed(0)}% of the library's sized symbols) | ${delta(Math.round(crypto * share.opensslFraction))} |`,
+        `| ↳ the library gzipped (-9), estimating its share of the download | ${delta(-share.libGzippedBytes)} |`,
+      );
+    }
+    const architecture = total - storage - crypto - secureStore;
+    extra.push(
+      `| Secure-storage library (${SECURE_STORE_LIBS.join(', ')}: react-native-sensitive-info, jsCore only) | ${delta(secureStore)} |`,
+      `| KMP architecture (everything else: Nitro bridge library, Kotlin dex, smaller JS bundle) | ${delta(architecture)} |`,
       `| Total | ${delta(total)} |`,
     );
-    verdicts.push(`BM-08 arm64-v8a APK split: architecture ${delta(total - storage)}, storage choice ${delta(storage)} → total ${delta(total)}`);
+    verdicts.push(
+      `BM-08 arm64-v8a APK split: architecture ${delta(architecture)}, storage choice ${delta(storage)}, PIN crypto choice ${delta(crypto)}, secure-storage library ${delta(secureStore)} → total ${delta(total)}`,
+    );
   }
   const kept = data.keptClassesByOrigin;
   if (kept?.kmpCore) {
@@ -514,8 +550,9 @@ function main() {
   const extra: string[] = [];
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
+  collectStartup(dir, 'BM-01-lock', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
-  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06']) {
+  for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
   }

@@ -1,6 +1,6 @@
 package com.pocketly.shared.domain
 
-/** requirements §4.3, plus NOT_FOUND / INVALID_ARGUMENT. Mirrors `ErrorCode` in core-contract. */
+/** requirements §4.3, plus NOT_FOUND / INVALID_ARGUMENT / SECURE_STORAGE_UNAVAILABLE. Mirrors `ErrorCode` in core-contract. */
 enum class ErrorCode(val retryable: Boolean) {
     INSUFFICIENT_FUNDS(false),
     DAILY_LIMIT_EXCEEDED(false),
@@ -12,6 +12,8 @@ enum class ErrorCode(val retryable: Boolean) {
     IDEMPOTENCY_CONFLICT(false),
     NOT_FOUND(false),
     INVALID_ARGUMENT(false),
+    /** ADR-0010: secure storage can't be used right now (device locked, Keystore busy). Nothing was wiped. */
+    SECURE_STORAGE_UNAVAILABLE(true),
 }
 
 /**

@@ -15,20 +15,38 @@
 
 // Forward declaration of `DatasetSeed` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct DatasetSeed; }
-// Forward declaration of `Transaction` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `Wallet` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Wallet; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
+// Forward declaration of `Transaction` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Transaction; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
-// Forward declaration of `IngestResult` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestResult; }
+// Forward declaration of `PinCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PinCheck; }
+// Forward declaration of `UnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct UnlockResult; }
+// Forward declaration of `AuthState` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -38,19 +56,28 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 
 #include <NitroModules/Promise.hpp>
 #include "DatasetSeed.hpp"
-#include "Transaction.hpp"
-#include <vector>
 #include "Wallet.hpp"
 #include "TransactionPage.hpp"
 #include <string>
 #include <optional>
 #include "TxFilter.hpp"
+#include "Transaction.hpp"
 #include "NetworkSimulation.hpp"
 #include "SpendingSummary.hpp"
-#include "IngestResult.hpp"
+#include "PinCheck.hpp"
+#include "UnlockResult.hpp"
+#include "AuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "OtpSendResult.hpp"
+#include "OtpVerifyResult.hpp"
+#include "BiometricStatus.hpp"
+#include "BiometricEnableResult.hpp"
+#include "BiometricPromptText.hpp"
+#include "BiometricUnlockResult.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
+#include <vector>
 #include "PriceTick.hpp"
 #include <functional>
 
@@ -85,7 +112,7 @@ namespace margelo::nitro::pocketly {
 
     public:
       // Methods
-      virtual std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) = 0;
+      virtual std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config) = 0;
       virtual std::shared_ptr<Promise<Wallet>> getWallet() = 0;
       virtual std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) = 0;
       virtual std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) = 0;
@@ -94,16 +121,24 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<Transaction>> simulateIncomingTransfer() = 0;
       virtual void setTimeZone(const std::string& zoneId) = 0;
       virtual std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) = 0;
-      virtual std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) = 0;
-      virtual std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) = 0;
-      virtual std::shared_ptr<Promise<IngestResult>> ingestStaged() = 0;
-      virtual double echo(double value) = 0;
+      virtual PinCheck checkPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<void>> setPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) = 0;
+      virtual std::shared_ptr<Promise<AuthState>> getAuthState() = 0;
+      virtual std::shared_ptr<Promise<void>> resetAuth() = 0;
+      virtual std::shared_ptr<Promise<void>> logout() = 0;
+      virtual std::shared_ptr<Promise<double>> getAutoLockTimeout() = 0;
+      virtual std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) = 0;
+      virtual PhoneCheck checkPhone(const std::string& nationalNumber) = 0;
+      virtual std::shared_ptr<Promise<OtpSendResult>> requestOtp(const std::string& phone) = 0;
+      virtual std::shared_ptr<Promise<OtpVerifyResult>> verifyOtp(const std::string& phone, const std::string& code) = 0;
+      virtual std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() = 0;
+      virtual std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) = 0;
+      virtual std::shared_ptr<Promise<void>> disableBiometrics() = 0;
+      virtual std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) = 0;
       virtual std::string formatMoney(double minor) = 0;
-      virtual std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;
-      virtual double lastComputeMs() = 0;
-      virtual double lastStorageMs() = 0;
 
     protected:
       // Hybrid Setup

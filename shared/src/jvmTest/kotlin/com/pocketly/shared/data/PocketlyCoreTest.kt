@@ -1,5 +1,7 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.security.MemorySecureStore
+import com.pocketly.shared.bridge.CoreProbe
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.JvmDatabaseDrivers
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,10 +27,10 @@ import kotlin.test.assertTrue
 
 /** Behaviour checks on in-memory SQLite. Exact-value parity is in contract/ContractFixturesTest. */
 class PocketlyCoreTest {
-    private val core = PocketlyCore.create(JvmDatabaseDrivers())
+    private val core = PocketlyCore.create(JvmDatabaseDrivers(), MemorySecureStore())
 
     /** On the test scheduler, so latencies and timeouts run on virtual time. */
-    private fun TestScope.virtualTimeCore() = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, StandardTestDispatcher(testScheduler))
+    private fun TestScope.virtualTimeCore() = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, StandardTestDispatcher(testScheduler), MemorySecureStore())
 
     @Test
     fun walletBalanceMatchesLedger() = runTest {
@@ -63,7 +65,7 @@ class PocketlyCoreTest {
         assertEquals(ErrorCode.NOT_FOUND, assertFailsWith<CoreException> { core.getTransaction("nope") }.code)
         assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.getTransactions(null, 0, null) }.code)
         assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.getTransactions("x", 20, null) }.code)
-        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.ingestTransactions("{") }.code)
+        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { CoreProbe(core).ingestTransactions("{") }.code)
         assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.computeSpendingSummary("2026-13") }.code)
     }
 
@@ -118,6 +120,6 @@ class PocketlyCoreTest {
     fun computeTimingIsRecorded() = runTest {
         core.resetData(DatasetConfig(seed = 7, transactionCount = 10_000, nowMillis = DatasetConfig.DEFAULT.nowMillis))
         core.computeSpendingSummary("2026-09")
-        assertTrue(core.lastComputeMs() > 0.0)
+        assertTrue(CoreProbe(core).lastComputeMs() > 0.0)
     }
 }

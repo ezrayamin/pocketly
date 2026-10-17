@@ -111,7 +111,7 @@ export const core: Core =
 > libraries: `jsCore` uses op-sqlite (its own bundled SQLite, over JSI), `kmpCore` uses
 > SQLDelight on the platform's SQLite. Same schema (generated from the same `.sq` files),
 > different engine builds. So every scenario that touches storage reports it separately:
-> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2). Bulk writes follow the same
+> `bench.lastStorageMs()` next to `bench.lastComputeMs()` (§5.2). Bulk writes follow the same
 > pattern in both: one transaction, one prepared statement bound and stepped per row (from
 > 2026-10-11; before that, `jsCore` re-prepared the statement for every row).
 
@@ -239,7 +239,7 @@ It records **two timings** for every `kmpCore` operation:
 
 **Bridge overhead = end-to-end − compute only.** For `jsCore`, end-to-end and compute are the same thing.
 
-Operations that also touch SQLite record a third timing, **storage** (`core.lastStorageMs()`),
+Operations that also touch SQLite record a third timing, **storage** (`bench.lastStorageMs()`),
 which is kept out of compute in both cores:
 
 | Operation | `lastComputeMs()` | `lastStorageMs()` |
@@ -249,6 +249,11 @@ which is kept out of compute in both cores:
 | `formatMoneyBatch` (BM-06) | formatting | 0 |
 
 For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
+
+The timing getters, `formatMoneyBatch`, the ingest entry points and `echo` are `BenchCore`
+methods (`packages/core-contract/src/bench.ts`), not `Core` methods: benchmark-only code is in
+perf builds only (ADR-0003, "Benchmark-only code"; CI's `check-release-clean.sh`). They work on
+the running core's own replica and timings, and BM-03 still times `Core.computeSpendingSummary`.
 
 **Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
 build started with `pocketly.bench=BM-03|BM-04|BM-04b|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders
@@ -317,6 +322,7 @@ visible error (`launch-args-error`) rather than letting it run on defaults.
 | `pocketly.tab` | `home`, `history`, `profile` | Start tab |
 | `pocketly.seed`, `pocketly.transactionCount`, `pocketly.nowMillis` | integers | `resetData()` with this dataset before anything loads (unset fields: `LIVE_DATASET`'s) |
 | `pocketly.network.mode`, `pocketly.network.normalLatencyMs`, `pocketly.network.failureRatePercent`, `pocketly.network.readTimeoutMs`, `pocketly.network.seed` | as `setNetworkSimulation` | Fake backend, same rules as the dev link |
+| `pocketly.skipLock` | `true`, `false` | No PIN gate (FR-LOCK-01): the app opens straight to its tabs. BM-01/BM-09 and BM-02 always pass `true`; each session's NOTES says so. The harness (`pocketly.bench`) never shows the gate |
 
 ```bash
 adb shell am start -W -n com.pocketly.kmp/com.pocketly.MainActivity \
@@ -328,11 +334,19 @@ are read at cold start only. A dataset argument resets the databases on **every*
 leave it out of startup scenarios (BM-01/BM-09) unless the reset is part of what is measured.
 iOS has no equivalent yet.
 
+> **Change (2026-10-12, slice 5): BM-01/BM-09 run on `perf` builds with `pocketly.skipLock=true`.**
+> With the PIN gate, a cold start on a release build stops at the lock screen, so Home's "fully
+> drawn" never fires. `perf` differs from `release` only in reading launch arguments, so BM-01
+> numbers stay comparable with earlier `release` sessions; the NOTES of the first session after
+> the change should still say so. A later metric could time "cold start → lock screen", which is
+> what users see first.
+
 ## 6. Scenarios
 
 | ID | Scenario | Metrics | Tool | Tests |
 |---|---|---|---|---|
 | **BM-01** | **Cold start → Home rendered** with 200 cached transactions | Time to initial display, time to fully drawn | Platform startup logs (§5 note) | H6 |
+| **BM-01-lock** | **Cold start → lock screen drawn** (added 2026-10-16), **release** builds, onboarded installs, biometrics off | Time to initial display, time to fully drawn (the lock screen's marker) | Platform startup logs, `TARGET=lock bm-01-startup.sh` | H6 |
 | **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, CPU per thread (JS, UI, Render), RAM. Flashlight has no JS FPS or frame overrun on Android | Flashlight + adb input (§5 note) | H4 (control) |
 | **BM-03** | **Spending summary from 10,000 ledger entries** (group by category and day, totals, balance check) | End-to-end ms, compute ms | In-app harness | H1 |
 | **BM-04** | **Ingest 5,000 transactions** from JSON → validate → write to SQLite cache | End-to-end ms, peak memory | In-app harness + `dumpsys meminfo` | H1 |
@@ -342,15 +356,43 @@ iOS has no equivalent yet.
 | **BM-07** | **Full transfer flow** (Home → Send → amount → review → PIN → result), fake latency fixed at 300 ms | Flow duration, FPS during transitions, CPU | Flashlight + Maestro | H4 |
 | **BM-08** | **App size** | APK size per ABI, download size, JS bundle size | APK Analyzer, bundletool | H5 |
 | **BM-09** | **Startup with Baseline Profile** (BM-01 rerun with `CompilationMode.Partial(BaselineProfileMode.Require)`) | Same as BM-01 | Macrobenchmark | H7 |
+| **BM-10** | **What-if: PBKDF2 without crypto libraries** (added 2026-10-16, ADR-0010 §8): `pbkdf2WhatIf` on the pin.json **60,000**-iteration vector, scaled ×10 to the PIN's 600,000 (notes below); pure JS (@noble/hashes, JS thread) vs pure Kotlin (KotlinCrypto HMAC, `Dispatchers.Default`). Never the PIN | Hash ms; longest JS-thread stall (4 ms timer probe); every run's hash checked | In-app harness | H1 (labelled what-if: the shipped PIN uses BM-11's libraries) |
+| **BM-11** | **PIN unlock** (added 2026-10-12): `verifyPin` with the right PIN, PBKDF2-HMAC-SHA256 × 600,000 (ADR-0010) | Unlock ms; longest JS-thread stall while hashing (4 ms timer probe) | In-app harness | — (platform crypto in both builds: a cost check, not a hypothesis test) |
 
 ### Scenario notes
 
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
 - **BM-04 vs BM-04b** (added 2026-10-11): BM-04 passes the 1.3 MB payload from JS into the core inside the timed call, which is the path when data starts in JS. In a KMP app whose core owns the network, the response arrives in Kotlin and never crosses the bridge; BM-04b measures that path. Report both.
 - **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
+- **BM-01-lock is what users see first** (decided 2026-10-16, before any BM-01-lock session).
+  Since slice 5 every cold start opens on the lock screen (FR-LOCK-01), which is the same screen
+  in both builds, while BM-01 needs `pocketly.skipLock` on perf builds to reach Home. Release
+  builds ignore launch arguments, so BM-01-lock measures them as shipped: the lock screen renders
+  `<FullyDrawnMarker />` and reports "fully drawn" (Home mounts only after unlock, so nothing
+  else can report first). Before it reaches the screen, each core reads its auth state from
+  secure storage (`getAuthState`). Both builds must be onboarded with biometrics off, or the
+  biometric prompt would sit over the screen; the runner installs the release APKs over the
+  onboarded apps (`adb install -r`, same ids and signing key) and never uninstalls. Same rounds
+  and order as BM-01 (alternating, 2 warm-up + 20 measured, compilation `verify`). The PIN entry
+  itself is not timed here (BM-11).
 - **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
 - **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.
+- **BM-11** times the shipped design: library or platform crypto in both builds (quick-crypto/OpenSSL vs javax.crypto on Android, CommonCrypto on iOS), so it answers "is 600,000 iterations fast enough on the slowest phone?" and "does the lock screen stay responsive?", not "JS vs Kotlin". BM-10 is that what-if. BM-11 replaces the install's PIN; run it on benchmark installs only.
+- **BM-10 runs at 60,000 iterations, a tenth of the PIN's** (decided 2026-10-16, before any BM-10
+  session). At 600,000, one jsCore run took 122.5 s on the vivo (kmpCore: 0.97 s; single-run
+  check, 2026-10-16), so a standard session (5 rounds × (10 + 5 warm-up) per build) would keep
+  jsCore busy for ~2.5 hours, with every run at risk of the screen timing out. PBKDF2's cost is
+  linear in the iteration count (the same HMAC repeated), so `collect.ts` also reports
+  `hashMsAt600k` = `hashMs` × 10, which is the number to set against BM-11's unlock time, always
+  labelled as scaled. `jsMaxGapMs` is not scaled. Sessions use **3 rounds × 5 measured runs (+ 1
+  warm-up per round) for both builds**, n = 15, smaller than usual (kmpCore could do more, but
+  both builds get the same n); the session NOTES say so. jsCore holds one CPU core at full load
+  for ~4 minutes, so builds alternate every round and the cooling check runs between blocks.
+- **BM-10** answers "what does keeping crypto in the core's own language cost?", without native libraries on either side. Both are libraries, so neither side is hand-tuned by us: @noble/hashes 1.8.0 and KotlinCrypto 0.8.0 (only the PBKDF2 loop is ours, checked against pin.json). In jsCore it blocks the JS thread for the whole hash (noble's async variant yields only to microtasks), so `jsMaxGapMs` ≈ `hashMs` there: in a real app the lock screen would freeze. The freeze itself
+  could be avoided by hashing in chunks that yield to the event loop (e.g. via `setTimeout`),
+  which keeps the UI responsive but makes the total longer; the total time is the real problem
+  either way. Report it as a what-if next to BM-11, never as the shipped unlock time. Touches no secrets, so any install works.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
 ## 7. Results Storage

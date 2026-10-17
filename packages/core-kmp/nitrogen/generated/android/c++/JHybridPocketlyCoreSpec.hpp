@@ -54,7 +54,7 @@ namespace margelo::nitro::pocketly {
 
   public:
     // Methods
-    std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) override;
+    std::shared_ptr<Promise<void>> resetData(const DatasetSeed& config) override;
     std::shared_ptr<Promise<Wallet>> getWallet() override;
     std::shared_ptr<Promise<TransactionPage>> getTransactions(const std::optional<std::string>& cursor, double limit, const std::optional<TxFilter>& filter) override;
     std::shared_ptr<Promise<Transaction>> getTransaction(const std::string& id) override;
@@ -63,16 +63,24 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<Transaction>> simulateIncomingTransfer() override;
     void setTimeZone(const std::string& zoneId) override;
     std::shared_ptr<Promise<SpendingSummary>> computeSpendingSummary(const std::string& month) override;
-    std::shared_ptr<Promise<IngestResult>> ingestTransactions(const std::string& json) override;
-    std::shared_ptr<Promise<void>> stageIngestPayload(const std::string& json) override;
-    std::shared_ptr<Promise<IngestResult>> ingestStaged() override;
-    double echo(double value) override;
+    PinCheck checkPin(const std::string& pin) override;
+    std::shared_ptr<Promise<void>> setPin(const std::string& pin) override;
+    std::shared_ptr<Promise<UnlockResult>> verifyPin(const std::string& pin) override;
+    std::shared_ptr<Promise<AuthState>> getAuthState() override;
+    std::shared_ptr<Promise<void>> resetAuth() override;
+    std::shared_ptr<Promise<void>> logout() override;
+    std::shared_ptr<Promise<double>> getAutoLockTimeout() override;
+    std::shared_ptr<Promise<void>> setAutoLockTimeout(double ms) override;
+    PhoneCheck checkPhone(const std::string& nationalNumber) override;
+    std::shared_ptr<Promise<OtpSendResult>> requestOtp(const std::string& phone) override;
+    std::shared_ptr<Promise<OtpVerifyResult>> verifyOtp(const std::string& phone, const std::string& code) override;
+    std::shared_ptr<Promise<BiometricStatus>> getBiometricStatus() override;
+    std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) override;
+    std::shared_ptr<Promise<void>> disableBiometrics() override;
+    std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override;
     std::string formatMoney(double minor) override;
-    std::vector<std::string> formatMoneyBatch(const std::vector<double>& minors) override;
     MoneyParseResult parseMoney(const std::string& input) override;
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;
-    double lastComputeMs() override;
-    double lastStorageMs() override;
 
   private:
     jni::global_ref<JHybridPocketlyCoreSpec::JavaPart> _javaPart;

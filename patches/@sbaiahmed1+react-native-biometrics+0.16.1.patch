@@ -1,0 +1,16 @@
+diff -ruN a/android/src/main/java/com/sbaiahmed1/reactnativebiometrics/ReactNativeBiometricsSharedImpl.kt b/android/src/main/java/com/sbaiahmed1/reactnativebiometrics/ReactNativeBiometricsSharedImpl.kt
+--- a/android/src/main/java/com/sbaiahmed1/reactnativebiometrics/ReactNativeBiometricsSharedImpl.kt
++++ b/android/src/main/java/com/sbaiahmed1/reactnativebiometrics/ReactNativeBiometricsSharedImpl.kt
+@@ -1554,6 +1554,12 @@
+ 
+     } catch (e: Exception) {
+       debugLog("verifyKeySignature failed - ${e.message}")
++      // pocketly patch (ADR-0012): a permanently invalidated key (biometrics enrolled or removed,
++      // screen lock removed) gets its own code, so the app can tell it from a temporary failure.
++      if (generateSequence(e as Throwable) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }) {
++        promise.resolve(createSignatureErrorResult("Key permanently invalidated", "KEY_INVALIDATED"))
++        return
++      }
+       val message = "Failed to verify signature: ${e.message ?: "Unknown error"}"
+       promise.resolve(createSignatureErrorResult(message, "SIGNATURE_CREATION_FAILED"))
+     }

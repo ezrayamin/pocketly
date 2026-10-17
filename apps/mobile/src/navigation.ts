@@ -10,4 +10,6 @@ export type RootStackParamList = {
   Tabs: undefined;
   /** `tx` paints the screen at once; the screen then re-reads it by id (status may have moved). */
   TransactionDetail: { id: string; tx?: Transaction };
+  /** Profile → Security: PIN, then one scan, to turn biometric unlock on (FR-AUTH-04). */
+  BiometricSetup: undefined;
 };

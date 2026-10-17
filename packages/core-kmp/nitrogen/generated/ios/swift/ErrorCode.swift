@@ -37,6 +37,8 @@ public extension ErrorCode {
         self = .notFound
       case "INVALID_ARGUMENT":
         self = .invalidArgument
+      case "SECURE_STORAGE_UNAVAILABLE":
+        self = .secureStorageUnavailable
       default:
         return nil
     }
@@ -67,6 +69,8 @@ public extension ErrorCode {
         return "NOT_FOUND"
       case .invalidArgument:
         return "INVALID_ARGUMENT"
+      case .secureStorageUnavailable:
+        return "SECURE_STORAGE_UNAVAILABLE"
     }
   }
 }

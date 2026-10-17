@@ -1,0 +1,11 @@
+wrote benchmarks/results/2026-10-16_mid-01/device.json
+  battery 36.8 °C
+  battery 37.7 °C
+  round 1/3 ✓
+  battery 37.7 °C
+  battery 37.7 °C
+  round 2/3 ✓
+  battery 37.7 °C
+  battery 37.8 °C
+  round 3/3 ✓
+▸ raw results in benchmarks/results/2026-10-16_mid-01/bm-10

@@ -7,15 +7,22 @@
  * <results-dir>/bm-08-size.json. Sizes are COMPRESSED bytes inside the APK, i.e. what
  * APK Analyzer calls "download size" before Play's extra compression. bundletool's
  * `get-size total` would be closer to the real download; it needs bundletool installed.
+ *
+ * ADR-0010 §8: libQuickCrypto.so (jsCore only) links OpenSSL statically, so OpenSSL has no file
+ * of its own. `openssl` estimates its share from the release build's unstripped copy of the
+ * library: sized symbols with C names are OpenSSL, mangled C++ ones are quick-crypto, Nitro and
+ * libc++. An estimate (it ignores relocations, unwind tables and symbol tables), not a measurement.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const ROOT = resolve(__dirname, '../..');
 const APK_DIR = join(ROOT, 'apps/mobile/android/app/build/outputs/apk');
 const MAPPING_DIR = join(ROOT, 'apps/mobile/android/app/build/outputs/mapping');
 const BUILDS = ['jsCore', 'kmpCore'] as const;
+const OPENSSL_LIB = 'libQuickCrypto.so';
 const ABIS = ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'] as const;
 
 interface Entry {
@@ -83,6 +90,47 @@ function keptClassesByOrigin(build: string): Record<string, number> {
   return counts;
 }
 
+function ndkTool(name: string): string | undefined {
+  const sdk = process.env.ANDROID_HOME ?? join(process.env.HOME ?? '', 'Library/Android/sdk');
+  const ndkRoot = join(sdk, 'ndk');
+  if (!existsSync(ndkRoot)) return undefined;
+  const version = readdirSync(ndkRoot).sort().pop();
+  if (version === undefined) return undefined;
+  const prebuilt = join(ndkRoot, version, 'toolchains/llvm/prebuilt');
+  const bin = join(prebuilt, readdirSync(prebuilt)[0], 'bin', name);
+  return existsSync(bin) ? bin : undefined;
+}
+
+/**
+ * ADR-0010 §8: OpenSSL's share of libQuickCrypto.so, by symbol size (see the header), and the
+ * shipped library gzipped (-9), as an estimate of what it adds to the download.
+ */
+function opensslShare(apk: string, abi: string) {
+  const lib = join(
+    ROOT,
+    `apps/mobile/android/app/build/intermediates/merged_native_libs/jsCoreRelease/mergeJsCoreReleaseNativeLibs/out/lib/${abi}/${OPENSSL_LIB}`,
+  );
+  const nm = ndkTool('llvm-nm');
+  if (!existsSync(lib) || nm === undefined) return undefined;
+  let opensslBytes = 0;
+  let cppBytes = 0;
+  const out = execFileSync(nm, ['-S', '--defined-only', lib], { encoding: 'utf8', maxBuffer: 256 << 20 });
+  for (const line of out.split('\n')) {
+    const [, size, type, name] = line.trim().split(/\s+/);
+    if (name === undefined || !/^[tTdDrR]$/.test(type)) continue; // code and data only
+    if (name.startsWith('_Z')) cppBytes += parseInt(size, 16);
+    else opensslBytes += parseInt(size, 16);
+  }
+  const shipped = execFileSync('unzip', ['-p', apk, `lib/${abi}/${OPENSSL_LIB}`], { maxBuffer: 256 << 20 });
+  return {
+    lib: OPENSSL_LIB,
+    opensslBytes,
+    cppBytes,
+    opensslFraction: opensslBytes / (opensslBytes + cppBytes),
+    libGzippedBytes: gzipSync(shipped, { level: 9 }).length,
+  };
+}
+
 function main() {
   const outDir = process.argv[2];
   if (!outDir) {
@@ -101,6 +149,7 @@ function main() {
         abi,
         fileBytes: statSync(apk).size,
         ...breakdown(entries),
+        ...(build === 'jsCore' ? { openssl: opensslShare(apk, abi) } : {}),
       });
     }
   }

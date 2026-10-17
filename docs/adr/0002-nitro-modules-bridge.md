@@ -34,3 +34,24 @@ Use **Nitro Modules 0.37** (`react-native-nitro-modules` + `nitrogen`).
 - `nitrogen` output (`packages/core-kmp/nitrogen/generated`) is committed and must be
   regenerated (`yarn nitrogen`) whenever the spec or a contract type changes.
 - Nitro is less common than Turbo Modules, so the README documents setup in detail.
+
+## Keep the contract coarse (added 2026-10-17)
+
+Two measurements point the same way:
+
+- **Size.** kmpCore's Nitro bridge library grew from 864 KB to 1,540 KB (arm64, +78%) between
+  slice 4 and slice 5, while the spec went from 19 to 35 methods (BM-08,
+  `benchmarks/results/2026-10-17_mid-01`). That is roughly **~42 KB per method**, a rough
+  figure because each method also brings its structs and enums. Removing 8 benchmark-only
+  methods (and their structs) later took 222 KB off it, ~28 KB each (`2026-10-17_mid-02`): call
+  it ~30–40 KB per method on arm64. jsCore pays nothing similar:
+  its contract methods are plain JS.
+- **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
+  batched call (BM-06).
+
+So, for anyone putting a KMP core behind Nitro: **prefer a few methods that each do a lot** over
+many small ones. Return one struct instead of several getters; batch instead of looping across
+the bridge; keep benchmark-only entry points out of the shipped spec. The same idea applies inside
+the core: at startup both cores read several secure-storage keys one by one, and each read is
+a Keystore round trip (ADR-0010 §4); one record instead of several keys would cut that.
+

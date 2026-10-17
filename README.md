@@ -147,7 +147,14 @@ late responses are discarded (ADR-0007). Scriptable: `pocketly://dev/network?nor
 - `jsCore`'s APK and JS bundle contain no KMP core code; `kmpCore`'s contain no op-sqlite.
   The exception is the Nitro runtime; see [ADR-0003](docs/adr/0003-linking-and-build-selection.md).
 - iOS (simulator, Debug): both cores show the same seeded balance on Home, and History and
-  the transaction detail work on `kmpCore`.
+  the transaction detail work on `kmpCore`. Slice 5 (2026-10-16, iPhone 16 Pro simulator, iOS
+  18.6): both cores onboard (phone, OTP, PIN in the Keychain), lock on cold start, count a wrong
+  PIN, re-lock after the auto-lock timeout (jsCore), and log out ("Forgot PIN" in jsCore, Profile
+  in kmpCore) leaving an empty replica with only the install id. Kotlin/Native's iOS tests
+  (CommonCrypto PBKDF2 against `pin.json`) pass. **Not verified on iOS:** biometric unlock (needs
+  a real iPhone: the simulator has no Secure Enclave, and both cores report biometrics
+  unavailable there) and the screen-capture cover (`UIScreen.isCaptured` never turns on in the
+  simulator).
 
 ## Known issues
 

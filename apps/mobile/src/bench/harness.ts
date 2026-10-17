@@ -1,6 +1,7 @@
-import { DEFAULT_DATASET, DEFAULT_NOW_MILLIS, MAX_PAGE_SIZE } from '@pocketly/core-contract';
+import { DEFAULT_DATASET, DEFAULT_NOW_MILLIS, FAKE_OTP_CODE, MAX_PAGE_SIZE } from '@pocketly/core-contract';
 import type { DatasetConfig, Transaction } from '@pocketly/core-contract';
 import { core } from '../core';
+import { bench } from './benchCore';
 
 /**
  * In-app benchmark harness (docs/benchmarking.md §5.2): runs core operations N times in the
@@ -13,7 +14,7 @@ import { core } from '../core';
  * neither bundle carries the other core's code (BM-08). Each result includes a checksum of its
  * input and of its output so collect.ts can confirm both builds did the same work.
  */
-export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-04b', 'BM-06'] as const;
+export const BENCH_SCENARIOS = ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11'] as const;
 export type BenchScenario = (typeof BENCH_SCENARIOS)[number];
 
 /** One measured run. Keys depend on the scenario; all values are milliseconds. */
@@ -50,6 +51,45 @@ const BM03_MONTH = '2026-09';
 const BM04_SOURCE: DatasetConfig = { seed: 2026, transactionCount: 5_000, nowMillis: DEFAULT_NOW_MILLIS };
 /** BM-06: amounts to format. */
 const BM06_COUNT = 10_000;
+/** BM-11: the PIN unlocked in every run (ADR-0010: PBKDF2-HMAC-SHA256, 600,000 iterations). */
+const BM11_PIN = '482915';
+const BM11_PHONE = '+6281234567890';
+/** BM-10, BM-11: how often the JS-thread probe ticks while hashing. */
+const BM11_PROBE_MS = 4;
+/**
+ * BM-10 what-if (ADR-0010 §8): the 60,000-iteration vector of fixtures/pin.json, hashed by each
+ * core's pure-language PBKDF2. Every run's hash is checked against it. A tenth of the PIN's
+ * iterations: at 600,000 one jsCore run takes ~2 min on the vivo (benchmarking.md, BM-10);
+ * PBKDF2's cost is linear in iterations, so results scale ×10.
+ */
+const BM10_VECTOR = {
+  password: '731048',
+  saltHex: 'f1e2d3c4b5a69788796a5b4c3d2e1f00',
+  iterations: 60_000,
+  hashHex: '5ed91aec6f585f8500b02bba210ce6c72fb26e7feb10c75b8ee3bb85ed602519',
+};
+
+/**
+ * Runs `work` while a timer ticks every BM11_PROBE_MS; the longest gap between ticks is how long
+ * the JS thread was stuck (ADR-0010: hashing must not block it).
+ */
+async function withJsProbe<T>(mark: Mark, work: () => Promise<T>): Promise<{ result: T; ms: number; jsMaxGapMs: number }> {
+  let lastTick = now();
+  let jsMaxGapMs = 0;
+  const probe = setInterval(() => {
+    const t = now();
+    jsMaxGapMs = Math.max(jsMaxGapMs, t - lastTick);
+    lastTick = t;
+  }, BM11_PROBE_MS);
+  mark('op-start');
+  const t0 = now();
+  const result = await work();
+  const ms = now() - t0;
+  mark('op-end');
+  clearInterval(probe);
+  jsMaxGapMs = Math.max(jsMaxGapMs, now() - lastTick);
+  return { result, ms, jsMaxGapMs };
+}
 
 // Hermes provides the High Resolution Time API; the app's TS lib config doesn't declare it.
 declare const performance: { now(): number };
@@ -166,7 +206,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         const endToEndMs = now() - t0;
         mark('op-end');
         last = JSON.stringify(summary);
-        return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
+        return { endToEndMs, computeMs: bench.lastComputeMs(), storageMs: bench.lastStorageMs() };
       });
       return {
         scenario,
@@ -190,14 +230,14 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       let last = '';
       const runs = await repeat(options, async (mark) => {
         await core.resetData(DEFAULT_DATASET); // same starting replica for every run (not timed)
-        if (staged) await core.stageIngestPayload(payload);
+        if (staged) await bench.stageIngestPayload(payload);
         mark('op-start');
         const t0 = now();
-        const result = staged ? await core.ingestStaged() : await core.ingestTransactions(payload);
+        const result = staged ? await bench.ingestStaged() : await bench.ingestTransactions(payload);
         const endToEndMs = now() - t0;
         mark('op-end');
         last = JSON.stringify(result);
-        return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
+        return { endToEndMs, computeMs: bench.lastComputeMs(), storageMs: bench.lastStorageMs() };
       });
       return {
         scenario,
@@ -221,17 +261,17 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         for (let i = 0; i < minors.length; i++) one[i] = core.formatMoney(minors[i]);
         const chattyEndToEndMs = now() - t0;
         const t1 = now();
-        const batch = core.formatMoneyBatch(minors);
+        const batch = bench.formatMoneyBatch(minors);
         const batchEndToEndMs = now() - t1;
         // Pure call cost: the same number of calls as the chatty loop, with no work in the core.
         const t2 = now();
         let echoed = 0;
-        for (let i = 0; i < minors.length; i++) echoed += core.echo(minors[i]);
+        for (let i = 0; i < minors.length; i++) echoed += bench.echo(minors[i]);
         const echoEndToEndMs = now() - t2;
         mark('op-end');
         const formatted = one.join('|') === batch.join('|') ? batch.join('|') : 'MISMATCH';
         last = echoed === echoTotal ? formatted : 'MISMATCH';
-        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: core.lastComputeMs(), echoEndToEndMs };
+        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: bench.lastComputeMs(), echoEndToEndMs };
       });
       return {
         scenario,
@@ -240,6 +280,50 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         runs,
         input: { description: `${minors.length} amounts, LCG seed 12345`, checksum: checksum(minors.join(',')) },
         output: { description: 'formatted amounts (chatty and batch must match; echo must return its inputs)', checksum: checksum(last) },
+        setupMs,
+      };
+    }
+    case 'BM-10': {
+      // What-if, not the shipped PIN (ADR-0010 §8): no secrets are touched.
+      const { password, saltHex, iterations, hashHex } = BM10_VECTOR;
+      const setupMs = now() - setupStart;
+      const runs = await repeat(options, async (mark) => {
+        const { result, ms, jsMaxGapMs } = await withJsProbe(mark, () => bench.pbkdf2WhatIf(password, saltHex, iterations));
+        if (result !== hashHex) throw new Error(`BM-10: ${core.impl}Core hashed ${result}, expected ${hashHex}`);
+        return { hashMs: ms, jsMaxGapMs };
+      });
+      return {
+        scenario,
+        build,
+        warmup: options.warmup,
+        runs,
+        input: { description: `pure-language PBKDF2-HMAC-SHA256 × ${iterations}, ${BM11_PROBE_MS} ms JS-thread probe`, checksum: checksum(`${password}:${saltHex}:${iterations}`) },
+        output: { description: 'the hash (checked against fixtures/pin.json in every run)', checksum: checksum(hashHex) },
+        setupMs,
+      };
+    }
+    case 'BM-11': {
+      // Replaces whatever PIN this install had: run it on benchmark installs only.
+      await core.resetAuth();
+      // ADR-0013: a PIN needs a verified phone. The fake server's code, not timed.
+      await core.requestOtp(BM11_PHONE);
+      await core.verifyOtp(BM11_PHONE, FAKE_OTP_CODE);
+      await core.setPin(BM11_PIN);
+      const setupMs = now() - setupStart;
+      const outcomes: string[] = [];
+      const runs = await repeat(options, async (mark) => {
+        const { result, ms, jsMaxGapMs } = await withJsProbe(mark, () => core.verifyPin(BM11_PIN));
+        outcomes.push(result.outcome);
+        return { unlockMs: ms, jsMaxGapMs };
+      });
+      await core.resetAuth();
+      return {
+        scenario,
+        build,
+        warmup: options.warmup,
+        runs,
+        input: { description: `verifyPin with the right PIN, ${BM11_PROBE_MS} ms JS-thread probe`, checksum: checksum(BM11_PIN) },
+        output: { description: 'outcome of every measured run', checksum: checksum([...new Set(outcomes)].join(',')) },
         setupMs,
       };
     }

@@ -16,6 +16,8 @@ jest.mock('@pocketly/native-preferences', () => {
     },
   };
 });
+// FLAG_SECURE / capture cover (NFR-SEC-03): tests can read which screens asked for it.
+jest.mock('@pocketly/native-secure-screen', () => ({ useSecureScreen: jest.fn() }));
 // Developer tools are on in every build this project produces (ADR-0008).
 jest.mock('@pocketly/native-build-info', () => ({ buildInfo: { devToolsEnabled: true } }));
 // op-sqlite (jsCore's storage, ADR-0009) on Node's built-in SQLite. Only what
@@ -64,6 +66,55 @@ jest.mock('@op-engineering/op-sqlite', () => {
         },
         close: () => {},
       };
+    },
+  };
+});
+// jsCore's PIN crypto (ADR-0010) on Node's crypto, which is OpenSSL too.
+jest.mock('react-native-quick-crypto', () => ({ ...require('node:crypto'), Buffer: require('node:buffer').Buffer }));
+// jsCore's secure storage (ADR-0010) in memory. Only what core-js/src/security/sensitiveInfoStore.ts uses.
+jest.mock('react-native-sensitive-info', () => {
+  const items = new Map();
+  return {
+    getItem: async (key) => (items.has(key) ? { key, value: items.get(key) } : null),
+    setItem: async (key, value) => {
+      items.set(key, value);
+    },
+    deleteItem: async (key) => items.delete(key),
+    clearService: async () => items.clear(),
+    isKeyInvalidatedError: () => false,
+    isIntegrityViolationError: () => false,
+  };
+});
+// jsCore's biometric key (ADR-0012): a software P-256 key. Tests script scans through `__scans`
+// ('MATCH' | 'CANCEL' | 'LOCKOUT' | 'INVALIDATED') and hardware through `__state`.
+jest.mock('@sbaiahmed1/react-native-biometrics', () => {
+  const crypto = require('node:crypto');
+  const { Buffer } = require('node:buffer');
+  const state = { available: true, key: undefined };
+  const scans = [];
+  return {
+    __state: state,
+    __scans: scans,
+    BiometricStrength: { Strong: 'strong', Weak: 'weak' },
+    InputEncoding: { UTF8: 'utf8', Base64: 'base64' },
+    isSensorAvailable: async () =>
+      state.available ? { available: true, biometryType: 'TouchID' } : { available: false, errorCode: 'BiometricErrorNoneEnrolled' },
+    createKeysWithOptions: async () => {
+      const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+      state.key = pair.privateKey;
+      return { publicKey: pair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64') };
+    },
+    deleteKeys: async () => {
+      state.key = undefined;
+      return { success: true };
+    },
+    signWithOptions: async ({ data }) => {
+      const scan = scans.shift() ?? 'MATCH';
+      if (scan === 'CANCEL') return { success: false, errorCode: 'USER_CANCELED' };
+      if (scan === 'LOCKOUT') return { success: false, errorCode: 'BIOMETRIC_LOCKOUT' };
+      if (scan === 'INVALIDATED' || !state.key) return { success: false, errorCode: 'KEY_INVALIDATED' };
+      const signature = crypto.sign('sha256', Buffer.from(data, 'base64'), { key: state.key, dsaEncoding: 'der' });
+      return { success: true, signature: signature.toString('base64') };
     },
   };
 });

@@ -51,7 +51,11 @@ export type Category =
   | 'TRANSFER'
   | 'TOP_UP';
 
-/** requirements §4.3, plus two contract-level codes (NOT_FOUND, INVALID_ARGUMENT). */
+/**
+ * requirements §4.3, plus contract-level codes: NOT_FOUND, INVALID_ARGUMENT, and
+ * SECURE_STORAGE_UNAVAILABLE (ADR-0010: secure storage can't be used right now, e.g. the device
+ * is locked; nothing was wiped, stay locked and retry).
+ */
 export type ErrorCode =
   | 'INSUFFICIENT_FUNDS'
   | 'DAILY_LIMIT_EXCEEDED'
@@ -62,7 +66,8 @@ export type ErrorCode =
   | 'SERVER_ERROR'
   | 'IDEMPOTENCY_CONFLICT'
   | 'NOT_FOUND'
-  | 'INVALID_ARGUMENT';
+  | 'INVALID_ARGUMENT'
+  | 'SECURE_STORAGE_UNAVAILABLE';
 
 export type CounterpartyKind = 'USER' | 'MERCHANT' | 'PAYMENT_METHOD';
 
@@ -242,10 +247,152 @@ export interface DatasetSeed {
   nowMillis?: EpochMillis;
 }
 
-export interface DatasetConfig extends DatasetSeed {
+/** The fake server's dataset. Extra seed rows are benchmark/test-only: BenchCore.resetDataWithExtras. */
+export type DatasetConfig = DatasetSeed;
+
+// ── Auth & App Lock (F1, F2; ADR-0010) ──────────────────────────────────
+
+/** FR-AUTH-03: why a candidate PIN is refused. */
+export type PinRejectReason = 'NOT_DIGITS' | 'WRONG_LENGTH' | 'TOO_SIMPLE';
+
+export interface PinCheck {
+  ok: boolean;
+  /** Set when `ok` is false. */
+  reason?: PinRejectReason;
+}
+
+/**
+ * FR-LOCK-04. LOCKED_OUT also covers the attempt that triggers the lockout; while locked out
+ * the PIN isn't checked at all.
+ */
+export type UnlockOutcome = 'UNLOCKED' | 'WRONG_PIN' | 'LOCKED_OUT';
+
+export interface UnlockResult {
+  outcome: UnlockOutcome;
+  /** Wrong attempts left before a lockout. PIN_MAX_ATTEMPTS after UNLOCKED, 0 when LOCKED_OUT. */
+  attemptsLeft: number;
+  /** Device-clock end of the lockout; set only when LOCKED_OUT. */
+  lockedUntil?: EpochMillis;
+}
+
+/** What the lock screen needs on start. Read from secure storage, so it survives force-closing. */
+export interface AuthState {
+  /** FR-AUTH-02: the phone verified by OTP on this install (E.164). Absent: onboarding starts there. */
+  phone?: string;
+  pinSet: boolean;
+  /** Wrong attempts since the last unlock or lockout (0..PIN_MAX_ATTEMPTS-1). */
+  failedAttempts: number;
+  /** Set while a lockout is running. */
+  lockedUntil?: EpochMillis;
+}
+
+// ── Biometrics (FR-AUTH-04, later FR-TRF-04; ADR-0012) ──────────────────
+
+export type BiometricKind = 'FINGERPRINT' | 'FACE' | 'IRIS' | 'OTHER';
+
+/** Why biometrics can't be used. Only strong (Class 3) biometrics count. */
+export type BiometricUnavailableReason = 'NO_HARDWARE' | 'NOT_ENROLLED' | 'NOT_STRONG' | 'TEMPORARILY_UNAVAILABLE';
+
+export interface BiometricStatus {
+  /** The device can sign with a strong biometric right now. */
+  available: boolean;
+  reason?: BiometricUnavailableReason;
+  kind?: BiometricKind;
+  /** The user turned biometric unlock on (a key and its public key exist). */
+  enabled: boolean;
+}
+
+/** What the system prompt says. The cancel button is how the user gets to the PIN. */
+export interface BiometricPromptText {
+  title: string;
+  subtitle?: string;
+  cancel: string;
+}
+
+/**
+ * enableBiometrics. WRONG_PIN / PIN_LOCKED_OUT: the PIN check failed (counted like verifyPin).
+ * CANCELLED / BIOMETRIC_LOCKED_OUT / UNAVAILABLE: the confirming scan didn't happen; nothing
+ * was enabled. NOT_AVAILABLE: no strong biometric on this device.
+ */
+export type BiometricEnableOutcome =
+  | 'ENABLED'
+  | 'WRONG_PIN'
+  | 'PIN_LOCKED_OUT'
+  | 'CANCELLED'
+  | 'BIOMETRIC_LOCKED_OUT'
+  | 'NOT_AVAILABLE'
+  | 'UNAVAILABLE';
+
+export interface BiometricEnableResult {
+  outcome: BiometricEnableOutcome;
+  /** WRONG_PIN only. */
+  attemptsLeft?: number;
+  /** PIN_LOCKED_OUT only. */
+  lockedUntil?: EpochMillis;
+}
+
+/**
+ * unlockWithBiometrics.
+ * - UNLOCKED: a fresh challenge was signed by the biometric key and verified.
+ * - CANCELLED: the user chose the PIN (or the system dismissed the prompt).
+ * - BIOMETRIC_LOCKED_OUT: the OS locked biometrics after failed scans; use the PIN.
+ * - KEY_INVALIDATED: biometrics changed (enrolled, removed, screen lock removed); biometric
+ *   unlock was turned off and the PIN is needed to turn it on again.
+ * - FAILED: the signature didn't verify (an old or forged answer): turned off. Also an answer
+ *   that came after BIOMETRIC_CHALLENGE_TTL_MS: left on, since that's a slow user.
+ * - UNAVAILABLE: temporarily can't be used (e.g. device locked); nothing changed.
+ */
+export type BiometricUnlockOutcome =
+  | 'UNLOCKED'
+  | 'CANCELLED'
+  | 'BIOMETRIC_LOCKED_OUT'
+  | 'KEY_INVALIDATED'
+  | 'FAILED'
+  | 'UNAVAILABLE';
+
+export interface BiometricUnlockResult {
+  outcome: BiometricUnlockOutcome;
   /**
-   * Extra transactions the fake server is seeded with, on top of the generated ones (tests,
-   * demos). Validated like ingest input; any invalid entry rejects the reset (INVALID_ARGUMENT).
+   * UNLOCKED during a PIN lockout. The lockout and its counter stay as they are; the app tells
+   * the user someone entered wrong PINs.
    */
-  extraTransactions?: Transaction[];
+  pinLockedOut: boolean;
+}
+
+// ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ────────────────────
+
+/** FR-AUTH-01: why a phone number is refused. Indonesia (+62) mobile numbers only. */
+export type PhoneRejectReason = 'NOT_DIGITS' | 'NOT_MOBILE' | 'TOO_SHORT' | 'TOO_LONG';
+
+export interface PhoneCheck {
+  ok: boolean;
+  /** E.164, e.g. "+6281234567890"; set when ok. */
+  e164?: string;
+  reason?: PhoneRejectReason;
+}
+
+/** requestOtp. TOO_SOON: a code was sent less than OTP_RESEND_MS ago; nothing was sent. */
+export type OtpSendOutcome = 'SENT' | 'TOO_SOON';
+
+export interface OtpSendResult {
+  outcome: OtpSendOutcome;
+  /** When "Resend" may be used. */
+  resendAt: EpochMillis;
+}
+
+/**
+ * verifyOtp (counted by the server, as a real backend would).
+ * - VERIFIED: the phone is now this install's verified phone (secure storage); the PIN comes next.
+ * - WRONG_CODE: `attemptsLeft` before a cooldown.
+ * - COOLDOWN: OTP_MAX_ATTEMPTS wrong codes; no code is checked until `retryAt`.
+ * - EXPIRED / NO_CODE: request a new code.
+ */
+export type OtpVerifyOutcome = 'VERIFIED' | 'WRONG_CODE' | 'COOLDOWN' | 'EXPIRED' | 'NO_CODE';
+
+export interface OtpVerifyResult {
+  outcome: OtpVerifyOutcome;
+  /** WRONG_CODE only. */
+  attemptsLeft?: number;
+  /** COOLDOWN only. */
+  retryAt?: EpochMillis;
 }

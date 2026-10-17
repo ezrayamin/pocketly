@@ -79,10 +79,66 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(const IngestResult& /* result */)>
-  Func_void_IngestResult create_Func_void_IngestResult(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = PocketlyCoreKmp::Func_void_IngestResult::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const IngestResult& result) mutable -> void {
+  // pragma MARK: std::function<void(const UnlockResult& /* result */)>
+  Func_void_UnlockResult create_Func_void_UnlockResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_UnlockResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UnlockResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const AuthState& /* result */)>
+  Func_void_AuthState create_Func_void_AuthState(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_AuthState::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const AuthState& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(double /* result */)>
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const OtpSendResult& /* result */)>
+  Func_void_OtpSendResult create_Func_void_OtpSendResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_OtpSendResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const OtpSendResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const OtpVerifyResult& /* result */)>
+  Func_void_OtpVerifyResult create_Func_void_OtpVerifyResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_OtpVerifyResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const OtpVerifyResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const BiometricStatus& /* result */)>
+  Func_void_BiometricStatus create_Func_void_BiometricStatus(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricStatus::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricStatus& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const BiometricEnableResult& /* result */)>
+  Func_void_BiometricEnableResult create_Func_void_BiometricEnableResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricEnableResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricEnableResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const BiometricUnlockResult& /* result */)>
+  Func_void_BiometricUnlockResult create_Func_void_BiometricUnlockResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_BiometricUnlockResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const BiometricUnlockResult& result) mutable -> void {
       swiftClosure.call(result);
     };
   }

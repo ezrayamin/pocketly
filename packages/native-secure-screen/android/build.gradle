@@ -1,0 +1,24 @@
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+  namespace "com.pocketly.securescreen"
+  compileSdk rootProject.ext.compileSdkVersion
+
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
+
+kotlin {
+  jvmToolchain(17)
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+}

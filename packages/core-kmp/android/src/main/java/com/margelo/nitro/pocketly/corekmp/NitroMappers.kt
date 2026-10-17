@@ -12,6 +12,16 @@ import com.pocketly.shared.domain.ErrorCode as KErrorCode
 import com.pocketly.shared.domain.IngestResult as KIngestResult
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyParseResult as KMoneyParseResult
+import com.pocketly.shared.domain.AuthState as KAuthState
+import com.pocketly.shared.domain.OtpSendResult as KOtpSendResult
+import com.pocketly.shared.domain.OtpVerifyResult as KOtpVerifyResult
+import com.pocketly.shared.domain.PhoneCheck as KPhoneCheck
+import com.pocketly.shared.domain.BiometricEnableResult as KBiometricEnableResult
+import com.pocketly.shared.domain.BiometricPromptText as KBiometricPromptText
+import com.pocketly.shared.domain.BiometricStatus as KBiometricStatus
+import com.pocketly.shared.domain.BiometricUnlockResult as KBiometricUnlockResult
+import com.pocketly.shared.domain.PinCheck as KPinCheck
+import com.pocketly.shared.domain.UnlockResult as KUnlockResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
 import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
@@ -29,26 +39,10 @@ import com.pocketly.shared.domain.Wallet as KWallet
 
 // ── JS → Kotlin ─────────────────────────────────────────────────────────────
 
-internal fun DatasetSeed.toDomain(extraTransactions: Array<Transaction>) = KDatasetConfig(
+internal fun DatasetSeed.toDomain() = KDatasetConfig(
     seed = BridgeConversions.toIntExact(seed, "seed"),
     transactionCount = BridgeConversions.toIntExact(transactionCount, "transactionCount"),
     nowMillis = nowMillis?.let { BridgeConversions.toLongExact(it, "nowMillis") },
-    extraTransactions = extraTransactions.map { it.toDomain() },
-)
-
-// Shape only: the fake server validates the values like ingest input (INVALID_ARGUMENT).
-private fun Transaction.toDomain() = KTransaction(
-    id = id,
-    idempotencyKey = idempotencyKey,
-    type = KTransactionType.valueOf(type.name),
-    category = KCategory.valueOf(category.name),
-    amount = Money(BridgeConversions.toLongExact(amount, "amount")),
-    counterparty = counterparty?.let { KCounterparty(KCounterpartyKind.valueOf(it.kind.name), it.id, it.name, it.phone) },
-    note = note,
-    status = KTransactionStatus.valueOf(status.name),
-    failureReason = failureReason?.let { KErrorCode.valueOf(it.name) },
-    createdAt = BridgeConversions.toLongExact(createdAt, "createdAt"),
-    updatedAt = BridgeConversions.toLongExact(updatedAt, "updatedAt"),
 )
 
 internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
@@ -131,17 +125,38 @@ internal fun KSpendingSummary.toNitro() = SpendingSummary(
     balanceCheck = balanceCheck.toNitro(),
 )
 
-internal fun KIngestResult.toNitro() = IngestResult(
-    accepted = accepted.toDouble(),
-    rejected = rejected.toDouble(),
-    duplicates = duplicates.toDouble(),
-    errors = Array(errors.size) { IngestError(errors[it].index.toDouble(), IngestRejectReason.valueOf(errors[it].reason.name)) },
-)
-
 internal fun KMoneyParseResult.toNitro() = MoneyParseResult(
     ok = ok,
     minor = minor?.minor?.toDouble(),
     error = error?.let { MoneyParseError.valueOf(it.name) },
 )
+
+internal fun KPinCheck.toNitro() = PinCheck(ok, reason?.let { PinRejectReason.valueOf(it.name) })
+
+internal fun KUnlockResult.toNitro() =
+    UnlockResult(UnlockOutcome.valueOf(outcome.name), attemptsLeft.toDouble(), lockedUntil?.toDouble())
+
+internal fun KAuthState.toNitro() = AuthState(phone, pinSet, failedAttempts.toDouble(), lockedUntil?.toDouble())
+
+internal fun KPhoneCheck.toNitro() = PhoneCheck(ok, e164, reason?.let { PhoneRejectReason.valueOf(it.name) })
+
+internal fun KOtpSendResult.toNitro() = OtpSendResult(OtpSendOutcome.valueOf(outcome.name), resendAt.toDouble())
+
+internal fun KOtpVerifyResult.toNitro() =
+    OtpVerifyResult(OtpVerifyOutcome.valueOf(outcome.name), attemptsLeft?.toDouble(), retryAt?.toDouble())
+
+internal fun KBiometricStatus.toNitro() = BiometricStatus(
+    available,
+    reason?.let { BiometricUnavailableReason.valueOf(it.name) },
+    kind?.let { BiometricKind.valueOf(it.name) },
+    enabled,
+)
+
+internal fun BiometricPromptText.toDomain() = KBiometricPromptText(title, subtitle, cancel)
+
+internal fun KBiometricEnableResult.toNitro() =
+    BiometricEnableResult(BiometricEnableOutcome.valueOf(outcome.name), attemptsLeft?.toDouble(), lockedUntil?.toDouble())
+
+internal fun KBiometricUnlockResult.toNitro() = BiometricUnlockResult(BiometricUnlockOutcome.valueOf(outcome.name), pinLockedOut)
 
 internal fun KPriceTick.toNitro() = PriceTick(symbol, price.minor.toDouble(), changeBps.toDouble(), seq.toDouble())

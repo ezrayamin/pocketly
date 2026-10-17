@@ -4,15 +4,24 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PRICE_INTERVAL_MS,
   MAX_PAGE_SIZE,
+  OTP_LENGTH,
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
+  AuthState,
+  BiometricEnableResult,
+  BiometricPromptText,
+  BiometricStatus,
+  BiometricUnlockResult,
   Core,
   DatasetConfig,
   ErrorCode,
-  IngestResult,
   MoneyParseResult,
   NetworkSimulation,
+  OtpSendResult,
+  OtpVerifyResult,
+  PhoneCheck,
+  PinCheck,
   PriceStreamOptions,
   PriceTick,
   SpendingSummary,
@@ -21,16 +30,23 @@ import type {
   Transaction,
   TransactionPage,
   TxFilter,
+  UnlockResult,
   Wallet,
 } from '@pocketly/core-contract';
 import { CacheStore } from './data/cacheStore';
 import type { SqlDriver } from './data/db/sqlDriver';
-import { FakeWalletApi } from './data/fake/fakeWalletApi';
+import { FakeWalletApi, type ServerDataset } from './data/fake/fakeWalletApi';
 import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
-import { parseAndValidate } from './data/transactionIngestor';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { BiometricAuth } from './security/biometricAuth';
+import type { BiometricSigner } from './security/biometricSigner';
+import { PinAuth } from './security/pinAuth';
+import { checkPhone, isValidE164 } from './security/phonePolicy';
+import type { PinCrypto } from './security/pinCrypto';
+import { checkPin } from './security/pinPolicy';
+import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
@@ -50,6 +66,15 @@ export interface JsCoreOptions {
   cache: SqlDriver;
   /** Seeds the server only if its database is empty. Default: DEFAULT_DATASET (frozen clock). */
   dataset?: DatasetConfig;
+  /** Secrets (ADR-0010): Keystore / Keychain in the app. */
+  secure: SecureStore;
+  crypto: PinCrypto;
+  /** ADR-0012: the strong-biometric-bound signing key. */
+  biometrics: BiometricSigner;
+  /** Device clock for PIN lockouts. Tests only. */
+  clock?: () => number;
+  /** PBKDF2 work factor for new PIN records. Tests only; default PIN_PBKDF2_ITERATIONS. */
+  pinIterations?: number;
 }
 
 /** Composition root for the TypeScript core. Counterpart of shared/.../bridge/PocketlyCore.kt. */
@@ -64,13 +89,19 @@ export class JsCore implements Core {
   private readonly ledgerSync: LedgerSync;
   /** Databases open lazily; every data call awaits this first. */
   private readonly ready: Promise<void>;
-  private computeMs = 0;
-  private storageMs = 0;
-  /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
-  private stagedPayload: string | undefined;
+  /**
+   * Time inside the core / in the database of the most recent timed call (computeSpendingSummary
+   * here; the bench's helpers too). Read only by core-js-bench (perf builds).
+   */
+  /** @internal */
+  computeMs = 0;
+  /** @internal */
+  storageMs = 0;
+  private readonly pin: PinAuth;
+  private readonly biometric: BiometricAuth;
 
   constructor(options: JsCoreOptions) {
-    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone);
+    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone, options.clock ?? Date.now);
     const cache = new CacheStore(options.cache);
     this.backend = backend;
     this.api = new TimeoutWalletApi(backend, () => backend.network.get().readTimeoutMs!);
@@ -80,15 +111,37 @@ export class JsCore implements Core {
       await backend.open(options.dataset ?? DEFAULT_DATASET);
       await cache.init();
     })();
+    this.pin = new PinAuth({
+      store: options.secure,
+      crypto: options.crypto,
+      marker: {
+        get: async () => {
+          await this.ready;
+          return cache.installId();
+        },
+        set: async (id) => {
+          await this.ready;
+          await cache.setInstallId(id);
+        },
+      },
+      clock: options.clock,
+      iterations: options.pinIterations,
+    });
+    this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
   }
 
-  async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
+  resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
+    return this.reset(config);
+  }
+
+  /** resetData, with extra seed rows allowed (core-js-bench: BenchCore.resetDataWithExtras). */
+  private async reset(config: ServerDataset): Promise<void> {
     await this.ready;
     await this.backend.reset(config);
     await this.cache.clear();
     try {
       await this.ledgerSync.sync();
-      await this.cache.upsertWallet(await this.api.getWallet(), Date.now());
+      await this.fetchWallet();
     } catch (e) {
       if (!STALEABLE.has(toCoreError(e).code)) throw e; // offline reset: replica stays empty
     }
@@ -97,15 +150,21 @@ export class JsCore implements Core {
   async getWallet(): Promise<Wallet> {
     await this.ready;
     try {
-      const wallet = await this.api.getWallet();
-      await this.cache.upsertWallet(wallet, Date.now());
-      return wallet;
+      return await this.fetchWallet();
     } catch (e) {
       const error = toCoreError(e);
       const cached = STALEABLE.has(error.code) ? await this.cache.getWallet() : undefined;
       if (cached === undefined) throw error;
       return { ...cached.wallet, stale: { reason: error.code, cachedAt: cached.cachedAt } };
     }
+  }
+
+  /** From the server into the replica, unless the replica was cleared meanwhile (logout). */
+  private async fetchWallet(): Promise<Wallet> {
+    const generation = this.cache.generation;
+    const wallet = await this.api.getWallet();
+    if (this.cache.generation === generation) await this.cache.upsertWallet(wallet, Date.now());
+    return wallet;
   }
 
   async getTransactions(
@@ -147,31 +206,6 @@ export class JsCore implements Core {
     return this.timed(() => computeSpendingSummary(month, this.zone.month(month), transactions, walletBalance));
   }
 
-  async stageIngestPayload(json: string): Promise<void> {
-    this.stagedPayload = json;
-  }
-
-  ingestStaged(): Promise<IngestResult> {
-    if (this.stagedPayload === undefined) {
-      return Promise.reject(new CoreError('INVALID_ARGUMENT', 'no ingest payload staged'));
-    }
-    return this.ingestTransactions(this.stagedPayload);
-  }
-
-  async ingestTransactions(json: string): Promise<IngestResult> {
-    await this.ready;
-    const parsed = this.timed(() => parseAndValidate(json));
-    const start = now();
-    const inserted = await this.cache.insertIfAbsentMany(parsed.valid);
-    this.storageMs = now() - start;
-    return {
-      accepted: inserted,
-      rejected: parsed.rejected,
-      duplicates: parsed.valid.length - inserted,
-      errors: parsed.errors,
-    };
-  }
-
   setNetworkSimulation(simulation: NetworkSimulation): void {
     this.backend.network.set(simulation);
   }
@@ -191,17 +225,78 @@ export class JsCore implements Core {
     }
   }
 
-  echo(value: number): number {
-    return value;
+  checkPin(pin: string): PinCheck {
+    return checkPin(pin);
+  }
+
+  setPin(pin: string): Promise<void> {
+    return this.pin.setPin(pin);
+  }
+
+  verifyPin(pin: string): Promise<UnlockResult> {
+    return this.pin.verifyPin(pin);
+  }
+
+  getAuthState(): Promise<AuthState> {
+    return this.pin.getAuthState();
+  }
+
+  resetAuth(): Promise<void> {
+    return this.biometric.reset();
+  }
+
+  async logout(): Promise<void> {
+    // The replica first: if the secrets then fail to go, nothing of the history is left behind.
+    await this.ready;
+    await this.cache.clear();
+    await this.biometric.reset();
+  }
+
+  checkPhone(nationalNumber: string): PhoneCheck {
+    return checkPhone(nationalNumber);
+  }
+
+  async requestOtp(phone: string): Promise<OtpSendResult> {
+    if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
+    await this.ready;
+    return this.api.requestOtp(phone);
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<OtpVerifyResult> {
+    if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
+    if (!new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(code)) throw new CoreError('INVALID_ARGUMENT', `the code has ${OTP_LENGTH} digits`);
+    await this.ready;
+    const { sessionToken, ...result } = await this.api.verifyOtp(phone, code);
+    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) await this.pin.rememberVerifiedPhone(phone, sessionToken);
+    return result;
+  }
+
+  getBiometricStatus(): Promise<BiometricStatus> {
+    return this.biometric.status();
+  }
+
+  enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult> {
+    return this.biometric.enable(pin, prompt);
+  }
+
+  disableBiometrics(): Promise<void> {
+    return this.biometric.disable();
+  }
+
+  unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> {
+    return this.biometric.unlock(prompt);
+  }
+
+  getAutoLockTimeout(): Promise<number> {
+    return this.pin.getAutoLockTimeout();
+  }
+
+  setAutoLockTimeout(ms: number): Promise<void> {
+    return this.pin.setAutoLockTimeout(ms);
   }
 
   formatMoney(minor: number): string {
     return formatMoney(minor);
-  }
-
-  formatMoneyBatch(minors: number[]): string[] {
-    this.storageMs = 0;
-    return this.timed(() => minors.map(formatMoney));
   }
 
   parseMoney(input: string): MoneyParseResult {
@@ -216,14 +311,6 @@ export class JsCore implements Core {
     const feed = new PriceFeed(symbols, options?.seed ?? 1);
     const handle = setInterval(() => onTicks(feed.step()), options?.intervalMs ?? DEFAULT_PRICE_INTERVAL_MS);
     return { unsubscribe: () => clearInterval(handle) };
-  }
-
-  lastComputeMs(): number {
-    return this.computeMs;
-  }
-
-  lastStorageMs(): number {
-    return this.storageMs;
   }
 
   private timed<T>(work: () => T): T {

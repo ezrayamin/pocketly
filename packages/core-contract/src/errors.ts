@@ -11,6 +11,7 @@ const ERROR_CODES: readonly ErrorCode[] = [
   'IDEMPOTENCY_CONFLICT',
   'NOT_FOUND',
   'INVALID_ARGUMENT',
+  'SECURE_STORAGE_UNAVAILABLE',
 ];
 
 export class CoreError extends Error {

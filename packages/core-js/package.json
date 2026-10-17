@@ -16,14 +16,21 @@
     "@pocketly/core-contract": "0.1.0"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.13",
-    "jest": "^29.6.3",
-    "tsx": "^4.20.0",
     "@babel/preset-env": "^7.25.3",
     "@babel/preset-typescript": "^7.27.0",
-    "@op-engineering/op-sqlite": "18.2.5"
+    "@op-engineering/op-sqlite": "18.2.5",
+    "@sbaiahmed1/react-native-biometrics": "0.16.1",
+    "@types/jest": "^29.5.13",
+    "jest": "^29.6.3",
+    "react-native-quick-crypto": "1.1.7",
+    "react-native-sensitive-info": "6.1.5",
+    "tsx": "^4.20.0",
+    "@pocketly/core-js-bench": "0.1.0"
   },
   "peerDependencies": {
-    "@op-engineering/op-sqlite": "*"
+    "@op-engineering/op-sqlite": "*",
+    "@sbaiahmed1/react-native-biometrics": "*",
+    "react-native-quick-crypto": "*",
+    "react-native-sensitive-info": "*"
   }
 }

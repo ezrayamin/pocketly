@@ -1,0 +1,12 @@
+{
+  "name": "@pocketly/native-secure-screen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Keeps sensitive screens out of screenshots and recordings (NFR-SEC-03). Same in both builds.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "peerDependencies": {
+    "react-native": "*"
+  }
+}

@@ -5,6 +5,7 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.pocketly.securescreen.SecureWindow
 import com.swmansion.rnscreens.fragment.restoration.RNScreensFragmentFactory
 
 class MainActivity : ReactActivity() {
@@ -30,5 +31,19 @@ class MainActivity : ReactActivity() {
     supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
     super.onCreate(savedInstanceState)
     FullyDrawnReporter.install(this) // BM-01 time to fully drawn
+    SecureWindow.onCreate(this) // FR-LOCK-03: no app content in the app switcher
+  }
+
+  // FR-LOCK-03 before Android 13: FLAG_SECURE while paused blanks the app-switcher snapshot.
+  override fun onPause() {
+    SecureWindow.paused = true
+    SecureWindow.apply(this)
+    super.onPause()
+  }
+
+  override fun onResume() {
+    super.onResume()
+    SecureWindow.paused = false
+    SecureWindow.apply(this)
   }
 }

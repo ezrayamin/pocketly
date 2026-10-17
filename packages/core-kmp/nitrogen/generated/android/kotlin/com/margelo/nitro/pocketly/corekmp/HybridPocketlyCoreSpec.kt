@@ -32,7 +32,7 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit>
+  abstract fun resetData(config: DatasetSeed): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -68,27 +68,67 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun ingestTransactions(json: String): Promise<IngestResult>
+  abstract fun checkPin(pin: String): PinCheck
   
   @DoNotStrip
   @Keep
-  abstract fun stageIngestPayload(json: String): Promise<Unit>
+  abstract fun setPin(pin: String): Promise<Unit>
   
   @DoNotStrip
   @Keep
-  abstract fun ingestStaged(): Promise<IngestResult>
+  abstract fun verifyPin(pin: String): Promise<UnlockResult>
   
   @DoNotStrip
   @Keep
-  abstract fun echo(value: Double): Double
+  abstract fun getAuthState(): Promise<AuthState>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun resetAuth(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun logout(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getAutoLockTimeout(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setAutoLockTimeout(ms: Double): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun checkPhone(nationalNumber: String): PhoneCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun requestOtp(phone: String): Promise<OtpSendResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun verifyOtp(phone: String, code: String): Promise<OtpVerifyResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getBiometricStatus(): Promise<BiometricStatus>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun enableBiometrics(pin: String, prompt: BiometricPromptText): Promise<BiometricEnableResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun disableBiometrics(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>
   
   @DoNotStrip
   @Keep
   abstract fun formatMoney(minor: Double): String
-  
-  @DoNotStrip
-  @Keep
-  abstract fun formatMoneyBatch(minors: DoubleArray): Array<String>
   
   @DoNotStrip
   @Keep
@@ -102,14 +142,6 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
     val __result = subscribePrices(symbols, intervalMs, seed, onTicks)
     return __result
   }
-  
-  @DoNotStrip
-  @Keep
-  abstract fun lastComputeMs(): Double
-  
-  @DoNotStrip
-  @Keep
-  abstract fun lastStorageMs(): Double
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

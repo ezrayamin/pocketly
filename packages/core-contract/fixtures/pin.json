@@ -1,0 +1,60 @@
+{
+  "_comment": "Hand-written (ADR-0010). PBKDF2 hashes were computed with Node's crypto and Python's hashlib, which agree. Both cores must reproduce every vector and use exactly these parameters.",
+  "params": {
+    "algorithm": "PBKDF2-HMAC-SHA256",
+    "iterations": 600000,
+    "saltBytes": 16,
+    "hashBytes": 32,
+    "recordVersion": 1,
+    "maxAttempts": 5,
+    "lockoutMs": 300000
+  },
+  "pbkdf2": [
+    { "pin": "482915", "saltHex": "000102030405060708090a0b0c0d0e0f", "iterations": 1, "hashHex": "b21e55f95380b52329c14221e40d76340bae3ca95289f5a40a499f0f5d7dd9af" },
+    { "pin": "482915", "saltHex": "000102030405060708090a0b0c0d0e0f", "iterations": 1000, "hashHex": "457849cec2fbbef4ff72b363da5f883a0384c67cd642c67f74ca85fc3cc48a83" },
+    { "pin": "731048", "saltHex": "f1e2d3c4b5a69788796a5b4c3d2e1f00", "iterations": 1000, "hashHex": "3559d641db58aa215422219701354b01f33db01e1f2a20b4b1109f05597cfbb6" },
+    { "pin": "731048", "saltHex": "f1e2d3c4b5a69788796a5b4c3d2e1f00", "iterations": 600000, "hashHex": "ca337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42" },
+    { "pin": "731048", "saltHex": "f1e2d3c4b5a69788796a5b4c3d2e1f00", "iterations": 60000, "hashHex": "5ed91aec6f585f8500b02bba210ce6c72fb26e7feb10c75b8ee3bb85ed602519" }
+  ],
+  "record": {
+    "_comment": "The stored PIN record, byte for byte, for the 600000-iteration vector above.",
+    "pin": "731048",
+    "encoded": "{\"v\":1,\"iterations\":600000,\"salt\":\"f1e2d3c4b5a69788796a5b4c3d2e1f00\",\"hash\":\"ca337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42\"}",
+    "unreadable": [
+      "",
+      "not json",
+      "{\"v\":2,\"iterations\":600000,\"salt\":\"f1e2d3c4b5a69788796a5b4c3d2e1f00\",\"hash\":\"ca337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42\"}",
+      "{\"v\":1,\"iterations\":0,\"salt\":\"f1e2d3c4b5a69788796a5b4c3d2e1f00\",\"hash\":\"ca337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42\"}",
+      "{\"v\":1,\"iterations\":600000,\"salt\":\"f1e2\",\"hash\":\"ca337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42\"}",
+      "{\"v\":1,\"iterations\":600000,\"salt\":\"f1e2d3c4b5a69788796a5b4c3d2e1f00\",\"hash\":\"zz337843cf767fa6da82eab8dcbe203e3f46b7d7a10a096763041107ffe2dc42\"}"
+    ]
+  },
+  "check": [
+    { "pin": "482915", "ok": true },
+    { "pin": "731048", "ok": true },
+    { "pin": "112233", "ok": true },
+    { "pin": "135792", "ok": true },
+    { "pin": "000001", "ok": true },
+    { "pin": "", "ok": false, "reason": "WRONG_LENGTH" },
+    { "pin": "48291", "ok": false, "reason": "WRONG_LENGTH" },
+    { "pin": "4829150", "ok": false, "reason": "WRONG_LENGTH" },
+    { "pin": "48291a", "ok": false, "reason": "NOT_DIGITS" },
+    { "pin": "4829 5", "ok": false, "reason": "NOT_DIGITS" },
+    { "pin": "４８２９１５", "ok": false, "reason": "NOT_DIGITS" },
+    { "pin": "-48291", "ok": false, "reason": "NOT_DIGITS" },
+    { "pin": "000000", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "777777", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "123456", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "012345", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "456789", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "987654", "ok": false, "reason": "TOO_SIMPLE" },
+    { "pin": "543210", "ok": false, "reason": "TOO_SIMPLE" }
+  ],
+  "autoLock": {
+    "_comment": "FR-LOCK-02. Stored in secure storage as the decimal string of the milliseconds.",
+    "defaultMs": 60000,
+    "maxMs": 3600000,
+    "valid": [0, 5000, 60000, 3600000],
+    "invalid": [-1, 0.5, 3600001]
+  }
+}

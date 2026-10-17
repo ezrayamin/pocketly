@@ -39,12 +39,42 @@ namespace margelo::nitro::pocketly { struct CategoryTotal; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BalanceCheck; }
-// Forward declaration of `IngestResult` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestResult; }
-// Forward declaration of `IngestError` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestError; }
-// Forward declaration of `IngestRejectReason` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class IngestRejectReason; }
+// Forward declaration of `PinCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PinCheck; }
+// Forward declaration of `PinRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PinRejectReason; }
+// Forward declaration of `UnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct UnlockResult; }
+// Forward declaration of `UnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class UnlockOutcome; }
+// Forward declaration of `AuthState` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AuthState; }
+// Forward declaration of `PhoneCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
+// Forward declaration of `OtpSendResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpSendResult; }
+// Forward declaration of `OtpSendOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
+// Forward declaration of `OtpVerifyResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
+// Forward declaration of `OtpVerifyOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
+// Forward declaration of `BiometricStatus` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricStatus; }
+// Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnavailableReason; }
+// Forward declaration of `BiometricKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricEnableResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
+// Forward declaration of `BiometricEnableOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
+// Forward declaration of `BiometricUnlockResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
+// Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -55,6 +85,8 @@ namespace margelo::nitro::pocketly { class HybridPriceSubscriptionSpec; }
 namespace margelo::nitro::pocketly { struct DatasetSeed; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
 
@@ -96,12 +128,42 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JDayTotal.hpp"
 #include "BalanceCheck.hpp"
 #include "JBalanceCheck.hpp"
-#include "IngestResult.hpp"
-#include "JIngestResult.hpp"
-#include "IngestError.hpp"
-#include "JIngestError.hpp"
-#include "IngestRejectReason.hpp"
-#include "JIngestRejectReason.hpp"
+#include "PinCheck.hpp"
+#include "JPinCheck.hpp"
+#include "PinRejectReason.hpp"
+#include "JPinRejectReason.hpp"
+#include "UnlockResult.hpp"
+#include "JUnlockResult.hpp"
+#include "UnlockOutcome.hpp"
+#include "JUnlockOutcome.hpp"
+#include "AuthState.hpp"
+#include "JAuthState.hpp"
+#include "PhoneCheck.hpp"
+#include "JPhoneCheck.hpp"
+#include "PhoneRejectReason.hpp"
+#include "JPhoneRejectReason.hpp"
+#include "OtpSendResult.hpp"
+#include "JOtpSendResult.hpp"
+#include "OtpSendOutcome.hpp"
+#include "JOtpSendOutcome.hpp"
+#include "OtpVerifyResult.hpp"
+#include "JOtpVerifyResult.hpp"
+#include "OtpVerifyOutcome.hpp"
+#include "JOtpVerifyOutcome.hpp"
+#include "BiometricStatus.hpp"
+#include "JBiometricStatus.hpp"
+#include "BiometricUnavailableReason.hpp"
+#include "JBiometricUnavailableReason.hpp"
+#include "BiometricKind.hpp"
+#include "JBiometricKind.hpp"
+#include "BiometricEnableResult.hpp"
+#include "JBiometricEnableResult.hpp"
+#include "BiometricEnableOutcome.hpp"
+#include "JBiometricEnableOutcome.hpp"
+#include "BiometricUnlockResult.hpp"
+#include "JBiometricUnlockResult.hpp"
+#include "BiometricUnlockOutcome.hpp"
+#include "JBiometricUnlockOutcome.hpp"
 #include "MoneyParseResult.hpp"
 #include "JMoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
@@ -113,6 +175,8 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JDatasetSeed.hpp"
 #include "TxFilter.hpp"
 #include "JTxFilter.hpp"
+#include "BiometricPromptText.hpp"
+#include "JBiometricPromptText.hpp"
 #include "PriceTick.hpp"
 #include <functional>
 #include "JFunc_void_std__vector_PriceTick_.hpp"
@@ -152,18 +216,9 @@ namespace margelo::nitro::pocketly {
   
 
   // Methods
-  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetSeed> /* config */, jni::alias_ref<jni::JArrayClass<JTransaction>> /* extraTransactions */)>("resetData");
-    auto __result = method(_javaPart, JDatasetSeed::fromCpp(config), [&](auto&& __input) {
-      size_t __size = __input.size();
-      jni::local_ref<jni::JArrayClass<JTransaction>> __array = jni::JArrayClass<JTransaction>::newArray(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        const auto& __element = __input[__i];
-        auto __elementJni = JTransaction::fromCpp(__element);
-        __array->setElement(__i, *__elementJni);
-      }
-      return __array;
-    }(extraTransactions));
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetSeed& config) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetSeed> /* config */)>("resetData");
+    auto __result = method(_javaPart, JDatasetSeed::fromCpp(config));
     return [&]() {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
@@ -269,25 +324,14 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
-  std::shared_ptr<Promise<IngestResult>> JHybridPocketlyCoreSpec::ingestTransactions(const std::string& json) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* json */)>("ingestTransactions");
-    auto __result = method(_javaPart, jni::make_jstring(json));
-    return [&]() {
-      auto __promise = Promise<IngestResult>::create();
-      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
-        auto __result = jni::static_ref_cast<JIngestResult>(__boxedResult);
-        __promise->resolve(__result->toCpp());
-      });
-      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
-        jni::JniException __jniError(__throwable);
-        __promise->reject(std::make_exception_ptr(__jniError));
-      });
-      return __promise;
-    }();
+  PinCheck JHybridPocketlyCoreSpec::checkPin(const std::string& pin) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPinCheck>(jni::alias_ref<jni::JString> /* pin */)>("checkPin");
+    auto __result = method(_javaPart, jni::make_jstring(pin));
+    return __result->toCpp();
   }
-  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::stageIngestPayload(const std::string& json) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* json */)>("stageIngestPayload");
-    auto __result = method(_javaPart, jni::make_jstring(json));
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::setPin(const std::string& pin) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* pin */)>("setPin");
+    auto __result = method(_javaPart, jni::make_jstring(pin));
     return [&]() {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
@@ -300,13 +344,13 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
-  std::shared_ptr<Promise<IngestResult>> JHybridPocketlyCoreSpec::ingestStaged() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("ingestStaged");
-    auto __result = method(_javaPart);
+  std::shared_ptr<Promise<UnlockResult>> JHybridPocketlyCoreSpec::verifyPin(const std::string& pin) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* pin */)>("verifyPin");
+    auto __result = method(_javaPart, jni::make_jstring(pin));
     return [&]() {
-      auto __promise = Promise<IngestResult>::create();
+      auto __promise = Promise<UnlockResult>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
-        auto __result = jni::static_ref_cast<JIngestResult>(__boxedResult);
+        auto __result = jni::static_ref_cast<JUnlockResult>(__boxedResult);
         __promise->resolve(__result->toCpp());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
@@ -316,34 +360,187 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
-  double JHybridPocketlyCoreSpec::echo(double value) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double(double /* value */)>("echo");
-    auto __result = method(_javaPart, value);
-    return __result;
+  std::shared_ptr<Promise<AuthState>> JHybridPocketlyCoreSpec::getAuthState() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getAuthState");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<AuthState>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JAuthState>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetAuth() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("resetAuth");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::logout() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("logout");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<double>> JHybridPocketlyCoreSpec::getAutoLockTimeout() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getAutoLockTimeout");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<double>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<jni::JDouble>(__boxedResult);
+        __promise->resolve(__result->value());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::setAutoLockTimeout(double ms) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(double /* ms */)>("setAutoLockTimeout");
+    auto __result = method(_javaPart, ms);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  PhoneCheck JHybridPocketlyCoreSpec::checkPhone(const std::string& nationalNumber) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPhoneCheck>(jni::alias_ref<jni::JString> /* nationalNumber */)>("checkPhone");
+    auto __result = method(_javaPart, jni::make_jstring(nationalNumber));
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<OtpSendResult>> JHybridPocketlyCoreSpec::requestOtp(const std::string& phone) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* phone */)>("requestOtp");
+    auto __result = method(_javaPart, jni::make_jstring(phone));
+    return [&]() {
+      auto __promise = Promise<OtpSendResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JOtpSendResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<OtpVerifyResult>> JHybridPocketlyCoreSpec::verifyOtp(const std::string& phone, const std::string& code) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* phone */, jni::alias_ref<jni::JString> /* code */)>("verifyOtp");
+    auto __result = method(_javaPart, jni::make_jstring(phone), jni::make_jstring(code));
+    return [&]() {
+      auto __promise = Promise<OtpVerifyResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JOtpVerifyResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<BiometricStatus>> JHybridPocketlyCoreSpec::getBiometricStatus() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getBiometricStatus");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<BiometricStatus>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JBiometricStatus>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<BiometricEnableResult>> JHybridPocketlyCoreSpec::enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* pin */, jni::alias_ref<JBiometricPromptText> /* prompt */)>("enableBiometrics");
+    auto __result = method(_javaPart, jni::make_jstring(pin), JBiometricPromptText::fromCpp(prompt));
+    return [&]() {
+      auto __promise = Promise<BiometricEnableResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JBiometricEnableResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::disableBiometrics() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("disableBiometrics");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<BiometricUnlockResult>> JHybridPocketlyCoreSpec::unlockWithBiometrics(const BiometricPromptText& prompt) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JBiometricPromptText> /* prompt */)>("unlockWithBiometrics");
+    auto __result = method(_javaPart, JBiometricPromptText::fromCpp(prompt));
+    return [&]() {
+      auto __promise = Promise<BiometricUnlockResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JBiometricUnlockResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
   std::string JHybridPocketlyCoreSpec::formatMoney(double minor) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>(double /* minor */)>("formatMoney");
     auto __result = method(_javaPart, minor);
     return __result->toStdString();
-  }
-  std::vector<std::string> JHybridPocketlyCoreSpec::formatMoneyBatch(const std::vector<double>& minors) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JArrayClass<jni::JString>>(jni::alias_ref<jni::JArrayDouble> /* minors */)>("formatMoneyBatch");
-    auto __result = method(_javaPart, [&]() {
-      size_t __size = minors.size();
-      jni::local_ref<jni::JArrayDouble> __array = jni::JArrayDouble::newArray(__size);
-      __array->setRegion(0, __size, minors.data());
-      return __array;
-    }());
-    return [&](auto&& __input) {
-      size_t __size = __input->size();
-      std::vector<std::string> __vector;
-      __vector.reserve(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        auto __element = __input->getElement(__i);
-        __vector.push_back(__element->toStdString());
-      }
-      return __vector;
-    }(__result);
   }
   MoneyParseResult JHybridPocketlyCoreSpec::parseMoney(const std::string& input) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JMoneyParseResult>(jni::alias_ref<jni::JString> /* input */)>("parseMoney");
@@ -363,16 +560,6 @@ namespace margelo::nitro::pocketly {
       return __array;
     }(symbols), intervalMs, seed, JFunc_void_std__vector_PriceTick__cxx::fromCpp(onTicks));
     return __result->getJHybridPriceSubscriptionSpec();
-  }
-  double JHybridPocketlyCoreSpec::lastComputeMs() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastComputeMs");
-    auto __result = method(_javaPart);
-    return __result;
-  }
-  double JHybridPocketlyCoreSpec::lastStorageMs() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastStorageMs");
-    auto __result = method(_javaPart);
-    return __result;
   }
 
 } // namespace margelo::nitro::pocketly

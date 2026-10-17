@@ -1,0 +1,82 @@
+// kmpCorePerf-only Android library: the PocketlyBench Nitro object + shared-bench (benchmark-only
+// code, benchmarking.md §5.2). Linked ONLY into kmpCorePerf (apps/mobile/android/app/build.gradle),
+// so release and debug APKs contain none of it (benchmarks/scripts/check-release-clean.sh).
+
+def reactNativeArchitectures() {
+  def value = rootProject.getProperties().get("reactNativeArchitectures")
+  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
+}
+
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+apply from: "../nitrogen/generated/android/PocketlyCoreKmpBench+autolinking.gradle"
+apply from: "./fix-prefab.gradle"
+
+def ext(name) { rootProject.ext.get(name) }
+
+android {
+  namespace "com.margelo.nitro.pocketly.bench"
+  ndkVersion ext("ndkVersion")
+  compileSdk ext("compileSdkVersion")
+
+  defaultConfig {
+    minSdkVersion ext("minSdkVersion")
+    consumerProguardFiles "consumer-rules.pro"
+
+    externalNativeBuild {
+      cmake {
+        cppFlags "-frtti -fexceptions -Wall -Wextra -fstack-protector-all"
+        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        abiFilters(*reactNativeArchitectures())
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake { path "CMakeLists.txt" }
+  }
+
+  // Provided by react-native / react-native-nitro-modules at the app level.
+  packagingOptions {
+    excludes = [
+      "META-INF",
+      "META-INF/**",
+      "**/libc++_shared.so",
+      "**/libNitroModules.so",
+      "**/libfbjni.so",
+      "**/libjsi.so",
+      "**/libfolly_json.so",
+      "**/libfolly_runtime.so",
+      "**/libglog.so",
+      "**/libhermes.so",
+      "**/libhermesvm.so",
+      "**/libreactnative.so",
+      "**/libreactnativejni.so",
+      "**/libturbomodulejsijni.so",
+      "**/libreact_nativemodule_core.so",
+    ]
+  }
+
+  buildFeatures {
+    prefab true
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+}
+
+kotlin {
+  jvmToolchain(17)
+}
+
+dependencies {
+  implementation "com.facebook.react:react-android"
+  implementation project(":react-native-nitro-modules")
+  // The same core instance as PocketlyCore (HybridPocketlyCore.current).
+  implementation project(":pocketly_core-kmp")
+  // Resolved from the included build ../../../shared (composite-build substitution).
+  implementation "com.pocketly:pocketly-shared:0.1.0"
+  implementation "com.pocketly:pocketly-shared-bench:0.1.0"
+}

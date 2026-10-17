@@ -3,9 +3,11 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { BenchScreen } from './src/bench/BenchScreen';
+import { BenchScreen } from '@pocketly/bench-app';
 import { TabBar, type TabKey } from './src/components/TabBar';
 import { DEV_TOOLS_ENABLED } from './src/devtools';
+import { AuthGate, useAppLocked } from './src/features/auth/AuthGate';
+import { BiometricSetupScreen } from './src/features/auth/BiometricSetupScreen';
 import { DevMenu } from './src/features/devmenu/DevMenu';
 import { applyDevLink } from './src/features/devmenu/devLinks';
 import { HistoryScreen } from './src/features/history/HistoryScreen';
@@ -30,12 +32,14 @@ const NAV_THEME: Theme = {
   },
 };
 
-function MainApp({ initialTab }: { initialTab: TabKey }) {
+function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lockSkipped?: boolean }) {
   const [tab, setTab] = useState<TabKey>(initialTab);
   // History mounts on first visit, then stays mounted (keeps its list and scroll) like Home.
   const [historyVisited, setHistoryVisited] = useState(initialTab === 'history');
   const [historyScrollToTop, setHistoryScrollToTop] = useState(0);
   const [devMenuOpen, setDevMenuOpen] = useState(false);
+  // A Modal is its own window, above the lock screen: keep it hidden while locked.
+  const locked = useAppLocked();
   // Bumped when the developer menu closes or a dev link changes the backend, so Home and
   // History reload from it.
   const [homeRefresh, setHomeRefresh] = useState(0);
@@ -82,7 +86,7 @@ function MainApp({ initialTab }: { initialTab: TabKey }) {
       )}
       {tab === 'profile' && (
         <View style={styles.screen}>
-          <ProfileScreen onOpenDevMenu={() => setDevMenuOpen(true)} />
+          <ProfileScreen onOpenDevMenu={() => setDevMenuOpen(true)} lockSkipped={lockSkipped} />
         </View>
       )}
       <TabBar active={tab} onSelect={selectTab} />
@@ -95,11 +99,13 @@ function MainApp({ initialTab }: { initialTab: TabKey }) {
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
           <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
+          <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (
         <DevMenu
-          visible={devMenuOpen}
+          visible={devMenuOpen && !locked}
+          lockSkipped={lockSkipped}
           onClose={() => {
             setDevMenuOpen(false);
             setHomeRefresh((n) => n + 1);
@@ -155,14 +161,19 @@ function App({ launchArgs }: { launchArgs?: Record<string, string> }) {
     );
   }
   if (!ready) return <View style={styles.root} testID="launch-setup" />;
-  if (launch.args.bench) {
+  if (launch.args.bench && BenchScreen) {
     return (
       <SafeAreaProvider>
         <BenchScreen {...launch.args.bench} />
       </SafeAreaProvider>
     );
   }
-  return <MainApp initialTab={launch.args.tab ?? 'home'} />;
+  const app = <MainApp initialTab={launch.args.tab ?? 'home'} lockSkipped={launch.args.skipLock === true} />;
+  if (launch.args.skipLock) {
+    console.info('[Pocketly] skipLock: PIN gate off (benchmark launch argument)');
+    return app;
+  }
+  return <AuthGate>{app}</AuthGate>;
 }
 
 export default App;

@@ -10,6 +10,11 @@ import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
+import com.pocketly.shared.domain.AuthState
+import com.pocketly.shared.domain.BiometricEnableResult
+import com.pocketly.shared.domain.BiometricPromptText
+import com.pocketly.shared.domain.BiometricStatus
+import com.pocketly.shared.domain.BiometricUnlockResult
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -18,6 +23,11 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.OtpSendResult
+import com.pocketly.shared.domain.OtpVerifyOutcome
+import com.pocketly.shared.domain.OtpVerifyResult
+import com.pocketly.shared.domain.PhoneCheck
+import com.pocketly.shared.domain.PinCheck
 import com.pocketly.shared.domain.PriceTick
 import com.pocketly.shared.domain.SpendingCalculator
 import com.pocketly.shared.domain.SpendingSummary
@@ -25,7 +35,18 @@ import com.pocketly.shared.domain.StaleInfo
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
+import com.pocketly.shared.domain.UnlockResult
 import com.pocketly.shared.domain.Wallet
+import com.pocketly.shared.security.BiometricAuthenticator
+import com.pocketly.shared.security.BiometricSigner
+import com.pocketly.shared.security.InstallMarker
+import com.pocketly.shared.security.NoBiometricSigner
+import com.pocketly.shared.security.PhonePolicy
+import com.pocketly.shared.security.PinAuthenticator
+import com.pocketly.shared.security.PinCrypto
+import com.pocketly.shared.security.PinPolicy
+import com.pocketly.shared.security.SecureStore
+import com.pocketly.shared.security.platformPinCrypto
 import com.pocketly.shared.sync.LedgerSync
 import com.pocketly.shared.sync.PriceFeed
 import kotlinx.coroutines.CancellationException
@@ -58,6 +79,10 @@ class PocketlyCore internal constructor(
     initialDataset: DatasetConfig,
     /** All database work runs here (one thread: SQLDelight drivers aren't shared). Tests inject a test dispatcher. */
     private val db: CoroutineDispatcher,
+    /** Builds the PIN logic (ADR-0010) around this core's install marker (the replica's cache_meta). */
+    pin: (InstallMarker) -> PinAuthenticator,
+    /** Builds biometric unlock (ADR-0012) on top of the PIN logic. */
+    biometric: (PinAuthenticator) -> BiometricAuthenticator,
 ) {
     private val streamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ledgerSync = LedgerSync(api, cache)
@@ -65,11 +90,20 @@ class PocketlyCore internal constructor(
     /** Databases open lazily, off the caller's thread; every data call awaits this first. */
     private val ready = streamScope.async(db) { backend.open(initialDataset) }
 
-    @Volatile
-    private var computeMs = 0.0
+    private val pin = pin(object : InstallMarker {
+        override suspend fun get(): String? = onDb { cache.installId() }
+        override suspend fun set(id: String) {
+            onDb { cache.setInstallId(id) }
+        }
+    })
+
+    private val biometric = biometric(this.pin)
 
     @Volatile
-    private var storageMs = 0.0
+    internal var computeMs = 0.0
+
+    @Volatile
+    internal var storageMs = 0.0
 
     private val controls: FakeBackendControls get() = backend
 
@@ -81,7 +115,7 @@ class PocketlyCore internal constructor(
         cache.clear()
         try {
             ledgerSync.sync()
-            cache.upsertWallet(api.getWallet(), currentTimeMillis())
+            fetchWallet()
         } catch (e: CoreException) {
             if (e.code !in STALEABLE) throw e // offline reset: replica stays empty
         }
@@ -90,11 +124,17 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getWallet(): Wallet = onDb {
         try {
-            api.getWallet().also { cache.upsertWallet(it, currentTimeMillis()) }
+            fetchWallet()
         } catch (e: CoreException) {
             val cached = if (e.code in STALEABLE) cache.getWallet() else null
             cached?.let { (wallet, cachedAt) -> wallet.copy(stale = StaleInfo(e.code, cachedAt)) } ?: throw e
         }
+    }
+
+    /** From the server into the replica, unless the replica was cleared meanwhile (logout). */
+    private suspend fun fetchWallet(): Wallet {
+        val generation = cache.generation
+        return api.getWallet().also { if (cache.generation == generation) cache.upsertWallet(it, currentTimeMillis()) }
     }
 
     @Throws(CoreException::class, CancellationException::class)
@@ -152,21 +192,8 @@ class PocketlyCore internal constructor(
         timed { SpendingCalculator.compute(month, timeZone.current.month(month), transactions, walletBalance) }
     }
 
-    /** BM-04b: a payload held in Kotlin, as a network response would be. Survives resetData. */
-    @Volatile
-    private var stagedPayload: String? = null
-
-    fun stageIngestPayload(json: String) {
-        stagedPayload = json
-    }
-
-    /** BM-04b: [ingestTransactions] on the staged payload, so nothing crosses the bridge in the call. */
-    @Throws(CoreException::class, CancellationException::class)
-    suspend fun ingestStaged(): IngestResult =
-        ingestTransactions(stagedPayload ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "no ingest payload staged"))
-
-    @Throws(CoreException::class, CancellationException::class)
-    suspend fun ingestTransactions(json: String): IngestResult = onDb {
+    /** BM-04 (CoreProbe, perf builds only): parse, validate, write to the replica; timed in parts. */
+    internal suspend fun ingestTransactions(json: String): IngestResult = onDb {
         val parsed = timed { TransactionIngestor.parseAndValidate(json) }
         val mark = TimeSource.Monotonic.markNow()
         val inserted = cache.insertIfAbsentMany(parsed.valid)
@@ -174,14 +201,78 @@ class PocketlyCore internal constructor(
         IngestResult(inserted, parsed.rejected, parsed.valid.size - inserted, parsed.errors)
     }
 
-    // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
+    // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
 
-    /** BM-06: the pure cost of a call. No conversion, so only the crossing is timed. */
-    fun echo(value: Double): Double = value
+    /** FR-AUTH-03. */
+    fun checkPin(pin: String): PinCheck = PinPolicy.check(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun setPin(pin: String) = this.pin.setPin(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun verifyPin(pin: String): UnlockResult = this.pin.verifyPin(pin)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getAuthState(): AuthState = pin.getAuthState()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun resetAuth() = biometric.reset()
+
+    /** NFR-SEC-05. The replica first: if the secrets then fail to go, none of the history is left. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun logout() {
+        onDb { cache.clear() }
+        biometric.reset()
+    }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getAutoLockTimeout(): Long = pin.getAutoLockTimeout()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun setAutoLockTimeout(ms: Long) = pin.setAutoLockTimeout(ms)
+
+    // ── Phone + OTP onboarding (FR-AUTH-01/02; ADR-0013) ───────────────────
+
+    /** FR-AUTH-01: an Indonesian mobile number as typed (a leading 0 is allowed and dropped). */
+    fun checkPhone(nationalNumber: String): PhoneCheck = PhonePolicy.check(nationalNumber)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun requestOtp(phone: String): OtpSendResult {
+        if (!PhonePolicy.isValidE164(phone)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not a valid +62 mobile number")
+        return onDb { api.requestOtp(phone) }
+    }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun verifyOtp(phone: String, code: String): OtpVerifyResult {
+        if (!PhonePolicy.isValidE164(phone)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not a valid +62 mobile number")
+        if (!PhonePolicy.isOtpCode(code)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "the code has ${PhonePolicy.OTP_LENGTH} digits")
+        val answer = onDb { api.verifyOtp(phone, code) }
+        if (answer.result.outcome == OtpVerifyOutcome.VERIFIED && answer.sessionToken != null) {
+            this.pin.rememberVerifiedPhone(phone, answer.sessionToken)
+        }
+        return answer.result
+    }
+
+    // ── Biometrics (FR-AUTH-04; ADR-0012) ──────────────────────────────────
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getBiometricStatus(): BiometricStatus = biometric.status()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun enableBiometrics(pin: String, prompt: BiometricPromptText): BiometricEnableResult = biometric.enable(pin, prompt)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun disableBiometrics() = biometric.disable()
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun unlockWithBiometrics(prompt: BiometricPromptText): BiometricUnlockResult = biometric.unlock(prompt)
+
+    // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
     fun formatMoney(minor: Long): String = MoneyFormatter.format(Money(minor))
 
-    fun formatMoneyBatch(minors: LongArray): List<String> {
+    /** BM-06 batched (CoreProbe, perf builds only). */
+    internal fun formatMoneyBatch(minors: LongArray): List<String> {
         storageMs = 0.0
         return timed { List(minors.size) { MoneyFormatter.format(Money(minors[it])) } }
     }
@@ -204,12 +295,7 @@ class PocketlyCore internal constructor(
         return Cancellable { job.cancel() }
     }
 
-    // ── Benchmark harness (benchmarking.md §5.2: compute vs storage) ──────
-
-    fun lastComputeMs(): Double = computeMs
-
-    /** Database time of the same call; the engines differ between builds (ADR-0009). */
-    fun lastStorageMs(): Double = storageMs
+    // ── Internals ──────────────────────────────────────────────────────────
 
     private suspend fun <T> onDb(block: suspend () -> T): T = withContext(db) {
         ready.await()
@@ -232,15 +318,33 @@ class PocketlyCore internal constructor(
         private val STALEABLE = setOf(ErrorCode.NETWORK_UNAVAILABLE, ErrorCode.NETWORK_TIMEOUT, ErrorCode.SERVER_ERROR)
 
         /**
-         * Builds a fully wired core on [drivers] (two databases, ADR-0009). Each call gets its own
-         * isolated Koin graph. The server is seeded with [dataset] only if its database is empty.
-         * Native adapters pass [DatasetConfig.LIVE] and the platform drivers.
+         * Builds a fully wired core on [drivers] (two databases, ADR-0009) and [secureStore]
+         * (ADR-0010). Each call gets its own isolated Koin graph. The server is seeded with
+         * [dataset] only if its database is empty. Native adapters pass the platform drivers and
+         * store, and [DatasetConfig.LIVE].
          */
-        fun create(drivers: DatabaseDrivers, dataset: DatasetConfig = DatasetConfig.DEFAULT): PocketlyCore =
-            create(drivers, dataset, singleThread())
+        fun create(
+            drivers: DatabaseDrivers,
+            secureStore: SecureStore,
+            dataset: DatasetConfig = DatasetConfig.DEFAULT,
+            biometricSigner: BiometricSigner = NoBiometricSigner,
+        ): PocketlyCore = create(drivers, dataset, singleThread(), secureStore, biometricSigner = biometricSigner)
 
-        internal fun create(drivers: DatabaseDrivers, dataset: DatasetConfig, db: CoroutineDispatcher): PocketlyCore =
-            koinApplication { modules(coreModule(drivers, dataset, db)) }.koin.get()
+        internal fun create(
+            drivers: DatabaseDrivers,
+            dataset: DatasetConfig,
+            db: CoroutineDispatcher,
+            secureStore: SecureStore,
+            crypto: PinCrypto = platformPinCrypto(),
+            clock: () -> Long = ::currentTimeMillis,
+            pinIterations: Int = PinPolicy.ITERATIONS,
+            biometricSigner: BiometricSigner = NoBiometricSigner,
+        ): PocketlyCore {
+            // PBKDF2 blocks for hundreds of ms: off the database thread, which other calls share.
+            val pin = { marker: InstallMarker -> PinAuthenticator(secureStore, crypto, marker, Dispatchers.Default, clock, pinIterations) }
+            val biometric = { auth: PinAuthenticator -> BiometricAuthenticator(auth, biometricSigner, crypto, clock) }
+            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric, clock)) }.koin.get()
+        }
 
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
         private fun singleThread(): CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)

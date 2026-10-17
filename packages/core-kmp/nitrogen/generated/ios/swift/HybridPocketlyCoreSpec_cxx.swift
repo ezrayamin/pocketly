@@ -125,9 +125,9 @@ open class HybridPocketlyCoreSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func resetData(config: DatasetSeed, extraTransactions: bridge.std__vector_Transaction_) -> bridge.Result_std__shared_ptr_Promise_void___ {
+  public final func resetData(config: DatasetSeed) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      let __result = try self.__implementation.resetData(config: config, extraTransactions: extraTransactions.map({ __item in __item }))
+      let __result = try self.__implementation.resetData(config: config)
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
         let __promise = bridge.create_std__shared_ptr_Promise_void__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
@@ -280,28 +280,21 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
-  public final func ingestTransactions(json: std.string) -> bridge.Result_std__shared_ptr_Promise_IngestResult___ {
+  public final func checkPin(pin: std.string) -> bridge.Result_PinCheck_ {
     do {
-      let __result = try self.__implementation.ingestTransactions(json: String(json))
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_IngestResult__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_IngestResult__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_IngestResult__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve(__result) })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__resultCpp)
+      let __result = try self.__implementation.checkPin(pin: String(pin))
+      let __resultCpp = __result
+      return bridge.create_Result_PinCheck_(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__exceptionPtr)
+      return bridge.create_Result_PinCheck_(__exceptionPtr)
     }
   }
   
   @inline(__always)
-  public final func stageIngestPayload(json: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
+  public final func setPin(pin: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      let __result = try self.__implementation.stageIngestPayload(json: String(json))
+      let __result = try self.__implementation.setPin(pin: String(pin))
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
         let __promise = bridge.create_std__shared_ptr_Promise_void__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
@@ -318,33 +311,242 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
-  public final func ingestStaged() -> bridge.Result_std__shared_ptr_Promise_IngestResult___ {
+  public final func verifyPin(pin: std.string) -> bridge.Result_std__shared_ptr_Promise_UnlockResult___ {
     do {
-      let __result = try self.__implementation.ingestStaged()
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_IngestResult__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_IngestResult__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_IngestResult__(__promise)
+      let __result = try self.__implementation.verifyPin(pin: String(pin))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_UnlockResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_UnlockResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_UnlockResult__(__promise)
         __result
           .then({ __result in __promiseHolder.resolve(__result) })
           .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
         return __promise
       }()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__resultCpp)
+      return bridge.create_Result_std__shared_ptr_Promise_UnlockResult___(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_Promise_UnlockResult___(__exceptionPtr)
     }
   }
   
   @inline(__always)
-  public final func echo(value: Double) -> bridge.Result_double_ {
+  public final func getAuthState() -> bridge.Result_std__shared_ptr_Promise_AuthState___ {
     do {
-      let __result = try self.__implementation.echo(value: value)
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
+      let __result = try self.__implementation.getAuthState()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_AuthState__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_AuthState__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_AuthState__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_AuthState___(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_Promise_AuthState___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func resetAuth() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.resetAuth()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func logout() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.logout()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getAutoLockTimeout() -> bridge.Result_std__shared_ptr_Promise_double___ {
+    do {
+      let __result = try self.__implementation.getAutoLockTimeout()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_double__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_double__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_double__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_double___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func setAutoLockTimeout(ms: Double) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.setAutoLockTimeout(ms: ms)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func checkPhone(nationalNumber: std.string) -> bridge.Result_PhoneCheck_ {
+    do {
+      let __result = try self.__implementation.checkPhone(nationalNumber: String(nationalNumber))
+      let __resultCpp = __result
+      return bridge.create_Result_PhoneCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_PhoneCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func requestOtp(phone: std.string) -> bridge.Result_std__shared_ptr_Promise_OtpSendResult___ {
+    do {
+      let __result = try self.__implementation.requestOtp(phone: String(phone))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_OtpSendResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_OtpSendResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_OtpSendResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpSendResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpSendResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func verifyOtp(phone: std.string, code: std.string) -> bridge.Result_std__shared_ptr_Promise_OtpVerifyResult___ {
+    do {
+      let __result = try self.__implementation.verifyOtp(phone: String(phone), code: String(code))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_OtpVerifyResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_OtpVerifyResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_OtpVerifyResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpVerifyResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_OtpVerifyResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getBiometricStatus() -> bridge.Result_std__shared_ptr_Promise_BiometricStatus___ {
+    do {
+      let __result = try self.__implementation.getBiometricStatus()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricStatus__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricStatus__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricStatus__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricStatus___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricStatus___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func enableBiometrics(pin: std.string, prompt: BiometricPromptText) -> bridge.Result_std__shared_ptr_Promise_BiometricEnableResult___ {
+    do {
+      let __result = try self.__implementation.enableBiometrics(pin: String(pin), prompt: prompt)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricEnableResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricEnableResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricEnableResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricEnableResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricEnableResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func disableBiometrics() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.disableBiometrics()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func unlockWithBiometrics(prompt: BiometricPromptText) -> bridge.Result_std__shared_ptr_Promise_BiometricUnlockResult___ {
+    do {
+      let __result = try self.__implementation.unlockWithBiometrics(prompt: prompt)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_BiometricUnlockResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_BiometricUnlockResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_BiometricUnlockResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(__exceptionPtr)
     }
   }
   
@@ -357,24 +559,6 @@ open class HybridPocketlyCoreSpec_cxx {
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
       return bridge.create_Result_std__string_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func formatMoneyBatch(minors: bridge.std__vector_double_) -> bridge.Result_std__vector_std__string__ {
-    do {
-      let __result = try self.__implementation.formatMoneyBatch(minors: minors.map({ __item in __item }))
-      let __resultCpp = { () -> bridge.std__vector_std__string_ in
-        var __vector = bridge.create_std__vector_std__string_(__result.count)
-        for __item in __result {
-          __vector.push_back(std.string(__item))
-        }
-        return __vector
-      }()
-      return bridge.create_Result_std__vector_std__string__(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__vector_std__string__(__exceptionPtr)
     }
   }
   
@@ -413,30 +597,6 @@ open class HybridPocketlyCoreSpec_cxx {
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
       return bridge.create_Result_std__shared_ptr_HybridPriceSubscriptionSpec__(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func lastComputeMs() -> bridge.Result_double_ {
-    do {
-      let __result = try self.__implementation.lastComputeMs()
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func lastStorageMs() -> bridge.Result_double_ {
-    do {
-      let __result = try self.__implementation.lastStorageMs()
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
     }
   }
 }

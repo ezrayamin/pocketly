@@ -52,7 +52,7 @@ prepare() {
   adb shell am force-stop "$PKG"
   adb shell input keyevent KEYCODE_WAKEUP
   adb shell am start -W -n "$PKG/$ACTIVITY" \
-    -e pocketly.tab history --ei pocketly.transactionCount 1000 >/dev/null
+    -e pocketly.tab history --ei pocketly.transactionCount 1000 -e pocketly.skipLock true >/dev/null
   for _ in $(seq 1 30); do
     has_id history-list && return 0
     sleep 1
