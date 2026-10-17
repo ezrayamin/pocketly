@@ -57,3 +57,10 @@ still fine in kmpCore (under 1 s, off the JS thread). That is the case for quick
 ADR-0010 §8: jsCore *needs* a native library for this work, kmpCore doesn't. The BM-11 numbers
 above come from a 2 × 10-run quick check, not a full session; BM-11's full run is due with the
 step-5 reruns.
+
+## Limitations: checklist deviations (benchmarking.md §4.2)
+
+Same as `2026-10-17_mid-01`, noted after the fact: **airplane mode off**, **Bluetooth on**, battery
+**40%** and charging, device **not restarted**. The jsCore/kmpCore ratio (~129×) is far beyond
+any noise these could add, and both builds ran alternately under the same conditions; absolute
+times may be slightly noisier than usual.

@@ -107,6 +107,17 @@ it to check a PIN. Biometrics (step 4 of slice 5) protect a separate secret.
 | Wiped on logout / "reset onboarding" | `resetAuth` → `clear()`: deletes the values and the Keystore key (`logout` clears the replica first, §7) | `resetAuth` → `clearService` | Yes |
 | Wiped when the app is reinstalled | Android: yes (OS). iOS: **Keychain survives uninstall** → install marker, below | Same | Yes |
 | The counter is on disk before hashing starts | `commit()` / `SecItemUpdate` | **No:** Android `apply()` writes asynchronously; iOS deletes then re-adds an item | **Yes**: `commit()` (patch); the iOS gap is covered by "missing counter fails closed" |
+| A changed value is detected | Android: AES-GCM's tag (a changed ciphertext or IV fails to decrypt). iOS: the Keychain's own encryption | Same (AES-GCM; Keychain) | Same |
+| A value can't be moved under another key | Android: the key name is the AES-GCM AAD. iOS: the Keychain account is the key | Android: the key is inside its HMAC'd metadata (below). iOS: Keychain account | Same |
+| Integrity of stored metadata | **Nothing to protect:** it stores only `key → IV + ciphertext`; the access policy is fixed in code and in the Keystore key, not stored per entry | An HMAC-SHA256 over each entry's metadata (access control, security level, key version, timestamp, IV, ciphertext) with a second Keystore-bound key, checked on every read (`MetadataIntegrity`) | Same |
+
+**The two stores are comparably secure, at different costs.** kmpCore skips no check: AES-GCM
+already rejects a changed value (its authentication tag fails if the ciphertext or IV changes),
+and the key name as AAD stops a value being moved under another key. sensitive-info keeps more
+per entry (its access-control and security-level settings, chosen per call), and its extra HMAC
+protects that metadata, which kmpCore doesn't have. The price is extra Keystore round trips on
+every read: about +22 calls and +78 ms before the lock screen on the vivo (BM-01-lock trace,
+`benchmarks/results/2026-10-17_mid-01`).
 
 Gaps 2, 3 and the Android write are fixed by `patches/react-native-sensitive-info+6.1.5.patch`,
 applied by the root `postinstall` (`scripts/apply-patches.js`, which uses the system `patch`, so

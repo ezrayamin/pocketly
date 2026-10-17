@@ -35,6 +35,21 @@ All CVs ≤ 6.0%; no relaunches, no excluded runs.
   the auth libraries) on the startup path. The gap between the builds stays small (−17 then,
   −21 ms now).
 
+## Limitations: checklist deviations (benchmarking.md §4.2)
+
+| Checklist item | This session |
+|---|---|
+| Airplane mode on, Wi-Fi/Bluetooth off | **Airplane mode off** (mobile data on), Wi-Fi off, **Bluetooth on** |
+| Battery > 50% | **48%**, charging the whole session |
+| Device restarted at the start of the session | **No** (up ~9 days) |
+| Freshly installed builds | BM-01 yes; BM-01-lock no, by design (it installs over onboarded apps) |
+
+Results stay comparable **within** the session: both builds ran alternately, round by round, under
+the same conditions, and every CV is ≤ 6%. Absolute numbers may carry more background noise than
+a by-the-book session (background network and Bluetooth activity is what the checklist exists to
+rule out), so compare them across sessions with care. Next session: restart, airplane mode on,
+Bluetooth off, battery above 50%.
+
 ## Why kmpCore reaches the lock screen sooner (one trace per build)
 
 `traces/bm-01-lock-{jsCore,kmpCore}.atrace.txt.gz`: one cold start each, `adb shell atrace -t 7
@@ -60,7 +75,9 @@ the split below is indicative; the traced lock screens drew at 710 vs 581 ms (at
   HMAC-SHA256 tag over the entry's metadata with a second, Keystore-bound key
   (`MetadataIntegrity.kt`), on top of the AES-GCM decrypt. kmpCore's `AndroidSecureStore` does
   only the AES-GCM decrypt (key name as AAD, ADR-0010 §3). So this is a library design choice
-  (extra tamper detection) with a startup cost, not the architecture.
+  (extra tamper detection) with a startup cost, not the architecture. kmpCore is not faster by
+  skipping security: AES-GCM already rejects a changed value and the key-name AAD stops values
+  moving between keys; the HMAC protects per-entry metadata that kmpCore doesn't keep (ADR-0010 §4).
 - Accounted for: ~78 + 8 + 13 ≈ 99 ms of the 119 ms; the rest is within one trace's noise.
 - Not changed: the shipped design stays as ADR-0010 decides. Fewer startup reads (e.g. one record
   instead of several keys) would shrink this in both cores; noted for a later slice, not done.
@@ -88,11 +105,12 @@ the architecture row, which then read +220 KB. Same data, recomputed by `collect
 - **The bridge grows with the contract.** kmpCore's Nitro bridge library `libPocketlyCoreKmp.so`
   went from 749 KB (2026-10-03) to 864 KB (2026-10-05_mid-02, slice 4) to **1,540 KB** now:
   **+676 KB (+78%) since slice 4**, while the Nitro spec went from 19 to 35 methods (auth, phone,
-  biometrics, logout, BM-10) plus their structs. That is ~42 KB of generated C++/JNI per method
-  on arm64, and it is most of the architecture row: without it the row would be −597 KB (the
+  biometrics, logout, BM-10) plus their structs. That is roughly ~42 KB of generated C++/JNI per
+  method on arm64 (rough: methods and their structs are mixed), and it is most of the architecture row: without it the row would be −597 KB (the
   smaller JS bundle outweighs the Kotlin dex). jsCore has no equivalent cost: its contract
-  methods are plain JS. Gzipped the bridge library is smaller, but it scales with the API, so a
-  wide, chatty contract costs kmpCore size as well as call overhead (BM-06).
+  methods are plain JS. Gzipped the bridge library is smaller, but it scales with the API. **Design
+  guidance (ADR-0002, "Keep the contract coarse"):** a few methods that do a lot each beat many
+  small ones, for app size (this finding) and for call overhead (BM-06).
 - Since slice 4, jsCore's download grew ~3.9 MB, almost all quick-crypto; kmpCore's grew ~0.35 MB
   (mostly the bridge). Both include BM-10's what-if libraries (@noble/hashes in the JS bundle,
   KotlinCrypto in the dex), which are small. As ADR-0010 §8 says, the size gap is mostly library
