@@ -28,6 +28,10 @@ module.exports = {
         ...(linkKmpOnIos ? {} : { ios: null }),
       },
     },
+    // Benchmark-only (kmpCorePerf): linked by hand on Android, never on iOS (no perf build there).
+    '@pocketly/core-kmp-bench': {
+      platforms: { android: null, ios: null },
+    },
     '@op-engineering/op-sqlite': {
       platforms: linkKmpOnIos ? { ios: null } : {},
     },

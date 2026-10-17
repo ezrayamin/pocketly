@@ -1,6 +1,7 @@
 import { DEFAULT_DATASET, DEFAULT_NOW_MILLIS, FAKE_OTP_CODE, MAX_PAGE_SIZE } from '@pocketly/core-contract';
 import type { DatasetConfig, Transaction } from '@pocketly/core-contract';
 import { core } from '../core';
+import { bench } from './benchCore';
 
 /**
  * In-app benchmark harness (docs/benchmarking.md §5.2): runs core operations N times in the
@@ -205,7 +206,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         const endToEndMs = now() - t0;
         mark('op-end');
         last = JSON.stringify(summary);
-        return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
+        return { endToEndMs, computeMs: bench.lastComputeMs(), storageMs: bench.lastStorageMs() };
       });
       return {
         scenario,
@@ -229,14 +230,14 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       let last = '';
       const runs = await repeat(options, async (mark) => {
         await core.resetData(DEFAULT_DATASET); // same starting replica for every run (not timed)
-        if (staged) await core.stageIngestPayload(payload);
+        if (staged) await bench.stageIngestPayload(payload);
         mark('op-start');
         const t0 = now();
-        const result = staged ? await core.ingestStaged() : await core.ingestTransactions(payload);
+        const result = staged ? await bench.ingestStaged() : await bench.ingestTransactions(payload);
         const endToEndMs = now() - t0;
         mark('op-end');
         last = JSON.stringify(result);
-        return { endToEndMs, computeMs: core.lastComputeMs(), storageMs: core.lastStorageMs() };
+        return { endToEndMs, computeMs: bench.lastComputeMs(), storageMs: bench.lastStorageMs() };
       });
       return {
         scenario,
@@ -260,17 +261,17 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
         for (let i = 0; i < minors.length; i++) one[i] = core.formatMoney(minors[i]);
         const chattyEndToEndMs = now() - t0;
         const t1 = now();
-        const batch = core.formatMoneyBatch(minors);
+        const batch = bench.formatMoneyBatch(minors);
         const batchEndToEndMs = now() - t1;
         // Pure call cost: the same number of calls as the chatty loop, with no work in the core.
         const t2 = now();
         let echoed = 0;
-        for (let i = 0; i < minors.length; i++) echoed += core.echo(minors[i]);
+        for (let i = 0; i < minors.length; i++) echoed += bench.echo(minors[i]);
         const echoEndToEndMs = now() - t2;
         mark('op-end');
         const formatted = one.join('|') === batch.join('|') ? batch.join('|') : 'MISMATCH';
         last = echoed === echoTotal ? formatted : 'MISMATCH';
-        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: core.lastComputeMs(), echoEndToEndMs };
+        return { chattyEndToEndMs, batchEndToEndMs, batchComputeMs: bench.lastComputeMs(), echoEndToEndMs };
       });
       return {
         scenario,
@@ -287,7 +288,7 @@ export async function runBench(scenario: BenchScenario, options: BenchOptions): 
       const { password, saltHex, iterations, hashHex } = BM10_VECTOR;
       const setupMs = now() - setupStart;
       const runs = await repeat(options, async (mark) => {
-        const { result, ms, jsMaxGapMs } = await withJsProbe(mark, () => core.pbkdf2WhatIf(password, saltHex, iterations));
+        const { result, ms, jsMaxGapMs } = await withJsProbe(mark, () => bench.pbkdf2WhatIf(password, saltHex, iterations));
         if (result !== hashHex) throw new Error(`BM-10: ${core.impl}Core hashed ${result}, expected ${hashHex}`);
         return { hashMs: ms, jsMaxGapMs };
       });

@@ -5,7 +5,6 @@ import type {
   BiometricStatus,
   BiometricUnlockResult,
   DatasetConfig,
-  IngestResult,
   MinorUnits,
   MoneyParseResult,
   NetworkSimulation,
@@ -30,7 +29,8 @@ export type CoreImpl = 'js' | 'kmp';
  * The business core. The UI talks to this and nothing else.
  *
  * Two implementations exist (`core-js`, `core-kmp`) and one is picked at bundle
- * time (`CORE_IMPL`). Both must pass `runContractSuite` (BM-PAR-01).
+ * time (`CORE_IMPL`). Both must pass `runContractSuite` (BM-PAR-01). Benchmark-only entry
+ * points are not here: they are `BenchCore` (bench.ts), in perf builds only.
  *
  * Async methods reject with a {@link CoreError}.
  */
@@ -75,28 +75,12 @@ export interface Core {
    */
   setTimeZone(zoneId: string): void;
 
-  // ── CPU-heavy work (BM-03, BM-04) ─────────────────────────────────────
+  // ── CPU-heavy work (BM-03) ────────────────────────────────────────────
   /**
    * Over the local replica. `month` is `YYYY-MM` in the core's time zone; byDay uses local
    * dates; balanceCheck compares the replica's ledger with the server balance last received.
    */
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
-  /**
-   * BM-04: parse a JSON array of transactions, validate each one and write the valid ones to
-   * the local replica (not the server: balances are unaffected). Existing ids are duplicates.
-   */
-  ingestTransactions(json: string): Promise<IngestResult>;
-  /**
-   * BM-04b: hands the core a payload to ingest later, as if it had arrived on the core's own
-   * side (in a real app, from the network). Not timed by the harness. Replaces any staged
-   * payload; resetData leaves it alone.
-   */
-  stageIngestPayload(json: string): Promise<void>;
-  /**
-   * BM-04b: ingestTransactions on the staged payload, so no data crosses into the core during
-   * the call. The payload stays staged. Throws INVALID_ARGUMENT if nothing is staged.
-   */
-  ingestStaged(): Promise<IngestResult>;
 
   // ── Auth & App Lock (F1, F2; ADR-0010) ────────────────────────────────
   // Every async auth call rejects with SECURE_STORAGE_UNAVAILABLE when secure storage can't be
@@ -162,14 +146,8 @@ export interface Core {
   /** NOT_FOUND if biometric unlock isn't enabled. Never changes the PIN counter. */
   unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
 
-  // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
-  /**
-   * Returns its argument and does nothing else: BM-06 times it to get the pure cost of a call
-   * (in kmpCore, one JS → Nitro → Kotlin round trip; in jsCore, a plain function call).
-   */
-  echo(value: number): number;
+  // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;
-  formatMoneyBatch(minors: MinorUnits[]): string[];
   parseMoney(input: string): MoneyParseResult;
 
   // ── Streams (BM-05, NFR-ARCH-04) ──────────────────────────────────────
@@ -178,26 +156,5 @@ export interface Core {
     onTicks: (ticks: PriceTick[]) => void,
     options?: PriceStreamOptions,
   ): Subscription;
-
-  // ── Benchmark harness ─────────────────────────────────────────────────
-  /**
-   * Time spent *inside* the core by the most recent computeSpendingSummary,
-   * ingestTransactions or formatMoneyBatch call (benchmarking.md §5.2).
-   * For kmpCore, this is measured in Kotlin, so end-to-end minus this = bridge overhead.
-   */
-  lastComputeMs(): number;
-  /**
-   * Database time of that same call (reading the replica for a summary, writing it for an
-   * ingest). Reported separately because the two builds use different SQLite engines (ADR-0009).
-   */
-  lastStorageMs(): number;
-  /**
-   * BM-10 what-if (ADR-0010 §8), never used by the PIN: PBKDF2-HMAC-SHA256 (32 bytes) written in
-   * the core's own language with no native crypto library. jsCore: @noble/hashes, on the JS
-   * thread. kmpCore: KotlinCrypto's pure-Kotlin HMAC, off the JS thread. `password` is ASCII,
-   * `saltHex` lowercase hex, `iterations` 1..BM10_MAX_ITERATIONS, else INVALID_ARGUMENT.
-   * Returns the hash as lowercase hex.
-   */
-  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string>;
 }
 

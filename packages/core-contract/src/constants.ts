@@ -46,8 +46,6 @@ export const PIN_LENGTH = 6;
  * re-hashed on the next successful unlock.
  */
 export const PIN_PBKDF2_ITERATIONS = 600_000;
-/** BM-10 (pbkdf2WhatIf): upper bound on iterations, so a typo can't hang the app for minutes. */
-export const BM10_MAX_ITERATIONS = 1_000_000;
 export const PIN_SALT_BYTES = 16;
 export const PIN_HASH_BYTES = 32;
 /** Format version of the stored PIN record. */

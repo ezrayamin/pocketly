@@ -1,6 +1,7 @@
 import { CoreError, LIVE_DATASET } from '@pocketly/core-contract';
 import type { DatasetConfig } from '@pocketly/core-contract';
-import { BENCH_SCENARIOS, type BenchScenario } from './bench/harness';
+import { BENCH_SCENARIOS } from '@pocketly/bench-app';
+import type { BenchScenario } from './bench/harness';
 import type { TabKey } from './components/TabBar';
 import { core } from './core';
 import { applyNetworkParams } from './features/devmenu/devLinks';

@@ -13,7 +13,6 @@ import type {
   BiometricUnlockResult,
   Core,
   DatasetConfig,
-  IngestResult,
   MoneyParseResult,
   NetworkSimulation,
   OtpSendResult,
@@ -44,8 +43,7 @@ export class KmpCore implements Core {
   constructor(private readonly native: PocketlyCore) {}
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
-    const { extraTransactions = [], ...seed } = config;
-    return this.native.resetData(seed, extraTransactions).catch(rethrow);
+    return this.native.resetData(config).catch(rethrow);
   }
 
   getWallet(): Promise<Wallet> {
@@ -86,18 +84,6 @@ export class KmpCore implements Core {
 
   computeSpendingSummary(month: string): Promise<SpendingSummary> {
     return this.native.computeSpendingSummary(month).catch(rethrow);
-  }
-
-  ingestTransactions(json: string): Promise<IngestResult> {
-    return this.native.ingestTransactions(json).catch(rethrow);
-  }
-
-  stageIngestPayload(json: string): Promise<void> {
-    return this.native.stageIngestPayload(json).catch(rethrow);
-  }
-
-  ingestStaged(): Promise<IngestResult> {
-    return this.native.ingestStaged().catch(rethrow);
   }
 
   checkPin(pin: string): PinCheck {
@@ -167,22 +153,9 @@ export class KmpCore implements Core {
     return this.native.unlockWithBiometrics(prompt).catch(rethrow);
   }
 
-  // Straight through: it can't throw, and BM-06 times exactly this path.
-  echo(value: number): number {
-    return this.native.echo(value);
-  }
-
   formatMoney(minor: number): string {
     try {
       return this.native.formatMoney(minor);
-    } catch (e) {
-      throw toCoreError(e);
-    }
-  }
-
-  formatMoneyBatch(minors: number[]): string[] {
-    try {
-      return this.native.formatMoneyBatch(minors);
     } catch (e) {
       throw toCoreError(e);
     }
@@ -206,17 +179,6 @@ export class KmpCore implements Core {
     return { unsubscribe: () => sub.unsubscribe() };
   }
 
-  lastComputeMs(): number {
-    return this.native.lastComputeMs();
-  }
-
-  lastStorageMs(): number {
-    return this.native.lastStorageMs();
-  }
-
-  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string> {
-    return this.native.pbkdf2WhatIf(password, saltHex, iterations).catch(rethrow);
-  }
 }
 
 /** Optional struct fields arrive as explicit `undefined`; the contract omits them (as jsCore does). */

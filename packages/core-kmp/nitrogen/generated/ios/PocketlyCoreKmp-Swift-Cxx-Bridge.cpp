@@ -79,14 +79,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(const IngestResult& /* result */)>
-  Func_void_IngestResult create_Func_void_IngestResult(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = PocketlyCoreKmp::Func_void_IngestResult::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const IngestResult& result) mutable -> void {
-      swiftClosure.call(result);
-    };
-  }
-  
   // pragma MARK: std::function<void(const UnlockResult& /* result */)>
   Func_void_UnlockResult create_Func_void_UnlockResult(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_UnlockResult::fromUnsafe(swiftClosureWrapper);
@@ -156,14 +148,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_PriceTick_::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const std::vector<PriceTick>& ticks) mutable -> void {
       swiftClosure.call(ticks);
-    };
-  }
-  
-  // pragma MARK: std::function<void(const std::string& /* result */)>
-  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = PocketlyCoreKmp::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
-      swiftClosure.call(result);
     };
   }
   

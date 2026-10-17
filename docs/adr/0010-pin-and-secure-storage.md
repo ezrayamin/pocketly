@@ -240,5 +240,6 @@ fallback; nothing outside `quickCryptoPinCrypto()` would change, since the core 
   core's language". `pbkdf2WhatIf`: @noble/hashes 1.8.0 in jsCore, a PBKDF2 loop over KotlinCrypto
   0.8.0's pure-Kotlin HMAC in kmpCore, every hash checked against pin.json. Run at 60,000
   iterations and scaled ×10: at 600,000 one jsCore run takes ~2 minutes on the vivo
-  (benchmarking.md, BM-10). Benchmark-only: the PIN never uses it, and both libraries ship in the app only for
-  it (small; BM-08 shows them in the JS bundle and the dex). The shipped design stays as above.
+  (benchmarking.md, BM-10). Benchmark-only: the PIN never uses it, and since 2026-10-17 both
+  libraries are in perf builds only (core-js-bench, shared-bench; ADR-0003, "Benchmark-only
+  code"). The shipped design stays as above.

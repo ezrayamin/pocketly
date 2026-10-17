@@ -22,7 +22,7 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   )
   private let convert = PocketlyShared.BridgeConversions.shared
 
-  func resetData(config: DatasetSeed, extraTransactions: [Transaction]) throws -> Promise<Void> {
+  func resetData(config: DatasetSeed) throws -> Promise<Void> {
     var nowMillis: KotlinLong? = nil
     if let now = config.nowMillis {
       nowMillis = KotlinLong(value: try convert.toLongExact(value: now, field: "nowMillis"))
@@ -31,7 +31,7 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       seed: try convert.toIntExact(value: config.seed, field: "seed"),
       transactionCount: try convert.toIntExact(value: config.transactionCount, field: "transactionCount"),
       nowMillis: nowMillis,
-      extraTransactions: try extraTransactions.map { try $0.toDomain(convert) }
+      extraTransactions: []
     )
     return Promise.async { [core] in try await core.resetData(config: kConfig) }
   }
@@ -91,33 +91,8 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.computeSpendingSummary(month: month).toNitro() }
   }
 
-  func ingestTransactions(json: String) throws -> Promise<IngestResult> {
-    return Promise.async { [core] in try await core.ingestTransactions(json: json).toNitro() }
-  }
-
-  func stageIngestPayload(json: String) throws -> Promise<Void> {
-    core.stageIngestPayload(json: json)
-    return Promise.resolved()
-  }
-
-  func ingestStaged() throws -> Promise<IngestResult> {
-    return Promise.async { [core] in try await core.ingestStaged().toNitro() }
-  }
-
-  func echo(value: Double) throws -> Double {
-    return core.echo(value: value)
-  }
-
   func formatMoney(minor: Double) throws -> String {
     return core.formatMoney(minor: try convert.toLongExact(value: minor, field: "amount"))
-  }
-
-  func formatMoneyBatch(minors: [Double]) throws -> [String] {
-    let array = KotlinLongArray(size: Int32(minors.count))
-    for (i, value) in minors.enumerated() {
-      array.set(index: Int32(i), value: try convert.toLongExact(value: value, field: "amount"))
-    }
-    return core.formatMoneyBatch(minors: array)
   }
 
   func checkPin(pin: String) throws -> PinCheck {
@@ -254,20 +229,6 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return HybridPriceSubscription(cancellable: cancellable)
   }
 
-  func lastComputeMs() throws -> Double {
-    return core.lastComputeMs()
-  }
-
-  func lastStorageMs() throws -> Double {
-    return core.lastStorageMs()
-  }
-
-  func pbkdf2WhatIf(password: String, saltHex: String, iterations: Double) throws -> Promise<String> {
-    let iterations = try convert.toIntExact(value: iterations, field: "iterations")
-    return Promise.async { [core] in
-      try await core.pbkdf2WhatIf(password: password, saltHex: saltHex, iterations: iterations)
-    }
-  }
 }
 
 final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
@@ -279,34 +240,6 @@ final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
 
   func unsubscribe() throws {
     cancellable.cancel()
-  }
-}
-
-// MARK: - Nitro structs → Kotlin domain
-
-private extension Transaction {
-  /// Shape only: the fake server validates the values like ingest input (INVALID_ARGUMENT).
-  func toDomain(_ convert: PocketlyShared.BridgeConversions) throws -> PocketlyShared.Transaction {
-    PocketlyShared.Transaction(
-      id: id,
-      idempotencyKey: idempotencyKey,
-      type: PocketlyShared.TransactionType.entries.first { $0.name == type.stringValue }!,
-      category: PocketlyShared.Category.entries.first { $0.name == category.stringValue }!,
-      amount: try convert.toLongExact(value: amount, field: "amount"),
-      counterparty: counterparty.map { c in
-        PocketlyShared.Counterparty(
-          kind: PocketlyShared.CounterpartyKind.entries.first { $0.name == c.kind.stringValue }!,
-          id: c.id,
-          name: c.name,
-          phone: c.phone
-        )
-      },
-      note: note,
-      status: PocketlyShared.TransactionStatus.entries.first { $0.name == status.stringValue }!,
-      failureReason: failureReason.map { r in PocketlyShared.ErrorCode.entries.first { $0.name == r.stringValue }! },
-      createdAt: try convert.toLongExact(value: createdAt, field: "createdAt"),
-      updatedAt: try convert.toLongExact(value: updatedAt, field: "updatedAt")
-    )
   }
 }
 
@@ -374,17 +307,6 @@ private extension PocketlyShared.SpendingSummary {
         walletBalance: Double(balanceCheck.walletBalance),
         consistent: balanceCheck.consistent
       )
-    )
-  }
-}
-
-private extension PocketlyShared.IngestResult {
-  func toNitro() -> IngestResult {
-    IngestResult(
-      accepted: Double(accepted),
-      rejected: Double(rejected),
-      duplicates: Double(duplicates),
-      errors: errors.map { IngestError(index: Double($0.index), reason: IngestRejectReason(fromString: $0.reason.name)!) }
     )
   }
 }

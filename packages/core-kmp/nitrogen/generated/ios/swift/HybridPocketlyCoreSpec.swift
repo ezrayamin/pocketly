@@ -13,7 +13,7 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   
 
   // Methods
-  func resetData(config: DatasetSeed, extraTransactions: [Transaction]) throws -> Promise<Void>
+  func resetData(config: DatasetSeed) throws -> Promise<Void>
   func getWallet() throws -> Promise<Wallet>
   func getTransactions(cursor: String?, limit: Double, filter: TxFilter?) throws -> Promise<TransactionPage>
   func getTransaction(id: String) throws -> Promise<Transaction>
@@ -22,9 +22,6 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func simulateIncomingTransfer() throws -> Promise<Transaction>
   func setTimeZone(zoneId: String) throws -> Void
   func computeSpendingSummary(month: String) throws -> Promise<SpendingSummary>
-  func ingestTransactions(json: String) throws -> Promise<IngestResult>
-  func stageIngestPayload(json: String) throws -> Promise<Void>
-  func ingestStaged() throws -> Promise<IngestResult>
   func checkPin(pin: String) throws -> PinCheck
   func setPin(pin: String) throws -> Promise<Void>
   func verifyPin(pin: String) throws -> Promise<UnlockResult>
@@ -40,14 +37,9 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func enableBiometrics(pin: String, prompt: BiometricPromptText) throws -> Promise<BiometricEnableResult>
   func disableBiometrics() throws -> Promise<Void>
   func unlockWithBiometrics(prompt: BiometricPromptText) throws -> Promise<BiometricUnlockResult>
-  func echo(value: Double) throws -> Double
   func formatMoney(minor: Double) throws -> String
-  func formatMoneyBatch(minors: [Double]) throws -> [String]
   func parseMoney(input: String) throws -> MoneyParseResult
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)
-  func lastComputeMs() throws -> Double
-  func lastStorageMs() throws -> Double
-  func pbkdf2WhatIf(password: String, saltHex: String, iterations: Double) throws -> Promise<String>
 }
 
 public extension HybridPocketlyCoreSpec_protocol {

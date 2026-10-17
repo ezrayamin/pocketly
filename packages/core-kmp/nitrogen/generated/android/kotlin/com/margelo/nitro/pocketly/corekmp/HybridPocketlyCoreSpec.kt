@@ -32,7 +32,7 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit>
+  abstract fun resetData(config: DatasetSeed): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -65,18 +65,6 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun computeSpendingSummary(month: String): Promise<SpendingSummary>
-  
-  @DoNotStrip
-  @Keep
-  abstract fun ingestTransactions(json: String): Promise<IngestResult>
-  
-  @DoNotStrip
-  @Keep
-  abstract fun stageIngestPayload(json: String): Promise<Unit>
-  
-  @DoNotStrip
-  @Keep
-  abstract fun ingestStaged(): Promise<IngestResult>
   
   @DoNotStrip
   @Keep
@@ -140,15 +128,7 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun echo(value: Double): Double
-  
-  @DoNotStrip
-  @Keep
   abstract fun formatMoney(minor: Double): String
-  
-  @DoNotStrip
-  @Keep
-  abstract fun formatMoneyBatch(minors: DoubleArray): Array<String>
   
   @DoNotStrip
   @Keep
@@ -162,18 +142,6 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
     val __result = subscribePrices(symbols, intervalMs, seed, onTicks)
     return __result
   }
-  
-  @DoNotStrip
-  @Keep
-  abstract fun lastComputeMs(): Double
-  
-  @DoNotStrip
-  @Keep
-  abstract fun lastStorageMs(): Double
-  
-  @DoNotStrip
-  @Keep
-  abstract fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Double): Promise<String>
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

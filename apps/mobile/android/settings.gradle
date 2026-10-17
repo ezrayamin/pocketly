@@ -10,6 +10,9 @@ includeBuild('../../../node_modules/@react-native/gradle-plugin')
 // react-native.config.js) so only the kmpCore flavor depends on it.
 include ':pocketly_core-kmp'
 project(':pocketly_core-kmp').projectDir = new File(rootDir, '../../../packages/core-kmp/android')
+// kmpCorePerf only: the benchmark Nitro object (BenchCore), linked by app/build.gradle.
+include ':pocketly_core-kmp-bench'
+project(':pocketly_core-kmp-bench').projectDir = new File(rootDir, '../../../packages/core-kmp-bench/android')
 
 // The KMP module, as a composite build: "com.pocketly:pocketly-shared" resolves to it.
 includeBuild('../../../shared')

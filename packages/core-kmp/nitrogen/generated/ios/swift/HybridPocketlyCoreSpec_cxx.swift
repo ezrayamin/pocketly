@@ -125,9 +125,9 @@ open class HybridPocketlyCoreSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func resetData(config: DatasetSeed, extraTransactions: bridge.std__vector_Transaction_) -> bridge.Result_std__shared_ptr_Promise_void___ {
+  public final func resetData(config: DatasetSeed) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
-      let __result = try self.__implementation.resetData(config: config, extraTransactions: extraTransactions.map({ __item in __item }))
+      let __result = try self.__implementation.resetData(config: config)
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
         let __promise = bridge.create_std__shared_ptr_Promise_void__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
@@ -276,63 +276,6 @@ open class HybridPocketlyCoreSpec_cxx {
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
       return bridge.create_Result_std__shared_ptr_Promise_SpendingSummary___(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func ingestTransactions(json: std.string) -> bridge.Result_std__shared_ptr_Promise_IngestResult___ {
-    do {
-      let __result = try self.__implementation.ingestTransactions(json: String(json))
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_IngestResult__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_IngestResult__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_IngestResult__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve(__result) })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func stageIngestPayload(json: std.string) -> bridge.Result_std__shared_ptr_Promise_void___ {
-    do {
-      let __result = try self.__implementation.stageIngestPayload(json: String(json))
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_void__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve() })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func ingestStaged() -> bridge.Result_std__shared_ptr_Promise_IngestResult___ {
-    do {
-      let __result = try self.__implementation.ingestStaged()
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_IngestResult__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_IngestResult__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_IngestResult__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve(__result) })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_IngestResult___(__exceptionPtr)
     }
   }
   
@@ -608,18 +551,6 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
-  public final func echo(value: Double) -> bridge.Result_double_ {
-    do {
-      let __result = try self.__implementation.echo(value: value)
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
   public final func formatMoney(minor: Double) -> bridge.Result_std__string_ {
     do {
       let __result = try self.__implementation.formatMoney(minor: minor)
@@ -628,24 +559,6 @@ open class HybridPocketlyCoreSpec_cxx {
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
       return bridge.create_Result_std__string_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func formatMoneyBatch(minors: bridge.std__vector_double_) -> bridge.Result_std__vector_std__string__ {
-    do {
-      let __result = try self.__implementation.formatMoneyBatch(minors: minors.map({ __item in __item }))
-      let __resultCpp = { () -> bridge.std__vector_std__string_ in
-        var __vector = bridge.create_std__vector_std__string_(__result.count)
-        for __item in __result {
-          __vector.push_back(std.string(__item))
-        }
-        return __vector
-      }()
-      return bridge.create_Result_std__vector_std__string__(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__vector_std__string__(__exceptionPtr)
     }
   }
   
@@ -684,49 +597,6 @@ open class HybridPocketlyCoreSpec_cxx {
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
       return bridge.create_Result_std__shared_ptr_HybridPriceSubscriptionSpec__(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func lastComputeMs() -> bridge.Result_double_ {
-    do {
-      let __result = try self.__implementation.lastComputeMs()
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func lastStorageMs() -> bridge.Result_double_ {
-    do {
-      let __result = try self.__implementation.lastStorageMs()
-      let __resultCpp = __result
-      return bridge.create_Result_double_(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_double_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func pbkdf2WhatIf(password: std.string, saltHex: std.string, iterations: Double) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
-    do {
-      let __result = try self.__implementation.pbkdf2WhatIf(password: String(password), saltHex: String(saltHex), iterations: iterations)
-      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__string__ in
-        let __promise = bridge.create_std__shared_ptr_Promise_std__string__()
-        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_std__string__(__promise)
-        __result
-          .then({ __result in __promiseHolder.resolve(std.string(__result)) })
-          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
-        return __promise
-      }()
-      return bridge.create_Result_std__shared_ptr_Promise_std__string___(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
     }
   }
 }

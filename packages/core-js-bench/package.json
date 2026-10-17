@@ -1,0 +1,14 @@
+{
+  "name": "@pocketly/core-js-bench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Benchmark-only entry points for jsCore (BenchCore). Bundled into perf builds only.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "@pocketly/core-contract": "0.1.0",
+    "@pocketly/core-js": "0.1.0"
+  }
+}

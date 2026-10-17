@@ -9,8 +9,8 @@
  *
  * Uses Jest globals; never import this from app code.
  */
+import { BM10_MAX_ITERATIONS } from '../benchConstants';
 import {
-  BM10_MAX_ITERATIONS,
   DEFAULT_AUTO_LOCK_MS,
   FAKE_OTP_CODE,
   OTP_COOLDOWN_MS,
@@ -31,9 +31,10 @@ import {
   PIN_RECORD_VERSION,
   PIN_SALT_BYTES,
 } from '../constants';
+import type { BenchCore } from '../bench';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
-import type { NetworkSimulation, PriceTick, Transaction, Wallet } from '../types';
+import type { DatasetConfig, NetworkSimulation, PriceTick, Transaction, Wallet } from '../types';
 import golden from '../../fixtures/golden.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
@@ -43,7 +44,15 @@ import pin from '../../fixtures/pin.json';
 import { TEST_PHONE, verifyTestPhone } from './onboarding';
 import timeZones from '../../fixtures/time-zones.json';
 
-type CoreFactory = () => Core | Promise<Core>;
+/** A core plus its benchmark-only entry points (perf builds; tests always have both). */
+export interface CoreUnderTest {
+  core: Core;
+  bench: BenchCore;
+  /** Test-only: resetData with extra rows seeded on the fake server (time-zone fixtures). */
+  resetDataWithExtras(config: DatasetConfig, extraTransactions: Transaction[]): Promise<void>;
+}
+
+type CoreFactory = () => CoreUnderTest | Promise<CoreUnderTest>;
 
 async function expectCoreError(promise: Promise<unknown>, code: CoreError['code']) {
   await expect(promise).rejects.toMatchObject({ code });
@@ -97,9 +106,11 @@ export function collectPriceBatches(
 export function runContractSuite(name: string, createCore: CoreFactory): void {
   describe(`Core contract: ${name}`, () => {
     let core: Core;
+    let bench: BenchCore;
+    let resetDataWithExtras: CoreUnderTest['resetDataWithExtras'];
 
     beforeEach(async () => {
-      core = await createCore();
+      ({ core, bench, resetDataWithExtras } = await createCore());
       core.setTimeZone('UTC');
       await core.resetData(DEFAULT_DATASET);
     });
@@ -109,13 +120,13 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(core.formatMoney(minor)).toBe(expected);
       });
 
-      it('echo returns its argument (BM-06 call-cost probe)', () => {
-        for (const v of [0, -1.5, 42, Number.MAX_SAFE_INTEGER]) expect(core.echo(v)).toBe(v);
+      it('echo returns its argument (bench, BM-06 call-cost probe)', () => {
+        for (const v of [0, -1.5, 42, Number.MAX_SAFE_INTEGER]) expect(bench.echo(v)).toBe(v);
       });
 
-      it('formatMoneyBatch matches formatMoney element-wise', () => {
+      it('formatMoneyBatch matches formatMoney element-wise (bench, BM-06)', () => {
         const minors = money.format.map((c) => c.minor);
-        expect(core.formatMoneyBatch(minors)).toEqual(money.format.map((c) => c.expected));
+        expect(bench.formatMoneyBatch(minors)).toEqual(money.format.map((c) => c.expected));
       });
 
       it.each(money.formatInvalid)('formatMoney(%p) rejects non-safe-integer input', (minor) => {
@@ -190,7 +201,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         expect(await core.computeSpendingSummary(month)).toEqual(
           golden.summaries[month as keyof typeof golden.summaries],
         );
-        expect(core.lastComputeMs()).toBeGreaterThanOrEqual(0);
+        expect(bench.lastComputeMs()).toBeGreaterThanOrEqual(0);
       });
 
       it('rejects malformed months', async () => {
@@ -207,47 +218,47 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
     });
 
-    describe('ingestTransactions (BM-04)', () => {
+    describe('bench: ingestTransactions (BM-04)', () => {
       it('validates, de-duplicates and writes entries to the replica (not the server)', async () => {
         const before = await core.getWallet();
-        expect(await core.ingestTransactions(JSON.stringify(ingest.input))).toEqual(ingest.expected);
+        expect(await bench.ingestTransactions(JSON.stringify(ingest.input))).toEqual(ingest.expected);
         const after = await core.getWallet();
         expect(after.balance - before.balance).toBe(ingest.expectedBalanceDelta);
         expect((await core.getTransaction('ing-0001')).note).toBe('Iced latte');
-        expect(core.lastStorageMs()).toBeGreaterThanOrEqual(0);
+        expect(bench.lastStorageMs()).toBeGreaterThanOrEqual(0);
       });
 
       it('is idempotent: re-ingesting the same payload only yields duplicates', async () => {
-        await core.ingestTransactions(JSON.stringify(ingest.input));
-        const second = await core.ingestTransactions(JSON.stringify(ingest.input));
+        await bench.ingestTransactions(JSON.stringify(ingest.input));
+        const second = await bench.ingestTransactions(JSON.stringify(ingest.input));
         expect(second.accepted).toBe(0);
         expect(second.duplicates).toBe(ingest.expected.accepted + ingest.expected.duplicates);
       });
 
       it('rejects payloads that are not a JSON array', async () => {
-        await expectCoreError(core.ingestTransactions('{not json'), 'INVALID_ARGUMENT');
-        await expectCoreError(core.ingestTransactions('{"a":1}'), 'INVALID_ARGUMENT');
+        await expectCoreError(bench.ingestTransactions('{not json'), 'INVALID_ARGUMENT');
+        await expectCoreError(bench.ingestTransactions('{"a":1}'), 'INVALID_ARGUMENT');
       });
     });
 
-    describe('ingestStaged (BM-04b)', () => {
+    describe('bench: ingestStaged (BM-04b)', () => {
       it('throws INVALID_ARGUMENT when nothing is staged', async () => {
-        await expectCoreError(core.ingestStaged(), 'INVALID_ARGUMENT');
+        await expectCoreError(bench.ingestStaged(), 'INVALID_ARGUMENT');
       });
 
       it('ingests the staged payload exactly as ingestTransactions does, and keeps it staged', async () => {
-        await core.stageIngestPayload(JSON.stringify(ingest.input));
-        expect(await core.ingestStaged()).toEqual(ingest.expected);
+        await bench.stageIngestPayload(JSON.stringify(ingest.input));
+        expect(await bench.ingestStaged()).toEqual(ingest.expected);
         expect((await core.getTransaction('ing-0001')).note).toBe('Iced latte');
-        const again = await core.ingestStaged();
+        const again = await bench.ingestStaged();
         expect(again.accepted).toBe(0);
         expect(again.duplicates).toBe(ingest.expected.accepted + ingest.expected.duplicates);
       });
 
       it('survives resetData: the payload is the core\'s, not the database\'s', async () => {
-        await core.stageIngestPayload(JSON.stringify(ingest.input));
+        await bench.stageIngestPayload(JSON.stringify(ingest.input));
         await core.resetData();
-        expect(await core.ingestStaged()).toEqual(ingest.expected);
+        expect(await bench.ingestStaged()).toEqual(ingest.expected);
       });
     });
 
@@ -350,7 +361,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
     describe('time zones (ADR-0006)', () => {
       it.each(timeZones.cases)('$name', async ({ zone, nowMillis, transactions, expected }) => {
         core.setTimeZone(zone);
-        await core.resetData({ seed: 1, transactionCount: 1, nowMillis, extraTransactions: transactions as Transaction[] });
+        await resetDataWithExtras({ seed: 1, transactionCount: 1, nowMillis }, transactions as Transaction[]);
 
         expect((await core.getWallet()).usedToday).toBe(expected.usedToday);
         for (const [month, want] of Object.entries(expected.months)) {
@@ -544,9 +555,9 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
     });
 
-    describe('pbkdf2WhatIf (BM-10, ADR-0010 §8)', () => {
+    describe('bench: pbkdf2WhatIf (BM-10, ADR-0010 §8)', () => {
       it.each(pin.pbkdf2)('matches fixtures/pin.json: $pin, $iterations iterations', async ({ pin: password, saltHex, iterations, hashHex }) => {
-        expect(await core.pbkdf2WhatIf(password, saltHex, iterations)).toBe(hashHex);
+        expect(await bench.pbkdf2WhatIf(password, saltHex, iterations)).toBe(hashHex);
       }, 60_000);
 
       it.each([
@@ -557,7 +568,7 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         ['fractional iterations', '482915', '00', 1.5],
         ['too many iterations', '482915', '00', BM10_MAX_ITERATIONS + 1],
       ])('%s is INVALID_ARGUMENT', async (_name, password, saltHex, iterations) => {
-        await expectCoreError(core.pbkdf2WhatIf(password as string, saltHex as string, iterations as number), 'INVALID_ARGUMENT');
+        await expectCoreError(bench.pbkdf2WhatIf(password as string, saltHex as string, iterations as number), 'INVALID_ARGUMENT');
       });
     });
 

@@ -16,7 +16,6 @@ import type {
   Core,
   DatasetConfig,
   ErrorCode,
-  IngestResult,
   MoneyParseResult,
   NetworkSimulation,
   OtpSendResult,
@@ -36,10 +35,9 @@ import type {
 } from '@pocketly/core-contract';
 import { CacheStore } from './data/cacheStore';
 import type { SqlDriver } from './data/db/sqlDriver';
-import { FakeWalletApi } from './data/fake/fakeWalletApi';
+import { FakeWalletApi, type ServerDataset } from './data/fake/fakeWalletApi';
 import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
-import { parseAndValidate } from './data/transactionIngestor';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
 import { BiometricAuth } from './security/biometricAuth';
@@ -48,7 +46,6 @@ import { PinAuth } from './security/pinAuth';
 import { checkPhone, isValidE164 } from './security/phonePolicy';
 import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
-import { purePbkdf2Sha256 } from './security/purePbkdf2';
 import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
@@ -92,10 +89,14 @@ export class JsCore implements Core {
   private readonly ledgerSync: LedgerSync;
   /** Databases open lazily; every data call awaits this first. */
   private readonly ready: Promise<void>;
-  private computeMs = 0;
-  private storageMs = 0;
-  /** BM-04b: a payload held in the core, as a network response would be. Survives resetData. */
-  private stagedPayload: string | undefined;
+  /**
+   * Time inside the core / in the database of the most recent timed call (computeSpendingSummary
+   * here; the bench's helpers too). Read only by core-js-bench (perf builds).
+   */
+  /** @internal */
+  computeMs = 0;
+  /** @internal */
+  storageMs = 0;
   private readonly pin: PinAuth;
   private readonly biometric: BiometricAuth;
 
@@ -129,7 +130,12 @@ export class JsCore implements Core {
     this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
   }
 
-  async resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
+  resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
+    return this.reset(config);
+  }
+
+  /** resetData, with extra seed rows allowed (core-js-bench: BenchCore.resetDataWithExtras). */
+  private async reset(config: ServerDataset): Promise<void> {
     await this.ready;
     await this.backend.reset(config);
     await this.cache.clear();
@@ -198,31 +204,6 @@ export class JsCore implements Core {
     this.storageMs = now() - start;
     const walletBalance = cachedWallet?.wallet.balance ?? 0;
     return this.timed(() => computeSpendingSummary(month, this.zone.month(month), transactions, walletBalance));
-  }
-
-  async stageIngestPayload(json: string): Promise<void> {
-    this.stagedPayload = json;
-  }
-
-  ingestStaged(): Promise<IngestResult> {
-    if (this.stagedPayload === undefined) {
-      return Promise.reject(new CoreError('INVALID_ARGUMENT', 'no ingest payload staged'));
-    }
-    return this.ingestTransactions(this.stagedPayload);
-  }
-
-  async ingestTransactions(json: string): Promise<IngestResult> {
-    await this.ready;
-    const parsed = this.timed(() => parseAndValidate(json));
-    const start = now();
-    const inserted = await this.cache.insertIfAbsentMany(parsed.valid);
-    this.storageMs = now() - start;
-    return {
-      accepted: inserted,
-      rejected: parsed.rejected,
-      duplicates: parsed.valid.length - inserted,
-      errors: parsed.errors,
-    };
   }
 
   setNetworkSimulation(simulation: NetworkSimulation): void {
@@ -314,17 +295,8 @@ export class JsCore implements Core {
     return this.pin.setAutoLockTimeout(ms);
   }
 
-  echo(value: number): number {
-    return value;
-  }
-
   formatMoney(minor: number): string {
     return formatMoney(minor);
-  }
-
-  formatMoneyBatch(minors: number[]): string[] {
-    this.storageMs = 0;
-    return this.timed(() => minors.map(formatMoney));
   }
 
   parseMoney(input: string): MoneyParseResult {
@@ -339,18 +311,6 @@ export class JsCore implements Core {
     const feed = new PriceFeed(symbols, options?.seed ?? 1);
     const handle = setInterval(() => onTicks(feed.step()), options?.intervalMs ?? DEFAULT_PRICE_INTERVAL_MS);
     return { unsubscribe: () => clearInterval(handle) };
-  }
-
-  lastComputeMs(): number {
-    return this.computeMs;
-  }
-
-  lastStorageMs(): number {
-    return this.storageMs;
-  }
-
-  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string> {
-    return purePbkdf2Sha256(password, saltHex, iterations);
   }
 
   private timed<T>(work: () => T): T {

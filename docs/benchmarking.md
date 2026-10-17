@@ -111,7 +111,7 @@ export const core: Core =
 > libraries: `jsCore` uses op-sqlite (its own bundled SQLite, over JSI), `kmpCore` uses
 > SQLDelight on the platform's SQLite. Same schema (generated from the same `.sq` files),
 > different engine builds. So every scenario that touches storage reports it separately:
-> `core.lastStorageMs()` next to `core.lastComputeMs()` (§5.2). Bulk writes follow the same
+> `bench.lastStorageMs()` next to `bench.lastComputeMs()` (§5.2). Bulk writes follow the same
 > pattern in both: one transaction, one prepared statement bound and stepped per row (from
 > 2026-10-11; before that, `jsCore` re-prepared the statement for every row).
 
@@ -239,7 +239,7 @@ It records **two timings** for every `kmpCore` operation:
 
 **Bridge overhead = end-to-end − compute only.** For `jsCore`, end-to-end and compute are the same thing.
 
-Operations that also touch SQLite record a third timing, **storage** (`core.lastStorageMs()`),
+Operations that also touch SQLite record a third timing, **storage** (`bench.lastStorageMs()`),
 which is kept out of compute in both cores:
 
 | Operation | `lastComputeMs()` | `lastStorageMs()` |
@@ -249,6 +249,11 @@ which is kept out of compute in both cores:
 | `formatMoneyBatch` (BM-06) | formatting | 0 |
 
 For `kmpCore`, bridge overhead is then end-to-end − compute − storage.
+
+The timing getters, `formatMoneyBatch`, the ingest entry points and `echo` are `BenchCore`
+methods (`packages/core-contract/src/bench.ts`), not `Core` methods: benchmark-only code is in
+perf builds only (ADR-0003, "Benchmark-only code"; CI's `check-release-clean.sh`). They work on
+the running core's own replica and timings, and BM-03 still times `Core.computeSpendingSummary`.
 
 **Implementation** (`apps/mobile/src/bench/`, run by `benchmarks/scripts/bm-harness.sh`). A perf
 build started with `pocketly.bench=BM-03|BM-04|BM-04b|BM-06` (plus `benchRuns`, `benchWarmup`, `benchMemory`) renders

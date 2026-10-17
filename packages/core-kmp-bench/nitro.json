@@ -1,0 +1,28 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "pocketly",
+    "bench"
+  ],
+  "ios": {
+    "iosModuleName": "PocketlyCoreKmpBench"
+  },
+  "android": {
+    "androidNamespace": [
+      "pocketly",
+      "bench"
+    ],
+    "androidCxxLibName": "PocketlyCoreKmpBench"
+  },
+  "autolinking": {
+    "PocketlyBench": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridPocketlyBench"
+      }
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

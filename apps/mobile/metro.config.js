@@ -27,18 +27,40 @@ function devServerPort() {
   const raw = i >= 0 ? argv[i + 1] : argv.find((a) => a.startsWith('--port='))?.slice('--port='.length);
   return raw === undefined ? undefined : Number(raw);
 }
-function createConfig(coreImpl) {
+/**
+ * Benchmark-only code (the harness, BenchCore, @noble/hashes, the KMP bench object) is in perf
+ * bundles only. Two virtual modules decide it at bundle time, like `@pocketly/core-impl`:
+ *
+ *   @pocketly/bench-app   → src/bench/index.ts (perf) | src/bench/disabled.ts (everything else)
+ *   @pocketly/bench-impl  → @pocketly/core-js-bench | @pocketly/core-kmp-bench (perf only)
+ *
+ * Gradle passes metro.bench.config.js / metro.kmp.bench.config.js for perf bundles
+ * (android/app/build.gradle). Release, debug and the dev server get no benchmark code; CI checks
+ * the release builds (benchmarks/scripts/check-release-clean.sh).
+ */
+function createConfig(coreImpl, { bench = false } = {}) {
   if (coreImpl !== 'js' && coreImpl !== 'kmp') {
     throw new Error(`CORE_IMPL must be "js" or "kmp", got "${coreImpl}"`);
   }
   const corePackage = coreImpl === 'kmp' ? '@pocketly/core-kmp' : '@pocketly/core-js';
+  const benchPackage = coreImpl === 'kmp' ? '@pocketly/core-kmp-bench' : '@pocketly/core-js-bench';
+  const benchApp = path.join(__dirname, 'src/bench', bench ? 'index.ts' : 'disabled.ts');
+  const resolveVirtual = (moduleName) => {
+    if (moduleName === '@pocketly/core-impl') return corePackage;
+    if (moduleName === '@pocketly/bench-app') return benchApp;
+    if (moduleName === '@pocketly/bench-impl') {
+      if (!bench) throw new Error('@pocketly/bench-impl is only available in perf (bench) bundles');
+      return benchPackage;
+    }
+    return moduleName;
+  };
 
   return mergeConfig(getDefaultConfig(__dirname), {
     watchFolders: [monorepoRoot],
     resolver: {
       nodeModulesPaths: [path.join(__dirname, 'node_modules'), path.join(monorepoRoot, 'node_modules')],
       resolveRequest: (context, moduleName, platform) =>
-        context.resolveRequest(context, moduleName === '@pocketly/core-impl' ? corePackage : moduleName, platform),
+        context.resolveRequest(context, resolveVirtual(moduleName), platform),
     },
   });
 }

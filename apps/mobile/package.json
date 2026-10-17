@@ -39,7 +39,9 @@
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "4.28.0",
     "react-native-sensitive-info": "6.1.5",
-    "react-native-svg": "15.15.5"
+    "react-native-svg": "15.15.5",
+    "@pocketly/core-js-bench": "0.1.0",
+    "@pocketly/core-kmp-bench": "0.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

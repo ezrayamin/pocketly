@@ -247,13 +247,8 @@ export interface DatasetSeed {
   nowMillis?: EpochMillis;
 }
 
-export interface DatasetConfig extends DatasetSeed {
-  /**
-   * Extra transactions the fake server is seeded with, on top of the generated ones (tests,
-   * demos). Validated like ingest input; any invalid entry rejects the reset (INVALID_ARGUMENT).
-   */
-  extraTransactions?: Transaction[];
-}
+/** The fake server's dataset. Extra seed rows are benchmark/test-only: BenchCore.resetDataWithExtras. */
+export type DatasetConfig = DatasetSeed;
 
 // ── Auth & App Lock (F1, F2; ADR-0010) ──────────────────────────────────
 

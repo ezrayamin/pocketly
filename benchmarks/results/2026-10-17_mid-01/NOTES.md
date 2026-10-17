@@ -113,5 +113,8 @@ the architecture row, which then read +220 KB. Same data, recomputed by `collect
   small ones, for app size (this finding) and for call overhead (BM-06).
 - Since slice 4, jsCore's download grew ~3.9 MB, almost all quick-crypto; kmpCore's grew ~0.35 MB
   (mostly the bridge). Both include BM-10's what-if libraries (@noble/hashes in the JS bundle,
-  KotlinCrypto in the dex), which are small. As ADR-0010 §8 says, the size gap is mostly library
+  KotlinCrypto in the dex), which are small. **Fixed after this session (2026-10-17):** benchmark-only code
+  (these libraries, the harness and 8 Nitro methods of the bridge library) is now in perf builds
+  only (ADR-0003, "Benchmark-only code"), so the next BM-08 run measures release builds without
+  it; this session's sizes still include it, in both builds. As ADR-0010 §8 says, the size gap is mostly library
   choices, not the architecture.

@@ -8,7 +8,6 @@ import type {
   BiometricStatus,
   BiometricUnlockResult,
   DatasetSeed,
-  IngestResult,
   MoneyParseResult,
   NetworkSimulation,
   OtpSendResult,
@@ -39,11 +38,7 @@ export interface PriceSubscription extends HybridObject<Platforms> {
  * `src/index.ts` adapts this to the `Core` contract.
  */
 export interface PocketlyCore extends HybridObject<Platforms> {
-  /**
-   * `DatasetConfig` arrives split: an optional array of structs inside a struct breaks Swift's
-   * `std::vector<Transaction>` conformance (Swift 6.1 C++ interop), which a plain array avoids.
-   */
-  resetData(config: DatasetSeed, extraTransactions: Transaction[]): Promise<void>;
+  resetData(config: DatasetSeed): Promise<void>;
   getWallet(): Promise<Wallet>;
   getTransactions(cursor: string | undefined, limit: number, filter: TxFilter | undefined): Promise<TransactionPage>;
   getTransaction(id: string): Promise<Transaction>;
@@ -55,9 +50,6 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   setTimeZone(zoneId: string): void;
 
   computeSpendingSummary(month: string): Promise<SpendingSummary>;
-  ingestTransactions(json: string): Promise<IngestResult>;
-  stageIngestPayload(json: string): Promise<void>;
-  ingestStaged(): Promise<IngestResult>;
 
   checkPin(pin: string): PinCheck;
   setPin(pin: string): Promise<void>;
@@ -75,9 +67,7 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   disableBiometrics(): Promise<void>;
   unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
 
-  echo(value: number): number;
   formatMoney(minor: number): string;
-  formatMoneyBatch(minors: number[]): string[];
   parseMoney(input: string): MoneyParseResult;
 
   subscribePrices(
@@ -86,8 +76,4 @@ export interface PocketlyCore extends HybridObject<Platforms> {
     seed: number,
     onTicks: (ticks: PriceTick[]) => void,
   ): PriceSubscription;
-
-  lastComputeMs(): number;
-  lastStorageMs(): number;
-  pbkdf2WhatIf(password: string, saltHex: string, iterations: number): Promise<string>;
 }

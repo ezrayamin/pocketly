@@ -39,26 +39,10 @@ import com.pocketly.shared.domain.Wallet as KWallet
 
 // ── JS → Kotlin ─────────────────────────────────────────────────────────────
 
-internal fun DatasetSeed.toDomain(extraTransactions: Array<Transaction>) = KDatasetConfig(
+internal fun DatasetSeed.toDomain() = KDatasetConfig(
     seed = BridgeConversions.toIntExact(seed, "seed"),
     transactionCount = BridgeConversions.toIntExact(transactionCount, "transactionCount"),
     nowMillis = nowMillis?.let { BridgeConversions.toLongExact(it, "nowMillis") },
-    extraTransactions = extraTransactions.map { it.toDomain() },
-)
-
-// Shape only: the fake server validates the values like ingest input (INVALID_ARGUMENT).
-private fun Transaction.toDomain() = KTransaction(
-    id = id,
-    idempotencyKey = idempotencyKey,
-    type = KTransactionType.valueOf(type.name),
-    category = KCategory.valueOf(category.name),
-    amount = Money(BridgeConversions.toLongExact(amount, "amount")),
-    counterparty = counterparty?.let { KCounterparty(KCounterpartyKind.valueOf(it.kind.name), it.id, it.name, it.phone) },
-    note = note,
-    status = KTransactionStatus.valueOf(status.name),
-    failureReason = failureReason?.let { KErrorCode.valueOf(it.name) },
-    createdAt = BridgeConversions.toLongExact(createdAt, "createdAt"),
-    updatedAt = BridgeConversions.toLongExact(updatedAt, "updatedAt"),
 )
 
 internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
@@ -139,13 +123,6 @@ internal fun KSpendingSummary.toNitro() = SpendingSummary(
     byCategory = Array(byCategory.size) { byCategory[it].toNitro() },
     byDay = Array(byDay.size) { byDay[it].toNitro() },
     balanceCheck = balanceCheck.toNitro(),
-)
-
-internal fun KIngestResult.toNitro() = IngestResult(
-    accepted = accepted.toDouble(),
-    rejected = rejected.toDouble(),
-    duplicates = duplicates.toDouble(),
-    errors = Array(errors.size) { IngestError(errors[it].index.toDouble(), IngestRejectReason.valueOf(errors[it].reason.name)) },
 )
 
 internal fun KMoneyParseResult.toNitro() = MoneyParseResult(

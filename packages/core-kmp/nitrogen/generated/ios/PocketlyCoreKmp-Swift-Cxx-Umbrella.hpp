@@ -46,12 +46,6 @@ namespace margelo::nitro::pocketly { enum class ErrorCode; }
 namespace margelo::nitro::pocketly { class HybridPocketlyCoreSpec; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
 namespace margelo::nitro::pocketly { class HybridPriceSubscriptionSpec; }
-// Forward declaration of `IngestError` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestError; }
-// Forward declaration of `IngestRejectReason` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class IngestRejectReason; }
-// Forward declaration of `IngestResult` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
@@ -119,9 +113,6 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "ErrorCode.hpp"
 #include "HybridPocketlyCoreSpec.hpp"
 #include "HybridPriceSubscriptionSpec.hpp"
-#include "IngestError.hpp"
-#include "IngestRejectReason.hpp"
-#include "IngestResult.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
 #include "NetworkMode.hpp"

@@ -20,15 +20,25 @@ import com.pocketly.shared.security.AndroidSecureStore
 @DoNotStrip
 @Keep
 class HybridPocketlyCore : HybridPocketlyCoreSpec() {
+    companion object {
+        /**
+         * This process's core, for other Nitro objects that must work on the same instance (the
+         * perf-only `PocketlyBench`, packages/core-kmp-bench). Set once the core exists.
+         */
+        @Volatile
+        var current: PocketlyCore? = null
+            private set
+    }
+
     private val core: PocketlyCore = PocketlyCore.create(
         AndroidDatabaseDrivers(NitroModules.applicationContext!!),
         AndroidSecureStore(NitroModules.applicationContext!!),
         com.pocketly.shared.domain.DatasetConfig.LIVE,
         AndroidBiometricSigner(NitroModules.applicationContext!!) { NitroModules.applicationContext?.currentActivity },
-    )
+    ).also { current = it }
 
-    override fun resetData(config: DatasetSeed, extraTransactions: Array<Transaction>): Promise<Unit> =
-        Promise.async { core.resetData(config.toDomain(extraTransactions)) }
+    override fun resetData(config: DatasetSeed): Promise<Unit> =
+        Promise.async { core.resetData(config.toDomain()) }
 
     override fun getWallet(): Promise<Wallet> = Promise.async { core.getWallet().toNitro() }
 
@@ -51,15 +61,6 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun computeSpendingSummary(month: String): Promise<SpendingSummary> =
         Promise.async { core.computeSpendingSummary(month).toNitro() }
-
-    override fun ingestTransactions(json: String): Promise<IngestResult> =
-        Promise.async { core.ingestTransactions(json).toNitro() }
-
-    override fun stageIngestPayload(json: String): Promise<Unit> =
-        Promise.async { core.stageIngestPayload(json) }
-
-    override fun ingestStaged(): Promise<IngestResult> =
-        Promise.async { core.ingestStaged().toNitro() }
 
     override fun checkPin(pin: String): PinCheck = core.checkPin(pin).toNitro()
 
@@ -96,12 +97,7 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun setAutoLockTimeout(ms: Double): Promise<Unit> =
         Promise.async { core.setAutoLockTimeout(BridgeConversions.toLongExact(ms, "ms")) }
 
-    override fun echo(value: Double): Double = core.echo(value)
-
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
-
-    override fun formatMoneyBatch(minors: DoubleArray): Array<String> =
-        core.formatMoneyBatch(BridgeConversions.toLongArrayExact(minors)).toTypedArray()
 
     override fun parseMoney(input: String): MoneyParseResult = core.parseMoney(input).toNitro()
 
@@ -118,13 +114,6 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
         ) { ticks -> onTicks(Array(ticks.size) { ticks[it].toNitro() }) }
         return HybridPriceSubscription(cancellable)
     }
-
-    override fun lastComputeMs(): Double = core.lastComputeMs()
-
-    override fun lastStorageMs(): Double = core.lastStorageMs()
-
-    override fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Double): Promise<String> =
-        Promise.async { core.pbkdf2WhatIf(password, saltHex, BridgeConversions.toIntExact(iterations, "iterations")) }
 }
 
 @DoNotStrip

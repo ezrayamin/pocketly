@@ -3,6 +3,9 @@ module.exports = {
   setupFiles: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
     '^@pocketly/core-impl$': '@pocketly/core-js',
+    // Tests always include the benchmark harness (perf bundles do; release bundles don't).
+    '^@pocketly/bench-app$': '<rootDir>/src/bench/index.ts',
+    '^@pocketly/bench-impl$': '@pocketly/core-js-bench',
   },
   transform: {
     // lucide-react-native ships per-icon ES modules (.mjs).

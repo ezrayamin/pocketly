@@ -2,6 +2,7 @@ package com.pocketly.shared.contract
 
 import com.pocketly.shared.security.MemorySecureStore
 import com.pocketly.shared.bridge.BridgeConversions
+import com.pocketly.shared.bridge.CoreProbe
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.TransactionDtoValidator
 import com.pocketly.shared.data.db.JvmDatabaseDrivers
@@ -82,7 +83,7 @@ class ContractFixturesTest {
             assertEquals(case["expected"]!!.jsonPrimitive.content, core.formatMoney(minor), "formatMoney($minor)")
         }
         val minors = money["format"]!!.jsonArray.map { it.jsonObject["minor"]!!.jsonPrimitive.long }.toLongArray()
-        assertEquals(minors.map { core.formatMoney(it) }, core.formatMoneyBatch(minors))
+        assertEquals(minors.map { core.formatMoney(it) }, CoreProbe(core).formatMoneyBatch(minors))
     }
 
     @Test
@@ -189,22 +190,12 @@ class ContractFixturesTest {
     @Test
     fun ingestTransactions() = runTest {
         val before = core.getWallet().balance.minor
-        assertEquals(ingest["expected"], core.ingestTransactions(ingest["input"].toString()).toJson())
+        assertEquals(ingest["expected"], CoreProbe(core).ingestTransactions(ingest["input"].toString()).toJson())
         assertEquals(ingest["expectedBalanceDelta"]!!.jsonPrimitive.long, core.getWallet().balance.minor - before)
         assertEquals("Iced latte", core.getTransaction("ing-0001").note)
 
-        val second = core.ingestTransactions(ingest["input"].toString())
+        val second = CoreProbe(core).ingestTransactions(ingest["input"].toString())
         assertEquals(0, second.accepted)
-    }
-
-    @Test
-    fun ingestStaged() = runTest {
-        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { core.ingestStaged() }.code)
-        core.stageIngestPayload(ingest["input"].toString())
-        core.resetData(DatasetConfig.DEFAULT) // the staged payload is the core's, not the database's
-        assertEquals(ingest["expected"], core.ingestStaged().toJson())
-        assertEquals("Iced latte", core.getTransaction("ing-0001").note)
-        assertEquals(0, core.ingestStaged().accepted) // still staged: only duplicates now
     }
 
     // ── developer menu (F11) ───────────────────────────────────────────────

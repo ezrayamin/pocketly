@@ -45,7 +45,6 @@ import com.pocketly.shared.security.PhonePolicy
 import com.pocketly.shared.security.PinAuthenticator
 import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
-import com.pocketly.shared.security.PurePbkdf2
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.security.platformPinCrypto
 import com.pocketly.shared.sync.LedgerSync
@@ -101,10 +100,10 @@ class PocketlyCore internal constructor(
     private val biometric = biometric(this.pin)
 
     @Volatile
-    private var computeMs = 0.0
+    internal var computeMs = 0.0
 
     @Volatile
-    private var storageMs = 0.0
+    internal var storageMs = 0.0
 
     private val controls: FakeBackendControls get() = backend
 
@@ -193,21 +192,8 @@ class PocketlyCore internal constructor(
         timed { SpendingCalculator.compute(month, timeZone.current.month(month), transactions, walletBalance) }
     }
 
-    /** BM-04b: a payload held in Kotlin, as a network response would be. Survives resetData. */
-    @Volatile
-    private var stagedPayload: String? = null
-
-    fun stageIngestPayload(json: String) {
-        stagedPayload = json
-    }
-
-    /** BM-04b: [ingestTransactions] on the staged payload, so nothing crosses the bridge in the call. */
-    @Throws(CoreException::class, CancellationException::class)
-    suspend fun ingestStaged(): IngestResult =
-        ingestTransactions(stagedPayload ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "no ingest payload staged"))
-
-    @Throws(CoreException::class, CancellationException::class)
-    suspend fun ingestTransactions(json: String): IngestResult = onDb {
+    /** BM-04 (CoreProbe, perf builds only): parse, validate, write to the replica; timed in parts. */
+    internal suspend fun ingestTransactions(json: String): IngestResult = onDb {
         val parsed = timed { TransactionIngestor.parseAndValidate(json) }
         val mark = TimeSource.Monotonic.markNow()
         val inserted = cache.insertIfAbsentMany(parsed.valid)
@@ -283,12 +269,10 @@ class PocketlyCore internal constructor(
 
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
-    /** BM-06: the pure cost of a call. No conversion, so only the crossing is timed. */
-    fun echo(value: Double): Double = value
-
     fun formatMoney(minor: Long): String = MoneyFormatter.format(Money(minor))
 
-    fun formatMoneyBatch(minors: LongArray): List<String> {
+    /** BM-06 batched (CoreProbe, perf builds only). */
+    internal fun formatMoneyBatch(minors: LongArray): List<String> {
         storageMs = 0.0
         return timed { List(minors.size) { MoneyFormatter.format(Money(minors[it])) } }
     }
@@ -311,17 +295,7 @@ class PocketlyCore internal constructor(
         return Cancellable { job.cancel() }
     }
 
-    // ── Benchmark harness (benchmarking.md §5.2: compute vs storage) ──────
-
-    fun lastComputeMs(): Double = computeMs
-
-    /** Database time of the same call; the engines differ between builds (ADR-0009). */
-    fun lastStorageMs(): Double = storageMs
-
-    /** BM-10 what-if (ADR-0010 §8): pure-Kotlin PBKDF2, off the caller's thread. Never the PIN. */
-    @Throws(CoreException::class, CancellationException::class)
-    suspend fun pbkdf2WhatIf(password: String, saltHex: String, iterations: Int): String =
-        withContext(Dispatchers.Default) { PurePbkdf2.sha256Hex(password, saltHex, iterations) }
+    // ── Internals ──────────────────────────────────────────────────────────
 
     private suspend fun <T> onDb(block: suspend () -> T): T = withContext(db) {
         ready.await()

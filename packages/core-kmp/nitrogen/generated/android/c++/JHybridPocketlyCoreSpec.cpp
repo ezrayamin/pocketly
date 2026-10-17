@@ -39,12 +39,6 @@ namespace margelo::nitro::pocketly { struct CategoryTotal; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BalanceCheck; }
-// Forward declaration of `IngestResult` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestResult; }
-// Forward declaration of `IngestError` to properly resolve imports.
-namespace margelo::nitro::pocketly { struct IngestError; }
-// Forward declaration of `IngestRejectReason` to properly resolve imports.
-namespace margelo::nitro::pocketly { enum class IngestRejectReason; }
 // Forward declaration of `PinCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PinCheck; }
 // Forward declaration of `PinRejectReason` to properly resolve imports.
@@ -134,12 +128,6 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JDayTotal.hpp"
 #include "BalanceCheck.hpp"
 #include "JBalanceCheck.hpp"
-#include "IngestResult.hpp"
-#include "JIngestResult.hpp"
-#include "IngestError.hpp"
-#include "JIngestError.hpp"
-#include "IngestRejectReason.hpp"
-#include "JIngestRejectReason.hpp"
 #include "PinCheck.hpp"
 #include "JPinCheck.hpp"
 #include "PinRejectReason.hpp"
@@ -228,18 +216,9 @@ namespace margelo::nitro::pocketly {
   
 
   // Methods
-  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetSeed& config, const std::vector<Transaction>& extraTransactions) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetSeed> /* config */, jni::alias_ref<jni::JArrayClass<JTransaction>> /* extraTransactions */)>("resetData");
-    auto __result = method(_javaPart, JDatasetSeed::fromCpp(config), [&](auto&& __input) {
-      size_t __size = __input.size();
-      jni::local_ref<jni::JArrayClass<JTransaction>> __array = jni::JArrayClass<JTransaction>::newArray(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        const auto& __element = __input[__i];
-        auto __elementJni = JTransaction::fromCpp(__element);
-        __array->setElement(__i, *__elementJni);
-      }
-      return __array;
-    }(extraTransactions));
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::resetData(const DatasetSeed& config) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JDatasetSeed> /* config */)>("resetData");
+    auto __result = method(_javaPart, JDatasetSeed::fromCpp(config));
     return [&]() {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
@@ -336,53 +315,6 @@ namespace margelo::nitro::pocketly {
       auto __promise = Promise<SpendingSummary>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
         auto __result = jni::static_ref_cast<JSpendingSummary>(__boxedResult);
-        __promise->resolve(__result->toCpp());
-      });
-      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
-        jni::JniException __jniError(__throwable);
-        __promise->reject(std::make_exception_ptr(__jniError));
-      });
-      return __promise;
-    }();
-  }
-  std::shared_ptr<Promise<IngestResult>> JHybridPocketlyCoreSpec::ingestTransactions(const std::string& json) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* json */)>("ingestTransactions");
-    auto __result = method(_javaPart, jni::make_jstring(json));
-    return [&]() {
-      auto __promise = Promise<IngestResult>::create();
-      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
-        auto __result = jni::static_ref_cast<JIngestResult>(__boxedResult);
-        __promise->resolve(__result->toCpp());
-      });
-      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
-        jni::JniException __jniError(__throwable);
-        __promise->reject(std::make_exception_ptr(__jniError));
-      });
-      return __promise;
-    }();
-  }
-  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::stageIngestPayload(const std::string& json) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* json */)>("stageIngestPayload");
-    auto __result = method(_javaPart, jni::make_jstring(json));
-    return [&]() {
-      auto __promise = Promise<void>::create();
-      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
-        __promise->resolve();
-      });
-      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
-        jni::JniException __jniError(__throwable);
-        __promise->reject(std::make_exception_ptr(__jniError));
-      });
-      return __promise;
-    }();
-  }
-  std::shared_ptr<Promise<IngestResult>> JHybridPocketlyCoreSpec::ingestStaged() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("ingestStaged");
-    auto __result = method(_javaPart);
-    return [&]() {
-      auto __promise = Promise<IngestResult>::create();
-      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
-        auto __result = jni::static_ref_cast<JIngestResult>(__boxedResult);
         __promise->resolve(__result->toCpp());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
@@ -605,34 +537,10 @@ namespace margelo::nitro::pocketly {
       return __promise;
     }();
   }
-  double JHybridPocketlyCoreSpec::echo(double value) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double(double /* value */)>("echo");
-    auto __result = method(_javaPart, value);
-    return __result;
-  }
   std::string JHybridPocketlyCoreSpec::formatMoney(double minor) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>(double /* minor */)>("formatMoney");
     auto __result = method(_javaPart, minor);
     return __result->toStdString();
-  }
-  std::vector<std::string> JHybridPocketlyCoreSpec::formatMoneyBatch(const std::vector<double>& minors) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JArrayClass<jni::JString>>(jni::alias_ref<jni::JArrayDouble> /* minors */)>("formatMoneyBatch");
-    auto __result = method(_javaPart, [&]() {
-      size_t __size = minors.size();
-      jni::local_ref<jni::JArrayDouble> __array = jni::JArrayDouble::newArray(__size);
-      __array->setRegion(0, __size, minors.data());
-      return __array;
-    }());
-    return [&](auto&& __input) {
-      size_t __size = __input->size();
-      std::vector<std::string> __vector;
-      __vector.reserve(__size);
-      for (size_t __i = 0; __i < __size; __i++) {
-        auto __element = __input->getElement(__i);
-        __vector.push_back(__element->toStdString());
-      }
-      return __vector;
-    }(__result);
   }
   MoneyParseResult JHybridPocketlyCoreSpec::parseMoney(const std::string& input) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JMoneyParseResult>(jni::alias_ref<jni::JString> /* input */)>("parseMoney");
@@ -652,32 +560,6 @@ namespace margelo::nitro::pocketly {
       return __array;
     }(symbols), intervalMs, seed, JFunc_void_std__vector_PriceTick__cxx::fromCpp(onTicks));
     return __result->getJHybridPriceSubscriptionSpec();
-  }
-  double JHybridPocketlyCoreSpec::lastComputeMs() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastComputeMs");
-    auto __result = method(_javaPart);
-    return __result;
-  }
-  double JHybridPocketlyCoreSpec::lastStorageMs() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("lastStorageMs");
-    auto __result = method(_javaPart);
-    return __result;
-  }
-  std::shared_ptr<Promise<std::string>> JHybridPocketlyCoreSpec::pbkdf2WhatIf(const std::string& password, const std::string& saltHex, double iterations) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* password */, jni::alias_ref<jni::JString> /* saltHex */, double /* iterations */)>("pbkdf2WhatIf");
-    auto __result = method(_javaPart, jni::make_jstring(password), jni::make_jstring(saltHex), iterations);
-    return [&]() {
-      auto __promise = Promise<std::string>::create();
-      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
-        auto __result = jni::static_ref_cast<jni::JString>(__boxedResult);
-        __promise->resolve(__result->toStdString());
-      });
-      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
-        jni::JniException __jniError(__throwable);
-        __promise->reject(std::make_exception_ptr(__jniError));
-      });
-      return __promise;
-    }();
   }
 
 } // namespace margelo::nitro::pocketly
