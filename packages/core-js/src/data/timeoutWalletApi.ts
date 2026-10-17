@@ -1,6 +1,9 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
-import type { ChangesPage, ServerOtpVerify, WalletApi } from './walletApi';
+import type { Contact, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
+import type { ChangesPage, ServerOtpVerify, TransferRequest, WalletApi } from './walletApi';
+
+/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+export type CallKind = 'read' | 'write';
 
 /**
  * NFR-REL-01: every backend call has a timeout. Wraps any WalletApi (fake or real).
@@ -14,7 +17,7 @@ import type { ChangesPage, ServerOtpVerify, WalletApi } from './walletApi';
 export class TimeoutWalletApi implements WalletApi {
   constructor(
     private readonly inner: WalletApi,
-    private readonly timeoutMs: () => number,
+    private readonly timeoutMs: (kind: CallKind) => number,
   ) {}
 
   getWallet(): Promise<Wallet> {
@@ -37,8 +40,25 @@ export class TimeoutWalletApi implements WalletApi {
     return this.withTimeout(() => this.inner.verifyOtp(phone, code));
   }
 
-  private withTimeout<T>(call: () => Promise<T>): Promise<T> {
-    const timeoutMs = this.timeoutMs();
+  searchContacts(query: string): Promise<Contact[]> {
+    return this.withTimeout(() => this.inner.searchContacts(query));
+  }
+
+  getContact(userId: string): Promise<Contact> {
+    return this.withTimeout(() => this.inner.getContact(userId));
+  }
+
+  /** A timeout here doesn't mean "not applied": the caller treats it as PENDING (ADR-0014 §4). */
+  transfer(request: TransferRequest, idempotencyKey: string): Promise<Transaction> {
+    return this.withTimeout(() => this.inner.transfer(request, idempotencyKey), 'write');
+  }
+
+  getTransferByKey(idempotencyKey: string): Promise<Transaction> {
+    return this.withTimeout(() => this.inner.getTransferByKey(idempotencyKey));
+  }
+
+  private withTimeout<T>(call: () => Promise<T>, kind: CallKind = 'read'): Promise<T> {
+    const timeoutMs = this.timeoutMs(kind);
     return new Promise<T>((resolve, reject) => {
       let settled = false;
       const timer = setTimeout(() => {

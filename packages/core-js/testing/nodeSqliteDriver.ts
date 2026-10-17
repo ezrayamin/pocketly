@@ -36,6 +36,16 @@ export function nodeSqliteDriver(path = ':memory:'): SqlDriver {
         throw e;
       }
     },
+    async batch(commands) {
+      db.exec('BEGIN');
+      try {
+        for (const c of commands) prepared(c.sql).run(...(c.values as SqlValue[]));
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    },
     async close() {
       db.close();
     },

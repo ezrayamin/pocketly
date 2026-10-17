@@ -1,9 +1,11 @@
 import type {
+  AmountCheck,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
   BiometricStatus,
   BiometricUnlockResult,
+  ContactSearch,
   DatasetConfig,
   MinorUnits,
   MoneyParseResult,
@@ -18,6 +20,10 @@ import type {
   Subscription,
   Transaction,
   TransactionPage,
+  TransferAuth,
+  TransferDraft,
+  TransferResult,
+  TransferReview,
   TxFilter,
   UnlockResult,
   Wallet,
@@ -133,8 +139,8 @@ export interface Core {
 
   // ── Biometrics (FR-AUTH-04; ADR-0012) ─────────────────────────────────
   // One primitive for every use: a strong-biometric-bound P-256 key signs bytes the core chose,
-  // and the core verifies the signature. Unlock signs a single-use challenge; slice 6 will sign
-  // transfers (a different, versioned message, fixtures/biometric.json).
+  // and the core verifies the signature. Unlock signs a single-use challenge; confirmTransfer
+  // signs the transfer (a different, versioned message, fixtures/biometric.json).
   getBiometricStatus(): Promise<BiometricStatus>;
   /**
    * Checks the PIN first (counted like verifyPin), then creates the key and confirms it with
@@ -145,6 +151,49 @@ export interface Core {
   disableBiometrics(): Promise<void>;
   /** NOT_FOUND if biometric unlock isn't enabled. Never changes the PIN counter. */
   unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
+
+  // ── P2P transfer (F5, FR-TRF-01..11; ADR-0014) ───────────────────────
+  // One flow at a time: searchContacts → startTransfer → checkTransferAmount (per keystroke) →
+  // reviewTransfer (creates the attempt and its idempotency key) → confirmTransfer → (if
+  // PENDING) getTransferStatus. Network failures reject with NETWORK_* / SERVER_ERROR; the Send
+  // flow treats them as "can't send right now" (FR-TRF-11).
+  /**
+   * FR-TRF-01. `recent` (empty query only) comes from the replica; `contacts` from the server.
+   * This install's verified phone is never listed; typing it gives phoneLookup SELF.
+   */
+  searchContacts(query: string): Promise<ContactSearch>;
+  /**
+   * Picks the recipient and reads the wallet fresh from the server (never cached data: FR-TRF-11).
+   * RECIPIENT_NOT_FOUND for an unknown user; INVALID_ARGUMENT for this install's own phone.
+   * Replaces any draft; attempts already sent keep going.
+   */
+  startTransfer(recipientId: string): Promise<TransferDraft>;
+  /** FR-TRF-02, synchronous, against the current draft. NOT_FOUND without one. */
+  checkTransferAmount(text: string): AmountCheck;
+  /**
+   * FR-TRF-03/05: creates the attempt and its idempotency key (UUID v4). The amount must pass
+   * checkTransferAmount's limits (else INVALID_ARGUMENT, INSUFFICIENT_FUNDS or
+   * DAILY_LIMIT_EXCEEDED); the note is trimmed, at most TRANSFER_NOTE_MAX_LENGTH, one line.
+   * NOT_FOUND without a draft. Reviewing again makes a new attempt (nothing was sent).
+   */
+  reviewTransfer(amount: MinorUnits, note?: string): Promise<TransferReview>;
+  /**
+   * FR-TRF-04..09. A DRAFT attempt needs `auth`: biometrics sign the transfer message
+   * (ADR-0012), or the PIN is checked like verifyPin. Then it's sent with the attempt's key and
+   * waits up to writeTimeoutMs. A FAILED attempt whose `retryable` is true is sent again with the
+   * same key and no new `auth`. A call while one is running gets that call's result (double
+   * tap). SUCCESS / PENDING / non-retryable FAILED attempts just return their result.
+   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT without `auth`.
+   */
+  confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult>;
+  /**
+   * FR-TRF-09: asks the server about a PENDING attempt (also one restored from the replica
+   * after a restart, NFR-REL-03). Other states return their result. Rejects with the network
+   * error when the server can't be reached (the attempt stays PENDING).
+   */
+  getTransferStatus(id: string): Promise<TransferResult>;
+  /** FR-TRF-10, developer menu: the fake server's daily limit, 0..MAX_AMOUNT_MINOR; resetData restores the default. */
+  setDailyLimit(minor: MinorUnits): Promise<void>;
 
   // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;

@@ -18,7 +18,7 @@ public extension NetworkSimulation {
   /**
    * Create a new instance of `NetworkSimulation`.
    */
-  init(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, seed: Double?) {
+  init(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?) {
     self.init(mode, failureRatePercent, { () -> bridge.std__optional_double_ in
       if let __unwrappedValue = normalLatencyMs {
         return bridge.create_std__optional_double_(__unwrappedValue)
@@ -27,6 +27,12 @@ public extension NetworkSimulation {
       }
     }(), { () -> bridge.std__optional_double_ in
       if let __unwrappedValue = readTimeoutMs {
+        return bridge.create_std__optional_double_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_double_ in
+      if let __unwrappedValue = writeTimeoutMs {
         return bridge.create_std__optional_double_(__unwrappedValue)
       } else {
         return .init()
@@ -67,6 +73,18 @@ public extension NetworkSimulation {
     return { () -> Double? in
       if bridge.has_value_std__optional_double_(self.__readTimeoutMs) {
         let __unwrapped = bridge.get_std__optional_double_(self.__readTimeoutMs)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var writeTimeoutMs: Double? {
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__writeTimeoutMs) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__writeTimeoutMs)
         return __unwrapped
       } else {
         return nil

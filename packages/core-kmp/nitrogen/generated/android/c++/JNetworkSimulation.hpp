@@ -41,6 +41,8 @@ namespace margelo::nitro::pocketly {
       jni::local_ref<jni::JDouble> normalLatencyMs = this->getFieldValue(fieldNormalLatencyMs);
       static const auto fieldReadTimeoutMs = clazz->getField<jni::JDouble>("readTimeoutMs");
       jni::local_ref<jni::JDouble> readTimeoutMs = this->getFieldValue(fieldReadTimeoutMs);
+      static const auto fieldWriteTimeoutMs = clazz->getField<jni::JDouble>("writeTimeoutMs");
+      jni::local_ref<jni::JDouble> writeTimeoutMs = this->getFieldValue(fieldWriteTimeoutMs);
       static const auto fieldSeed = clazz->getField<jni::JDouble>("seed");
       jni::local_ref<jni::JDouble> seed = this->getFieldValue(fieldSeed);
       return NetworkSimulation(
@@ -48,6 +50,7 @@ namespace margelo::nitro::pocketly {
         failureRatePercent,
         normalLatencyMs != nullptr ? std::make_optional(normalLatencyMs->value()) : std::nullopt,
         readTimeoutMs != nullptr ? std::make_optional(readTimeoutMs->value()) : std::nullopt,
+        writeTimeoutMs != nullptr ? std::make_optional(writeTimeoutMs->value()) : std::nullopt,
         seed != nullptr ? std::make_optional(seed->value()) : std::nullopt
       );
     }
@@ -58,7 +61,7 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JNetworkSimulation::javaobject> fromCpp(const NetworkSimulation& value) {
-      using JSignature = JNetworkSimulation(jni::alias_ref<JNetworkMode>, double, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>);
+      using JSignature = JNetworkSimulation(jni::alias_ref<JNetworkMode>, double, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -67,6 +70,7 @@ namespace margelo::nitro::pocketly {
         value.failureRatePercent,
         value.normalLatencyMs.has_value() ? jni::JDouble::valueOf(value.normalLatencyMs.value()) : nullptr,
         value.readTimeoutMs.has_value() ? jni::JDouble::valueOf(value.readTimeoutMs.value()) : nullptr,
+        value.writeTimeoutMs.has_value() ? jni::JDouble::valueOf(value.writeTimeoutMs.value()) : nullptr,
         value.seed.has_value() ? jni::JDouble::valueOf(value.seed.value()) : nullptr
       );
     }

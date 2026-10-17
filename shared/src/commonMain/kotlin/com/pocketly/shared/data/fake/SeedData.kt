@@ -9,6 +9,7 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 import com.pocketly.shared.domain.TransactionType
+import com.pocketly.shared.domain.TransferPolicy
 
 /**
  * FR-FAKE-01 dataset generator. Mirrors packages/core-js/src/data/seedData.ts draw-for-draw:
@@ -16,18 +17,27 @@ import com.pocketly.shared.domain.TransactionType
  */
 internal object SeedData {
     const val WALLET_ID = "w-main"
-    val DAILY_LIMIT = Money(500_000)
+    /** FR-TRF-10: until setDailyLimit changes it. */
+    val DAILY_LIMIT = Money(TransferPolicy.DEFAULT_DAILY_LIMIT)
     val OPENING_BALANCE = Money(1_000_000)
 
     private const val MINUTE = 60_000L
     private const val WINDOW_MINUTES = 60 * 24 * 60
 
+    /** FR-FAKE-01: the server's directory of users (ADR-0014). Same list as fixtures/transfer.json. */
     val CONTACTS: List<Counterparty> = listOf(
-        "Andi Pratama", "Budi Santoso", "Citra Lestari", "Dewi Anggraini", "Eko Saputra",
-        "Fajar Nugroho", "Gita Permata", "Hadi Wijaya", "Intan Maharani", "Joko Susilo",
-    ).mapIndexed { i, name ->
-        val n = (i + 1).toString().padStart(2, '0')
-        Counterparty(CounterpartyKind.USER, "u-$n", name, "+155500000$n")
+        "Andi Pratama" to "+6281234567781",
+        "Budi Santoso" to "+6281298765432",
+        "Citra Lestari" to "+6281355501234",
+        "Dewi Anggraini" to "+6281322104498",
+        "Eko Saputra" to "+6285711223344",
+        "Fajar Nugroho" to "+6281190871123",
+        "Gita Permata" to "+6287866120057",
+        "Hadi Wijaya" to "+6285744102290",
+        "Intan Maharani" to "+6281877003311",
+        "Joko Susilo" to "+6282145678901",
+    ).mapIndexed { i, (name, phone) ->
+        Counterparty(CounterpartyKind.USER, "u-" + (i + 1).toString().padStart(2, '0'), name, phone)
     }
 
     private class Merchant(val counterparty: Counterparty, val category: Category)

@@ -1,0 +1,139 @@
+{
+  "_comment": "Hand-written (F5, ADR-0014). Both cores test against this file: Jest (core-js) and JUnit (shared/src/jvmTest). The biometric transfer message is in biometric.json.",
+  "params": {
+    "minAmount": 100,
+    "fee": 0,
+    "defaultDailyLimit": 500000,
+    "timeoutMs": 15000,
+    "noteMaxLength": 100,
+    "recentLimit": 4,
+    "pendingResolveMinMs": 5000,
+    "pendingResolveMaxMs": 20000,
+    "idempotencyKeyPattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+  },
+  "directory": [
+    { "userId": "u-01", "name": "Andi Pratama", "phone": "+6281234567781" },
+    { "userId": "u-02", "name": "Budi Santoso", "phone": "+6281298765432" },
+    { "userId": "u-03", "name": "Citra Lestari", "phone": "+6281355501234" },
+    { "userId": "u-04", "name": "Dewi Anggraini", "phone": "+6281322104498" },
+    { "userId": "u-05", "name": "Eko Saputra", "phone": "+6285711223344" },
+    { "userId": "u-06", "name": "Fajar Nugroho", "phone": "+6281190871123" },
+    { "userId": "u-07", "name": "Gita Permata", "phone": "+6287866120057" },
+    { "userId": "u-08", "name": "Hadi Wijaya", "phone": "+6285744102290" },
+    { "userId": "u-09", "name": "Intan Maharani", "phone": "+6281877003311" },
+    { "userId": "u-10", "name": "Joko Susilo", "phone": "+6282145678901" }
+  ],
+  "search": {
+    "_comment": "searchDirectory(query, directory, selfPhone). Names: case-insensitive substring. Phone-like queries (^\\+?[0-9 -]+$): digits; a leading +62 is the country code, any other + matches nothing; one leading 0 is dropped; a contact matches when its national number contains them. phoneLookup is set when checkPhone accepts the national digits. Results sorted by name. selfPhone is never listed.",
+    "selfPhone": "+6281234567890",
+    "cases": [
+      { "query": "", "userIds": ["u-01", "u-02", "u-03", "u-04", "u-05", "u-06", "u-07", "u-08", "u-09", "u-10"] },
+      { "query": "   ", "userIds": ["u-01", "u-02", "u-03", "u-04", "u-05", "u-06", "u-07", "u-08", "u-09", "u-10"] },
+      { "query": "andi", "userIds": ["u-01"] },
+      { "query": "AN", "userIds": ["u-01", "u-02", "u-04", "u-09"] },
+      { "query": "zzz", "userIds": [] },
+      { "query": "0812", "userIds": ["u-01", "u-02"] },
+      { "query": "812", "userIds": ["u-01", "u-02"] },
+      { "query": "+62 812-3456-7781", "userIds": ["u-01"], "phoneLookup": "FOUND" },
+      { "query": "081234567781", "userIds": ["u-01"], "phoneLookup": "FOUND" },
+      { "query": "81234567781", "userIds": ["u-01"], "phoneLookup": "FOUND" },
+      { "query": "+62 899-0000-1234", "userIds": [], "phoneLookup": "NOT_FOUND" },
+      { "query": "+6281234567890", "userIds": [], "phoneLookup": "SELF" },
+      { "query": "081234567890", "userIds": [], "phoneLookup": "SELF" },
+      { "query": "+1 555 0000", "userIds": [] },
+      { "query": "7781", "userIds": ["u-01"] },
+      { "query": "0", "userIds": ["u-01", "u-02", "u-03", "u-04", "u-05", "u-06", "u-07", "u-08", "u-09", "u-10"], "_note": "a lone 0 is dropped, leaving nothing to match: everyone" }
+    ]
+  },
+  "amountCheck": {
+    "_comment": "checkTransferAmount over keypad text: ^(0|[1-9][0-9]*)(\\.[0-9]{0,2})?$ (a trailing '.' is allowed while typing). Then BELOW_MINIMUM (< minAmount), then INSUFFICIENT_FUNDS (> balance), then DAILY_LIMIT_EXCEEDED (> dailyRemaining): the server's order too. remainingBalance = balance - minor whenever the text parses (may be negative).",
+    "limits": { "balance": 1459085, "dailyRemaining": 165000 },
+    "cases": [
+      { "input": "", "expected": { "ok": false, "reason": "EMPTY", "acceptInput": true } },
+      { "input": "0", "expected": { "ok": false, "minor": 0, "reason": "BELOW_MINIMUM", "acceptInput": true, "remainingBalance": 1459085 } },
+      { "input": "0.", "expected": { "ok": false, "minor": 0, "reason": "BELOW_MINIMUM", "acceptInput": true, "remainingBalance": 1459085 } },
+      { "input": "0.99", "expected": { "ok": false, "minor": 99, "reason": "BELOW_MINIMUM", "acceptInput": true, "remainingBalance": 1458986 } },
+      { "input": "1", "expected": { "ok": true, "minor": 100, "acceptInput": true, "remainingBalance": 1458985 } },
+      { "input": "150", "expected": { "ok": true, "minor": 15000, "acceptInput": true, "remainingBalance": 1444085 } },
+      { "input": "150.", "expected": { "ok": true, "minor": 15000, "acceptInput": true, "remainingBalance": 1444085 } },
+      { "input": "150.5", "expected": { "ok": true, "minor": 15050, "acceptInput": true, "remainingBalance": 1444035 } },
+      { "input": "150.05", "expected": { "ok": true, "minor": 15005, "acceptInput": true, "remainingBalance": 1444080 } },
+      { "input": "1650", "expected": { "ok": true, "minor": 165000, "acceptInput": true, "remainingBalance": 1294085 } },
+      { "input": "1650.01", "expected": { "ok": false, "minor": 165001, "reason": "DAILY_LIMIT_EXCEEDED", "acceptInput": true, "remainingBalance": 1294084 } },
+      { "input": "2000", "expected": { "ok": false, "minor": 200000, "reason": "DAILY_LIMIT_EXCEEDED", "acceptInput": true, "remainingBalance": 1259085 } },
+      { "input": "15000", "expected": { "ok": false, "minor": 1500000, "reason": "INSUFFICIENT_FUNDS", "acceptInput": true, "remainingBalance": -40915 } },
+      { "input": "150.055", "expected": { "ok": false, "reason": "TOO_MANY_DECIMALS", "acceptInput": false } },
+      { "input": "00", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "07", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": ".", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": ".5", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "1.2.", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "1,500", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "$15", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": " 15", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "-5", "expected": { "ok": false, "reason": "NEGATIVE", "acceptInput": false } },
+      { "input": "100000000000", "expected": { "ok": false, "reason": "OUT_OF_RANGE", "acceptInput": false } }
+    ],
+    "fundsCases": {
+      "_comment": "Same rules with balance < dailyRemaining: the balance binds.",
+      "limits": { "balance": 9240, "dailyRemaining": 500000 },
+      "cases": [
+        { "input": "92.40", "expected": { "ok": true, "minor": 9240, "acceptInput": true, "remainingBalance": 0 } },
+        { "input": "150", "expected": { "ok": false, "minor": 15000, "reason": "INSUFFICIENT_FUNDS", "acceptInput": true, "remainingBalance": -5760 } }
+      ]
+    },
+    "equalCases": {
+      "_comment": "Above both: INSUFFICIENT_FUNDS comes first.",
+      "limits": { "balance": 10000, "dailyRemaining": 10000 },
+      "cases": [
+        { "input": "100.01", "expected": { "ok": false, "minor": 10001, "reason": "INSUFFICIENT_FUNDS", "acceptInput": true, "remainingBalance": -1 } }
+      ]
+    }
+  },
+  "notes": {
+    "_comment": "reviewTransfer's note: trimmed; empty after trimming means no note; longer than noteMaxLength or containing a line break is INVALID_ARGUMENT.",
+    "valid": [
+      { "input": "Dinner", "note": "Dinner" },
+      { "input": "  Dinner  ", "note": "Dinner" },
+      { "input": "", "note": null },
+      { "input": "   ", "note": null },
+      { "input": "Makan malam 🍜", "note": "Makan malam 🍜" }
+    ],
+    "invalid": ["line\nbreak", "carriage\rreturn", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+  },
+  "retryable": {
+    "_comment": "requirements §4.3. FAILED results carry retryable: true means confirmTransfer(id) may resend with the same key. A timeout makes a transfer PENDING; it fails with NETWORK_TIMEOUT only when the status check finds the server never got it, and then it's safe to resend.",
+    "INSUFFICIENT_FUNDS": false,
+    "DAILY_LIMIT_EXCEEDED": false,
+    "RECIPIENT_NOT_FOUND": false,
+    "NETWORK_UNAVAILABLE": true,
+    "SERVER_ERROR": true,
+    "IDEMPOTENCY_CONFLICT": false,
+    "NETWORK_TIMEOUT": true
+  },
+  "server": {
+    "_comment": "DEFAULT_DATASET starts at balance 1459085, usedToday 1578 (golden.json). The fake server's transfer endpoint, step by step on DEFAULT_DATASET (frozen clock, balance from golden.json). Each step: transfer(request, key). expect.sameAs = index of the step whose transaction is returned again (FR-FAKE-02); expect.error = the CoreError code thrown (FR-FAKE-03 etc.); expect.status/failureReason for a recorded transaction; balanceDelta = change in getWallet().balance after the step. Server transaction ids are trf-<n>, n counting recorded transfers from 1 (resetData restarts it).",
+    "steps": [
+      { "key": "k-1", "request": { "recipientId": "u-01", "amount": 15000, "note": "Dinner" }, "expect": { "status": "SUCCESS", "id": "trf-1" }, "balanceDelta": -15000 },
+      { "key": "k-1", "request": { "recipientId": "u-01", "amount": 15000, "note": "Dinner" }, "expect": { "sameAs": 0 }, "balanceDelta": 0 },
+      { "key": "k-1", "request": { "recipientId": "u-01", "amount": 15001, "note": "Dinner" }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-1", "request": { "recipientId": "u-02", "amount": 15000, "note": "Dinner" }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-1", "request": { "recipientId": "u-01", "amount": 15000 }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-2", "request": { "recipientId": "u-99", "amount": 15000 }, "expect": { "error": "RECIPIENT_NOT_FOUND" }, "balanceDelta": 0 },
+      { "key": "k-3", "request": { "recipientId": "u-02", "amount": 99999999 }, "expect": { "status": "FAILED", "failureReason": "INSUFFICIENT_FUNDS", "id": "trf-2" }, "balanceDelta": 0 },
+      { "key": "k-3", "request": { "recipientId": "u-02", "amount": 99999999 }, "expect": { "sameAs": 6 }, "balanceDelta": 0 },
+      { "key": "k-4", "request": { "recipientId": "u-02", "amount": 490000 }, "expect": { "status": "FAILED", "failureReason": "DAILY_LIMIT_EXCEEDED", "id": "trf-3" }, "balanceDelta": 0 },
+      { "key": "k-5", "request": { "recipientId": "u-03", "amount": 50 }, "expect": { "error": "INVALID_ARGUMENT" }, "balanceDelta": 0 },
+      { "key": "k-6", "request": { "recipientId": "u-03", "amount": 100, "note": "ok" }, "expect": { "status": "SUCCESS", "id": "trf-4" }, "balanceDelta": -100 }
+    ]
+  },
+  "timeoutMode": {
+    "_comment": "FR-FAKE-05. In TIMEOUT mode a transfer arrives, is recorded PENDING and never answered. Per transfer, after setNetworkSimulation: holdMs = pendingResolveMinMs + nextInt(15001), then fails = nextInt(100) < failureRatePercent. Computed with Mulberry32 (BM-PAR-04); both cores must draw the same.",
+    "simulation": { "mode": "TIMEOUT", "failureRatePercent": 50, "seed": 1 },
+    "holds": [
+      { "holdMs": 17529, "fails": true },
+      { "holdMs": 11773, "fails": true },
+      { "holdMs": 9145, "fails": false }
+    ]
+  }
+}

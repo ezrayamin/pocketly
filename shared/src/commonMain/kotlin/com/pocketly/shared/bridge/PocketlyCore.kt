@@ -10,11 +10,13 @@ import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
+import com.pocketly.shared.domain.AmountCheck
 import com.pocketly.shared.domain.AuthState
 import com.pocketly.shared.domain.BiometricEnableResult
 import com.pocketly.shared.domain.BiometricPromptText
 import com.pocketly.shared.domain.BiometricStatus
 import com.pocketly.shared.domain.BiometricUnlockResult
+import com.pocketly.shared.domain.ContactSearchResult
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.ErrorCode
@@ -34,6 +36,10 @@ import com.pocketly.shared.domain.SpendingSummary
 import com.pocketly.shared.domain.StaleInfo
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
+import com.pocketly.shared.domain.TransferAuth
+import com.pocketly.shared.domain.TransferDraft
+import com.pocketly.shared.domain.TransferResult
+import com.pocketly.shared.domain.TransferReview
 import com.pocketly.shared.domain.TxFilter
 import com.pocketly.shared.domain.UnlockResult
 import com.pocketly.shared.domain.Wallet
@@ -49,6 +55,7 @@ import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.security.platformPinCrypto
 import com.pocketly.shared.sync.LedgerSync
 import com.pocketly.shared.sync.PriceFeed
+import com.pocketly.shared.sync.TransferFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +90,10 @@ class PocketlyCore internal constructor(
     pin: (InstallMarker) -> PinAuthenticator,
     /** Builds biometric unlock (ADR-0012) on top of the PIN logic. */
     biometric: (PinAuthenticator) -> BiometricAuthenticator,
+    /** Secure random for idempotency keys (ADR-0014). */
+    randomBytes: (Int) -> ByteArray,
+    /** Device clock, for the app's own pending transfer rows. */
+    clock: () -> Long,
 ) {
     private val streamScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val ledgerSync = LedgerSync(api, cache)
@@ -99,6 +110,8 @@ class PocketlyCore internal constructor(
 
     private val biometric = biometric(this.pin)
 
+    private val transfers = TransferFlow(api, cache, this.pin, this.biometric, ::fetchWallet, randomBytes, clock)
+
     @Volatile
     internal var computeMs = 0.0
 
@@ -112,6 +125,7 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun resetData(config: DatasetConfig) = onDb {
         controls.reset(config)
+        transfers.reset()
         cache.clear()
         try {
             ledgerSync.sync()
@@ -221,7 +235,10 @@ class PocketlyCore internal constructor(
     /** NFR-SEC-05. The replica first: if the secrets then fail to go, none of the history is left. */
     @Throws(CoreException::class, CancellationException::class)
     suspend fun logout() {
-        onDb { cache.clear() }
+        onDb {
+            transfers.reset()
+            cache.clear()
+        }
         biometric.reset()
     }
 
@@ -266,6 +283,36 @@ class PocketlyCore internal constructor(
 
     @Throws(CoreException::class, CancellationException::class)
     suspend fun unlockWithBiometrics(prompt: BiometricPromptText): BiometricUnlockResult = biometric.unlock(prompt)
+
+    // ── P2P transfer (F5, FR-TRF-01..11; ADR-0014) ─────────────────────────
+    // On the database thread like everything that touches the replica; the waits (server,
+    // biometric prompt, PIN hashing) suspend and don't hold it.
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun searchContacts(query: String): ContactSearchResult = onDb { transfers.searchContacts(query) }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun startTransfer(recipientId: String): TransferDraft = onDb { transfers.startTransfer(recipientId) }
+
+    /** FR-TRF-02, synchronous: reads only the draft in memory. */
+    @Throws(CoreException::class)
+    fun checkTransferAmount(text: String): AmountCheck = transfers.checkTransferAmount(text)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun reviewTransfer(amount: Money, note: String?): TransferReview = onDb { transfers.reviewTransfer(amount, note) }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun confirmTransfer(id: String, auth: TransferAuth?): TransferResult = onDb { transfers.confirmTransfer(id, auth) }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getTransferStatus(id: String): TransferResult = onDb { transfers.getTransferStatus(id) }
+
+    /** Tests only: moves the fake server's frozen clock forward (held transfers settle by it). */
+    internal fun advanceServerClock(ms: Long) = backend.advanceClock(ms)
+
+    /** FR-TRF-10, developer menu. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun setDailyLimit(minor: Money) = onDb { controls.setDailyLimit(minor) }
 
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
@@ -343,7 +390,7 @@ class PocketlyCore internal constructor(
             // PBKDF2 blocks for hundreds of ms: off the database thread, which other calls share.
             val pin = { marker: InstallMarker -> PinAuthenticator(secureStore, crypto, marker, Dispatchers.Default, clock, pinIterations) }
             val biometric = { auth: PinAuthenticator -> BiometricAuthenticator(auth, biometricSigner, crypto, clock) }
-            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric, clock)) }.koin.get()
+            return koinApplication { modules(coreModule(drivers, dataset, db, pin, biometric, clock, crypto::randomBytes)) }.koin.get()
         }
 
         @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

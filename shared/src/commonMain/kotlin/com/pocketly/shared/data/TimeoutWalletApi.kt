@@ -1,5 +1,6 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.domain.Contact
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.OtpSendResult
@@ -15,23 +16,37 @@ import kotlinx.coroutines.withTimeout
  * regardless (M3 transfers) runs in the backend's own scope, not inside this call.
  * Retries with backoff come with the real backend. Mirrors packages/core-js/src/data/timeoutWalletApi.ts.
  */
+/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+internal enum class CallKind { READ, WRITE }
+
 internal class TimeoutWalletApi(
     private val inner: WalletApi,
-    private val timeoutMs: () -> Long,
+    private val timeoutMs: (CallKind) -> Long,
 ) : WalletApi {
-    override suspend fun getWallet() = withReadTimeout { inner.getWallet() }
+    override suspend fun getWallet() = withTimeoutOf { inner.getWallet() }
 
     override suspend fun getChanges(afterToken: String?, limit: Int): ChangesPage =
-        withReadTimeout { inner.getChanges(afterToken, limit) }
+        withTimeoutOf { inner.getChanges(afterToken, limit) }
 
-    override suspend fun getTransaction(id: String): Transaction = withReadTimeout { inner.getTransaction(id) }
+    override suspend fun getTransaction(id: String): Transaction = withTimeoutOf { inner.getTransaction(id) }
 
-    override suspend fun requestOtp(phone: String): OtpSendResult = withReadTimeout { inner.requestOtp(phone) }
+    override suspend fun requestOtp(phone: String): OtpSendResult = withTimeoutOf { inner.requestOtp(phone) }
 
-    override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify = withReadTimeout { inner.verifyOtp(phone, code) }
+    override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify = withTimeoutOf { inner.verifyOtp(phone, code) }
 
-    private suspend fun <T> withReadTimeout(call: suspend () -> T): T {
-        val timeout = timeoutMs()
+    override suspend fun searchContacts(query: String): List<Contact> = withTimeoutOf { inner.searchContacts(query) }
+
+    override suspend fun getContact(userId: String): Contact = withTimeoutOf { inner.getContact(userId) }
+
+    /** A timeout here doesn't mean "not applied": the caller treats it as PENDING (ADR-0014 §4). */
+    override suspend fun transfer(request: TransferRequest, idempotencyKey: String): Transaction =
+        withTimeoutOf(CallKind.WRITE) { inner.transfer(request, idempotencyKey) }
+
+    override suspend fun getTransferByKey(idempotencyKey: String): Transaction =
+        withTimeoutOf { inner.getTransferByKey(idempotencyKey) }
+
+    private suspend fun <T> withTimeoutOf(kind: CallKind = CallKind.READ, call: suspend () -> T): T {
+        val timeout = timeoutMs(kind)
         return try {
             withTimeout(timeout) { call() }
         } catch (e: TimeoutCancellationException) {

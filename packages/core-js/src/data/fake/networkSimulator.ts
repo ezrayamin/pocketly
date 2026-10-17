@@ -1,9 +1,12 @@
 import {
   CoreError,
   NETWORK_NORMAL,
+  PENDING_RESOLVE_MAX_MS,
+  PENDING_RESOLVE_MIN_MS,
   READ_TIMEOUT_MS,
   SLOW_LATENCY_MAX_MS,
   SLOW_LATENCY_MIN_MS,
+  TRANSFER_TIMEOUT_MS,
 } from '@pocketly/core-contract';
 import type { NetworkMode, NetworkSimulation } from '@pocketly/core-contract';
 import { SeededRandom } from '../random';
@@ -13,7 +16,8 @@ const MODES: readonly NetworkMode[] = ['NORMAL', 'SLOW', 'ALWAYS_FAIL', 'TIMEOUT
 /**
  * FR-FAKE-04: latency, failures and offline mode for the fake backend (developer menu).
  * Draw order is fixed (latency roll, then failure roll, for every NORMAL/SLOW/ALWAYS_FAIL
- * call) so both cores produce the same sequence for the same seed.
+ * call; a delay roll, then an outcome roll, for a transfer in TIMEOUT mode) so both cores
+ * produce the same sequence for the same seed.
  * Mirrors shared/.../data/fake/NetworkSimulator.kt.
  */
 export class NetworkSimulator {
@@ -27,6 +31,22 @@ export class NetworkSimulator {
 
   get(): NetworkSimulation {
     return { ...this.simulation };
+  }
+
+  /**
+   * Runs before a transfer reaches the server. In TIMEOUT mode the request arrives but its answer
+   * never does (FR-FAKE-05): returns how long the server holds it as PENDING and whether it then
+   * fails. Otherwise as beforeCall, and returns undefined.
+   */
+  async beforeTransfer(): Promise<{ holdMs: number; fails: boolean } | undefined> {
+    const { mode, failureRatePercent } = this.simulation;
+    if (mode !== 'TIMEOUT') {
+      await this.beforeCall();
+      return undefined;
+    }
+    const holdMs = PENDING_RESOLVE_MIN_MS + this.rng.nextInt(PENDING_RESOLVE_MAX_MS - PENDING_RESOLVE_MIN_MS + 1);
+    const fails = this.rng.nextInt(100) < failureRatePercent;
+    return { holdMs, fails };
   }
 
   /** Runs before every backend call: waits, then maybe fails. Never resolves in TIMEOUT. */
@@ -65,9 +85,13 @@ function normalize(s: NetworkSimulation): Required<NetworkSimulation> {
   if (!Number.isInteger(readTimeoutMs) || readTimeoutMs < 100 || readTimeoutMs > 60_000) {
     throw new CoreError('INVALID_ARGUMENT', 'readTimeoutMs must be an integer 100..60000');
   }
+  const writeTimeoutMs = s.writeTimeoutMs ?? TRANSFER_TIMEOUT_MS;
+  if (!Number.isInteger(writeTimeoutMs) || writeTimeoutMs < 100 || writeTimeoutMs > 60_000) {
+    throw new CoreError('INVALID_ARGUMENT', 'writeTimeoutMs must be an integer 100..60000');
+  }
   const seed = s.seed ?? 1;
   if (!Number.isInteger(seed)) {
     throw new CoreError('INVALID_ARGUMENT', 'seed must be an integer');
   }
-  return { mode: s.mode, failureRatePercent: s.failureRatePercent, normalLatencyMs, readTimeoutMs, seed };
+  return { mode: s.mode, failureRatePercent: s.failureRatePercent, normalLatencyMs, readTimeoutMs, writeTimeoutMs, seed };
 }

@@ -8,6 +8,10 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `AmountCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AmountCheck; }
+// Forward declaration of `AmountRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
@@ -18,6 +22,8 @@ namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
 namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
 // Forward declaration of `BiometricKind` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class BiometricKind; }
+// Forward declaration of `BiometricPromptText` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct BiometricPromptText; }
 // Forward declaration of `BiometricStatus` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricStatus; }
 // Forward declaration of `BiometricUnavailableReason` to properly resolve imports.
@@ -30,6 +36,10 @@ namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 namespace margelo::nitro::pocketly { struct CategoryTotal; }
 // Forward declaration of `Category` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class Category; }
+// Forward declaration of `ContactSearch` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct ContactSearch; }
+// Forward declaration of `Contact` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Contact; }
 // Forward declaration of `CounterpartyKind` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class CounterpartyKind; }
 // Forward declaration of `Counterparty` to properly resolve imports.
@@ -58,6 +68,8 @@ namespace margelo::nitro::pocketly { enum class OtpVerifyOutcome; }
 namespace margelo::nitro::pocketly { struct OtpVerifyResult; }
 // Forward declaration of `PhoneCheck` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PhoneCheck; }
+// Forward declaration of `PhoneLookup` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneLookup; }
 // Forward declaration of `PhoneRejectReason` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class PhoneRejectReason; }
 // Forward declaration of `PinCheck` to properly resolve imports.
@@ -78,6 +90,20 @@ namespace margelo::nitro::pocketly { enum class TransactionStatus; }
 namespace margelo::nitro::pocketly { enum class TransactionType; }
 // Forward declaration of `Transaction` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct Transaction; }
+// Forward declaration of `TransferAuthMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
+// Forward declaration of `TransferAuthOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
+// Forward declaration of `TransferAuth` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferAuth; }
+// Forward declaration of `TransferDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferDraft; }
+// Forward declaration of `TransferResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferResult; }
+// Forward declaration of `TransferReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferReview; }
+// Forward declaration of `TransferState` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferState; }
 // Forward declaration of `TxFilter` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `UnlockOutcome` to properly resolve imports.
@@ -94,17 +120,22 @@ namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 
 // Include C++ defined types
+#include "AmountCheck.hpp"
+#include "AmountRejectReason.hpp"
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
 #include "BiometricEnableOutcome.hpp"
 #include "BiometricEnableResult.hpp"
 #include "BiometricKind.hpp"
+#include "BiometricPromptText.hpp"
 #include "BiometricStatus.hpp"
 #include "BiometricUnavailableReason.hpp"
 #include "BiometricUnlockOutcome.hpp"
 #include "BiometricUnlockResult.hpp"
 #include "Category.hpp"
 #include "CategoryTotal.hpp"
+#include "Contact.hpp"
+#include "ContactSearch.hpp"
 #include "Counterparty.hpp"
 #include "CounterpartyKind.hpp"
 #include "DayTotal.hpp"
@@ -119,6 +150,7 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "OtpVerifyOutcome.hpp"
 #include "OtpVerifyResult.hpp"
 #include "PhoneCheck.hpp"
+#include "PhoneLookup.hpp"
 #include "PhoneRejectReason.hpp"
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
@@ -129,6 +161,13 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"
 #include "TransactionType.hpp"
+#include "TransferAuth.hpp"
+#include "TransferAuthMethod.hpp"
+#include "TransferAuthOutcome.hpp"
+#include "TransferDraft.hpp"
+#include "TransferResult.hpp"
+#include "TransferReview.hpp"
+#include "TransferState.hpp"
 #include "TxFilter.hpp"
 #include "UnlockOutcome.hpp"
 #include "UnlockResult.hpp"
@@ -869,6 +908,243 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Func_void_BiometricUnlockResult_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::vector<Contact>
+  /**
+   * Specialized version of `std::vector<Contact>`.
+   */
+  using std__vector_Contact_ = std::vector<Contact>;
+  inline std::vector<Contact> create_std__vector_Contact_(size_t size) noexcept {
+    std::vector<Contact> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::optional<PhoneLookup>
+  /**
+   * Specialized version of `std::optional<PhoneLookup>`.
+   */
+  using std__optional_PhoneLookup_ = std::optional<PhoneLookup>;
+  inline std::optional<PhoneLookup> create_std__optional_PhoneLookup_(const PhoneLookup& value) noexcept {
+    return std::optional<PhoneLookup>(value);
+  }
+  inline bool has_value_std__optional_PhoneLookup_(const std::optional<PhoneLookup>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline PhoneLookup get_std__optional_PhoneLookup_(const std::optional<PhoneLookup>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<ContactSearch>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<ContactSearch>>`.
+   */
+  using std__shared_ptr_Promise_ContactSearch__ = std::shared_ptr<Promise<ContactSearch>>;
+  inline std::shared_ptr<Promise<ContactSearch>> create_std__shared_ptr_Promise_ContactSearch__() noexcept {
+    return Promise<ContactSearch>::create();
+  }
+  inline PromiseHolder<ContactSearch> wrap_std__shared_ptr_Promise_ContactSearch__(std::shared_ptr<Promise<ContactSearch>> promise) noexcept {
+    return PromiseHolder<ContactSearch>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const ContactSearch& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const ContactSearch&)>`.
+   */
+  using Func_void_ContactSearch = std::function<void(const ContactSearch& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const ContactSearch& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_ContactSearch_Wrapper final {
+  public:
+    explicit Func_void_ContactSearch_Wrapper(std::function<void(const ContactSearch& /* result */)>&& func): _function(std::make_unique<std::function<void(const ContactSearch& /* result */)>>(std::move(func))) {}
+    inline void call(ContactSearch result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const ContactSearch& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_ContactSearch create_Func_void_ContactSearch(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_ContactSearch_Wrapper wrap_Func_void_ContactSearch(Func_void_ContactSearch value) noexcept {
+    return Func_void_ContactSearch_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<TransferDraft>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<TransferDraft>>`.
+   */
+  using std__shared_ptr_Promise_TransferDraft__ = std::shared_ptr<Promise<TransferDraft>>;
+  inline std::shared_ptr<Promise<TransferDraft>> create_std__shared_ptr_Promise_TransferDraft__() noexcept {
+    return Promise<TransferDraft>::create();
+  }
+  inline PromiseHolder<TransferDraft> wrap_std__shared_ptr_Promise_TransferDraft__(std::shared_ptr<Promise<TransferDraft>> promise) noexcept {
+    return PromiseHolder<TransferDraft>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const TransferDraft& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const TransferDraft&)>`.
+   */
+  using Func_void_TransferDraft = std::function<void(const TransferDraft& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const TransferDraft& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_TransferDraft_Wrapper final {
+  public:
+    explicit Func_void_TransferDraft_Wrapper(std::function<void(const TransferDraft& /* result */)>&& func): _function(std::make_unique<std::function<void(const TransferDraft& /* result */)>>(std::move(func))) {}
+    inline void call(TransferDraft result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const TransferDraft& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_TransferDraft create_Func_void_TransferDraft(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_TransferDraft_Wrapper wrap_Func_void_TransferDraft(Func_void_TransferDraft value) noexcept {
+    return Func_void_TransferDraft_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<AmountRejectReason>
+  /**
+   * Specialized version of `std::optional<AmountRejectReason>`.
+   */
+  using std__optional_AmountRejectReason_ = std::optional<AmountRejectReason>;
+  inline std::optional<AmountRejectReason> create_std__optional_AmountRejectReason_(const AmountRejectReason& value) noexcept {
+    return std::optional<AmountRejectReason>(value);
+  }
+  inline bool has_value_std__optional_AmountRejectReason_(const std::optional<AmountRejectReason>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline AmountRejectReason get_std__optional_AmountRejectReason_(const std::optional<AmountRejectReason>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<TransferReview>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<TransferReview>>`.
+   */
+  using std__shared_ptr_Promise_TransferReview__ = std::shared_ptr<Promise<TransferReview>>;
+  inline std::shared_ptr<Promise<TransferReview>> create_std__shared_ptr_Promise_TransferReview__() noexcept {
+    return Promise<TransferReview>::create();
+  }
+  inline PromiseHolder<TransferReview> wrap_std__shared_ptr_Promise_TransferReview__(std::shared_ptr<Promise<TransferReview>> promise) noexcept {
+    return PromiseHolder<TransferReview>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const TransferReview& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const TransferReview&)>`.
+   */
+  using Func_void_TransferReview = std::function<void(const TransferReview& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const TransferReview& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_TransferReview_Wrapper final {
+  public:
+    explicit Func_void_TransferReview_Wrapper(std::function<void(const TransferReview& /* result */)>&& func): _function(std::make_unique<std::function<void(const TransferReview& /* result */)>>(std::move(func))) {}
+    inline void call(TransferReview result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const TransferReview& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_TransferReview create_Func_void_TransferReview(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_TransferReview_Wrapper wrap_Func_void_TransferReview(Func_void_TransferReview value) noexcept {
+    return Func_void_TransferReview_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<Transaction>
+  /**
+   * Specialized version of `std::optional<Transaction>`.
+   */
+  using std__optional_Transaction_ = std::optional<Transaction>;
+  inline std::optional<Transaction> create_std__optional_Transaction_(const Transaction& value) noexcept {
+    return std::optional<Transaction>(value);
+  }
+  inline bool has_value_std__optional_Transaction_(const std::optional<Transaction>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline Transaction get_std__optional_Transaction_(const std::optional<Transaction>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<bool>
+  /**
+   * Specialized version of `std::optional<bool>`.
+   */
+  using std__optional_bool_ = std::optional<bool>;
+  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
+    return std::optional<bool>(value);
+  }
+  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<TransferResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<TransferResult>>`.
+   */
+  using std__shared_ptr_Promise_TransferResult__ = std::shared_ptr<Promise<TransferResult>>;
+  inline std::shared_ptr<Promise<TransferResult>> create_std__shared_ptr_Promise_TransferResult__() noexcept {
+    return Promise<TransferResult>::create();
+  }
+  inline PromiseHolder<TransferResult> wrap_std__shared_ptr_Promise_TransferResult__(std::shared_ptr<Promise<TransferResult>> promise) noexcept {
+    return PromiseHolder<TransferResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const TransferResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const TransferResult&)>`.
+   */
+  using Func_void_TransferResult = std::function<void(const TransferResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const TransferResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_TransferResult_Wrapper final {
+  public:
+    explicit Func_void_TransferResult_Wrapper(std::function<void(const TransferResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const TransferResult& /* result */)>>(std::move(func))) {}
+    inline void call(TransferResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const TransferResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_TransferResult create_Func_void_TransferResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_TransferResult_Wrapper wrap_Func_void_TransferResult(Func_void_TransferResult value) noexcept {
+    return Func_void_TransferResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<BiometricPromptText>
+  /**
+   * Specialized version of `std::optional<BiometricPromptText>`.
+   */
+  using std__optional_BiometricPromptText_ = std::optional<BiometricPromptText>;
+  inline std::optional<BiometricPromptText> create_std__optional_BiometricPromptText_(const BiometricPromptText& value) noexcept {
+    return std::optional<BiometricPromptText>(value);
+  }
+  inline bool has_value_std__optional_BiometricPromptText_(const std::optional<BiometricPromptText>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline BiometricPromptText get_std__optional_BiometricPromptText_(const std::optional<BiometricPromptText>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<TransferAuth>
+  /**
+   * Specialized version of `std::optional<TransferAuth>`.
+   */
+  using std__optional_TransferAuth_ = std::optional<TransferAuth>;
+  inline std::optional<TransferAuth> create_std__optional_TransferAuth_(const TransferAuth& value) noexcept {
+    return std::optional<TransferAuth>(value);
+  }
+  inline bool has_value_std__optional_TransferAuth_(const std::optional<TransferAuth>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline TransferAuth get_std__optional_TransferAuth_(const std::optional<TransferAuth>& optional) noexcept {
+    return optional.value();
+  }
+  
   // pragma MARK: std::optional<MoneyParseError>
   /**
    * Specialized version of `std::optional<MoneyParseError>`.
@@ -1082,6 +1358,51 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_BiometricUnlockResult___ create_Result_std__shared_ptr_Promise_BiometricUnlockResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<BiometricUnlockResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<ContactSearch>>>
+  using Result_std__shared_ptr_Promise_ContactSearch___ = Result<std::shared_ptr<Promise<ContactSearch>>>;
+  inline Result_std__shared_ptr_Promise_ContactSearch___ create_Result_std__shared_ptr_Promise_ContactSearch___(const std::shared_ptr<Promise<ContactSearch>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<ContactSearch>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_ContactSearch___ create_Result_std__shared_ptr_Promise_ContactSearch___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<ContactSearch>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<TransferDraft>>>
+  using Result_std__shared_ptr_Promise_TransferDraft___ = Result<std::shared_ptr<Promise<TransferDraft>>>;
+  inline Result_std__shared_ptr_Promise_TransferDraft___ create_Result_std__shared_ptr_Promise_TransferDraft___(const std::shared_ptr<Promise<TransferDraft>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<TransferDraft>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_TransferDraft___ create_Result_std__shared_ptr_Promise_TransferDraft___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<TransferDraft>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<AmountCheck>
+  using Result_AmountCheck_ = Result<AmountCheck>;
+  inline Result_AmountCheck_ create_Result_AmountCheck_(const AmountCheck& value) noexcept {
+    return Result<AmountCheck>::withValue(value);
+  }
+  inline Result_AmountCheck_ create_Result_AmountCheck_(const std::exception_ptr& error) noexcept {
+    return Result<AmountCheck>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<TransferReview>>>
+  using Result_std__shared_ptr_Promise_TransferReview___ = Result<std::shared_ptr<Promise<TransferReview>>>;
+  inline Result_std__shared_ptr_Promise_TransferReview___ create_Result_std__shared_ptr_Promise_TransferReview___(const std::shared_ptr<Promise<TransferReview>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<TransferReview>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_TransferReview___ create_Result_std__shared_ptr_Promise_TransferReview___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<TransferReview>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<TransferResult>>>
+  using Result_std__shared_ptr_Promise_TransferResult___ = Result<std::shared_ptr<Promise<TransferResult>>>;
+  inline Result_std__shared_ptr_Promise_TransferResult___ create_Result_std__shared_ptr_Promise_TransferResult___(const std::shared_ptr<Promise<TransferResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<TransferResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_TransferResult___ create_Result_std__shared_ptr_Promise_TransferResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<TransferResult>>>::withError(error);
   }
   
   // pragma MARK: Result<std::string>

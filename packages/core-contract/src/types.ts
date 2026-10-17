@@ -230,6 +230,12 @@ export interface NetworkSimulation {
    * A latency above it produces a *late* response, which must have no effect (ADR-0007).
    */
   readTimeoutMs?: number;
+  /**
+   * Client-side timeout for a transfer submission (FR-TRF-09), 100–60000. Default
+   * TRANSFER_TIMEOUT_MS (15 s). After it the transfer is PENDING; the server may still apply
+   * it, and a status check finds out (ADR-0007, ADR-0014).
+   */
+  writeTimeoutMs?: number;
   /** Seed for the latency/failure draws, so both cores produce the same sequence. Default 1. */
   seed?: number;
 }
@@ -395,4 +401,140 @@ export interface OtpVerifyResult {
   attemptsLeft?: number;
   /** COOLDOWN only. */
   retryAt?: EpochMillis;
+}
+
+// ── P2P transfer (F5, FR-TRF-01..11; ADR-0014) ──────────────────────────
+
+/** requirements §3.1. A Pocketly user the wallet can send to. `phone` is E.164. */
+export interface Contact {
+  userId: string;
+  name: string;
+  phone: string;
+}
+
+/**
+ * FR-TRF-01, for a typed phone number (the query passes checkPhone): FOUND (it's in
+ * `contacts`), NOT_FOUND (no Pocketly account uses it), or SELF (the verified phone of this
+ * install: can't be selected).
+ */
+export type PhoneLookup = 'FOUND' | 'NOT_FOUND' | 'SELF';
+
+export interface ContactSearch {
+  /** Empty query only: people this wallet sent to, most recent first (from the replica). */
+  recent: Contact[];
+  /** Matches by name (case-insensitive substring) or phone, sorted by name; never this user. */
+  contacts: Contact[];
+  /** Set when the query is a complete phone number. */
+  phoneLookup?: PhoneLookup;
+}
+
+/** startTransfer: a recipient picked, with the limits the amount step needs (FR-TRF-02/10). */
+export interface TransferDraft {
+  recipient: Contact;
+  /** Fresh from the server: a draft is never built from cached data (FR-TRF-11). */
+  balance: MinorUnits;
+  /** dailyLimit − usedToday, never negative. */
+  dailyRemaining: MinorUnits;
+  /** TRANSFER_MIN_MINOR. */
+  minAmount: MinorUnits;
+  /** min(balance, dailyRemaining). Below minAmount: nothing can be sent today. */
+  maxAmount: MinorUnits;
+}
+
+/**
+ * checkTransferAmount. The money parse errors (MoneyParseError's names, spelled out: Nitro needs
+ * one flat union), then for a parsed amount BELOW_MINIMUM, INSUFFICIENT_FUNDS,
+ * DAILY_LIMIT_EXCEEDED, checked in that order.
+ */
+export type AmountRejectReason =
+  | 'EMPTY'
+  | 'NEGATIVE'
+  | 'TOO_MANY_DECIMALS'
+  | 'INVALID_FORMAT'
+  | 'OUT_OF_RANGE'
+  | 'BELOW_MINIMUM'
+  | 'INSUFFICIENT_FUNDS'
+  | 'DAILY_LIMIT_EXCEEDED';
+
+export interface AmountCheck {
+  ok: boolean;
+  /** Set when the text parses, even if the amount is refused. */
+  minor?: MinorUnits;
+  reason?: AmountRejectReason;
+  /**
+   * FR-TRF-02 "invalid input blocked as typed": false when no amount can start with this text
+   * (INVALID_FORMAT, TOO_MANY_DECIMALS, NEGATIVE, OUT_OF_RANGE). The keypad drops that
+   * keystroke. EMPTY and the limit reasons keep the text and show a message.
+   */
+  acceptInput: boolean;
+  /** balance − minor, when the text parses: the live "remaining balance". */
+  remainingBalance?: MinorUnits;
+}
+
+/** reviewTransfer (FR-TRF-03): what the user confirms. The idempotency key exists from here on. */
+export interface TransferReview {
+  /** The attempt's id (FR-TRF-05: one attempt, one key). Pass it to confirmTransfer. */
+  id: string;
+  idempotencyKey: string;
+  recipient: Contact;
+  amount: MinorUnits;
+  /** TRANSFER_FEE_MINOR: always 0 for now (product §6.1). */
+  fee: MinorUnits;
+  note?: string;
+  balanceAfter: MinorUnits;
+}
+
+export type TransferAuthMethod = 'BIOMETRIC' | 'PIN';
+
+/** How the first confirmTransfer of an attempt is authorized (FR-TRF-04). */
+export interface TransferAuth {
+  method: TransferAuthMethod;
+  /** PIN only. Checked and counted like verifyPin (FR-LOCK-04). */
+  pin?: string;
+  /** BIOMETRIC only: the system prompt's text. */
+  prompt?: BiometricPromptText;
+}
+
+/**
+ * Whether confirmTransfer's authorization passed. Anything but OK leaves the attempt in DRAFT
+ * with nothing sent (FR-TRF-04: cancel returns to review without side effects).
+ * - CANCELLED: the user dismissed the biometric prompt (or chose the PIN).
+ * - WRONG_PIN / PIN_LOCKED_OUT: as verifyPin's WRONG_PIN / LOCKED_OUT.
+ * - BIOMETRIC_LOCKED_OUT, KEY_INVALIDATED, FAILED, UNAVAILABLE: as unlockWithBiometrics
+ *   (KEY_INVALIDATED and FAILED turned biometrics off); use the PIN.
+ * - NOT_REQUIRED: a retry of a FAILED attempt (no new authorization; same key, same approval).
+ */
+export type TransferAuthOutcome =
+  | 'OK'
+  | 'NOT_REQUIRED'
+  | 'CANCELLED'
+  | 'WRONG_PIN'
+  | 'PIN_LOCKED_OUT'
+  | 'BIOMETRIC_LOCKED_OUT'
+  | 'KEY_INVALIDATED'
+  | 'FAILED'
+  | 'UNAVAILABLE';
+
+/**
+ * confirmTransfer / getTransferStatus. `state` follows requirements §3.2:
+ * - DRAFT: not authorized (see `auth`); nothing was sent.
+ * - SUCCESS: `transaction` is the server's.
+ * - FAILED: `failureReason` and `retryable` (FR-TRF-08); the balance is as before.
+ * - PENDING: no answer within writeTimeoutMs (FR-TRF-09). `transaction` is the pending row
+ *   History shows; getTransferStatus resolves it.
+ */
+export interface TransferResult {
+  id: string;
+  state: TransferState;
+  auth: TransferAuthOutcome;
+  transaction?: Transaction;
+  failureReason?: ErrorCode;
+  /** FAILED only: confirmTransfer(id) may try again with the same key. */
+  retryable?: boolean;
+  /** WRONG_PIN only. */
+  attemptsLeft?: number;
+  /** PIN_LOCKED_OUT only. */
+  lockedUntil?: EpochMillis;
+  /** The wallet balance the result implies (SUCCESS, FAILED, PENDING). */
+  balance?: MinorUnits;
 }

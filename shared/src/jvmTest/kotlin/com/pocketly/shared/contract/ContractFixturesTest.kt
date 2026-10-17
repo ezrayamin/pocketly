@@ -209,6 +209,7 @@ class ContractFixturesTest {
         normalLatencyMs = o["normalLatencyMs"]?.jsonPrimitive?.int ?: 0,
         readTimeoutMs = o["readTimeoutMs"]?.jsonPrimitive?.int ?: 10_000,
         seed = o["seed"]?.jsonPrimitive?.int ?: 1,
+        writeTimeoutMs = o["writeTimeoutMs"]?.jsonPrimitive?.int ?: 15_000,
     )
 
     @Test

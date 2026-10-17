@@ -40,6 +40,10 @@ export function opSqliteDriver(name: string): SqlDriver {
       });
       return rowsAffected;
     },
+    async batch(commands) {
+      if (commands.length === 0) return;
+      await db.executeBatch(commands.map((c) => [c.sql, c.values as SqlValue[]]));
+    },
     async close() {
       statements.clear();
       db.close();

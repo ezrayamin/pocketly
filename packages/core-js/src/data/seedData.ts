@@ -7,6 +7,7 @@ import type {
   TransactionStatus,
   TransactionType,
 } from '@pocketly/core-contract';
+import { DEFAULT_DAILY_LIMIT_MINOR } from '@pocketly/core-contract';
 import { SeededRandom } from './random';
 
 /**
@@ -15,27 +16,28 @@ import { SeededRandom } from './random';
  */
 
 export const WALLET_ID = 'w-main';
-export const DAILY_LIMIT = 500_000;
+/** FR-TRF-10: until setDailyLimit changes it. */
+export const DAILY_LIMIT = DEFAULT_DAILY_LIMIT_MINOR;
 export const OPENING_BALANCE = 1_000_000;
 
 const MINUTE = 60_000;
 const WINDOW_MINUTES = 60 * 24 * 60;
 
-export const CONTACTS: readonly Counterparty[] = [
-  'Andi Pratama',
-  'Budi Santoso',
-  'Citra Lestari',
-  'Dewi Anggraini',
-  'Eko Saputra',
-  'Fajar Nugroho',
-  'Gita Permata',
-  'Hadi Wijaya',
-  'Intan Maharani',
-  'Joko Susilo',
-].map((name, i) => {
-  const n = String(i + 1).padStart(2, '0');
-  return { kind: 'USER', id: `u-${n}`, name, phone: `+155500000${n}` };
-});
+/** FR-FAKE-01: the server's directory of users (ADR-0014). Same list as fixtures/transfer.json. */
+export const CONTACTS: readonly Counterparty[] = (
+  [
+    ['Andi Pratama', '+6281234567781'],
+    ['Budi Santoso', '+6281298765432'],
+    ['Citra Lestari', '+6281355501234'],
+    ['Dewi Anggraini', '+6281322104498'],
+    ['Eko Saputra', '+6285711223344'],
+    ['Fajar Nugroho', '+6281190871123'],
+    ['Gita Permata', '+6287866120057'],
+    ['Hadi Wijaya', '+6285744102290'],
+    ['Intan Maharani', '+6281877003311'],
+    ['Joko Susilo', '+6282145678901'],
+  ] as const
+).map(([name, phone], i) => ({ kind: 'USER', id: `u-${String(i + 1).padStart(2, '0')}`, name, phone }));
 
 const MERCHANTS: readonly { counterparty: Counterparty; category: Category }[] = (
   [

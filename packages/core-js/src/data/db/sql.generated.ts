@@ -11,8 +11,21 @@ export interface SqlQuery {
 export const SERVER_SCHEMA: readonly string[] = [
   "CREATE TABLE server_transaction ( id TEXT NOT NULL PRIMARY KEY, idempotency_key TEXT NOT NULL, type TEXT NOT NULL, category TEXT NOT NULL, amount INTEGER NOT NULL, counterparty_kind TEXT, counterparty_id TEXT, counterparty_name TEXT, counterparty_phone TEXT, note TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL )",
   "CREATE INDEX server_transaction_changes ON server_transaction(updated_at, id)",
-  "CREATE TABLE server_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )"
+  "CREATE TABLE server_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )",
+  "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL )",
+  "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL )"
 ];
+
+/** Schema version (SQLDelight's: highest .sqm + 1). */
+export const SERVER_VERSION = 2;
+
+/** <n>.sqm: from version n to n + 1. */
+export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
+  "1": [
+    "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL )",
+    "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL )"
+  ]
+};
 
 export const SERVER_SQL = {
   "insertTransaction": {
@@ -44,6 +57,38 @@ export const SERVER_SQL = {
     "sql": "DELETE FROM server_transaction",
     "params": 0
   },
+  "updateTransactionStatus": {
+    "sql": "UPDATE server_transaction SET status = ?, failure_reason = ?, updated_at = ? WHERE id = ?",
+    "params": 4
+  },
+  "insertTransferKey": {
+    "sql": "INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id) VALUES (?, ?, ?, ?, ?)",
+    "params": 5
+  },
+  "getTransferKey": {
+    "sql": "SELECT * FROM server_transfer_key WHERE idempotency_key = ?",
+    "params": 1
+  },
+  "deleteAllTransferKeys": {
+    "sql": "DELETE FROM server_transfer_key",
+    "params": 0
+  },
+  "insertSettlement": {
+    "sql": "INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails) VALUES (?, ?, ?)",
+    "params": 3
+  },
+  "dueSettlements": {
+    "sql": "SELECT * FROM server_pending_settlement WHERE resolve_at <= ? ORDER BY resolve_at, transaction_id",
+    "params": 1
+  },
+  "deleteSettlement": {
+    "sql": "DELETE FROM server_pending_settlement WHERE transaction_id = ?",
+    "params": 1
+  },
+  "deleteAllSettlements": {
+    "sql": "DELETE FROM server_pending_settlement",
+    "params": 0
+  },
   "getMeta": {
     "sql": "SELECT value FROM server_meta WHERE key = ?",
     "params": 1
@@ -65,6 +110,12 @@ export const CACHE_SCHEMA: readonly string[] = [
   "CREATE TABLE cache_wallet ( id TEXT NOT NULL PRIMARY KEY, balance INTEGER NOT NULL, daily_limit INTEGER NOT NULL, used_today INTEGER NOT NULL, updated_at INTEGER NOT NULL, cached_at INTEGER NOT NULL )",
   "CREATE TABLE cache_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )"
 ];
+
+/** Schema version (SQLDelight's: highest .sqm + 1). */
+export const CACHE_VERSION = 1;
+
+/** <n>.sqm: from version n to n + 1. */
+export const CACHE_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {};
 
 export const CACHE_SQL = {
   "upsertTransaction": {
@@ -105,6 +156,22 @@ export const CACHE_SQL = {
   "allTransactions": {
     "sql": "SELECT * FROM cache_transaction ORDER BY created_at DESC, id DESC",
     "params": 0
+  },
+  "getByIdempotencyKey": {
+    "sql": "SELECT * FROM cache_transaction WHERE idempotency_key = ? ORDER BY (id LIKE 'local-%'), updated_at DESC LIMIT 1",
+    "params": 1
+  },
+  "dropSettledPlaceholders": {
+    "sql": "DELETE FROM cache_transaction WHERE id LIKE 'local-%' AND idempotency_key IN (SELECT idempotency_key FROM cache_transaction WHERE id NOT LIKE 'local-%')",
+    "params": 0
+  },
+  "deleteTransaction": {
+    "sql": "DELETE FROM cache_transaction WHERE id = ?",
+    "params": 1
+  },
+  "recentRecipients": {
+    "sql": "SELECT counterparty_id, counterparty_name, counterparty_phone, MAX(created_at) AS last_sent FROM cache_transaction WHERE type = 'TRANSFER_OUT' AND status IN ('SUCCESS', 'PENDING') AND counterparty_kind = 'USER' AND counterparty_phone IS NOT NULL GROUP BY counterparty_id, counterparty_name, counterparty_phone ORDER BY last_sent DESC, counterparty_id LIMIT ?",
+    "params": 1
   },
   "countTransactions": {
     "sql": "SELECT COUNT(*) AS n FROM cache_transaction",

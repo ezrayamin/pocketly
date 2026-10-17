@@ -17,6 +17,9 @@ class FakeBiometricSigner : BiometricSigner {
     /** Runs while the prompt is "open" (tests move the clock here). */
     var duringPrompt: () -> Unit = {}
     val prompts = mutableListOf<BiometricPromptText>()
+
+    /** Every message it was asked to sign, as text. */
+    val messages = mutableListOf<String>()
     private var key: PrivateKey? = null
     private val other = newPair().private
     private var lastSignature: ByteArray? = null
@@ -29,6 +32,7 @@ class FakeBiometricSigner : BiometricSigner {
 
     override suspend fun sign(message: ByteArray, prompt: BiometricPromptText): SignResult {
         prompts += prompt
+        messages += message.decodeToString()
         duringPrompt()
         val scan = scans.removeFirstOrNull() ?: Scan.MATCH
         val current = key

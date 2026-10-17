@@ -86,6 +86,30 @@ namespace margelo::nitro::pocketly { struct BiometricPromptText; }
 namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
+// Forward declaration of `ContactSearch` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct ContactSearch; }
+// Forward declaration of `Contact` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Contact; }
+// Forward declaration of `PhoneLookup` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneLookup; }
+// Forward declaration of `TransferDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferDraft; }
+// Forward declaration of `AmountCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AmountCheck; }
+// Forward declaration of `AmountRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
+// Forward declaration of `TransferReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferReview; }
+// Forward declaration of `TransferResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferResult; }
+// Forward declaration of `TransferState` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferState; }
+// Forward declaration of `TransferAuthOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
+// Forward declaration of `TransferAuth` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferAuth; }
+// Forward declaration of `TransferAuthMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -136,6 +160,18 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "BiometricPromptText.hpp"
 #include "BiometricUnlockResult.hpp"
 #include "BiometricUnlockOutcome.hpp"
+#include "ContactSearch.hpp"
+#include "Contact.hpp"
+#include "PhoneLookup.hpp"
+#include "TransferDraft.hpp"
+#include "AmountCheck.hpp"
+#include "AmountRejectReason.hpp"
+#include "TransferReview.hpp"
+#include "TransferResult.hpp"
+#include "TransferState.hpp"
+#include "TransferAuthOutcome.hpp"
+#include "TransferAuth.hpp"
+#include "TransferAuthMethod.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -375,6 +411,62 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override {
       auto __result = _swiftPart.unlockWithBiometrics(std::forward<decltype(prompt)>(prompt));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<ContactSearch>> searchContacts(const std::string& query) override {
+      auto __result = _swiftPart.searchContacts(query);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TransferDraft>> startTransfer(const std::string& recipientId) override {
+      auto __result = _swiftPart.startTransfer(recipientId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline AmountCheck checkTransferAmount(const std::string& text) override {
+      auto __result = _swiftPart.checkTransferAmount(text);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TransferReview>> reviewTransfer(double amount, const std::optional<std::string>& note) override {
+      auto __result = _swiftPart.reviewTransfer(std::forward<decltype(amount)>(amount), note);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TransferResult>> confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) override {
+      auto __result = _swiftPart.confirmTransfer(id, auth);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TransferResult>> getTransferStatus(const std::string& id) override {
+      auto __result = _swiftPart.getTransferStatus(id);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> setDailyLimit(double minor) override {
+      auto __result = _swiftPart.setDailyLimit(std::forward<decltype(minor)>(minor));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

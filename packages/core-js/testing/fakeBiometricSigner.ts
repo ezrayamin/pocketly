@@ -15,6 +15,8 @@ export class FakeBiometricSigner implements BiometricSigner {
   /** Runs while the prompt is "open" (tests move the clock here). */
   duringPrompt: () => void = () => {};
   readonly prompts: BiometricPromptText[] = [];
+  /** Every message it was asked to sign, as text. */
+  readonly messages: string[] = [];
   private key: KeyObject | undefined;
   private readonly other = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey;
   private lastSignature: Uint8Array | undefined;
@@ -35,6 +37,7 @@ export class FakeBiometricSigner implements BiometricSigner {
 
   async sign(message: Uint8Array, prompt: BiometricPromptText): Promise<SignResult> {
     this.prompts.push(prompt);
+    this.messages.push(new TextDecoder().decode(message));
     this.duringPrompt();
     const scan = this.scans.shift() ?? 'MATCH';
     if (scan === 'DEVICE_LOCKED') throw new Error('device locked');

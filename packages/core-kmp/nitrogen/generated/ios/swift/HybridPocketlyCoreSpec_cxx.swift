@@ -551,6 +551,139 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func searchContacts(query: std.string) -> bridge.Result_std__shared_ptr_Promise_ContactSearch___ {
+    do {
+      let __result = try self.__implementation.searchContacts(query: String(query))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_ContactSearch__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_ContactSearch__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_ContactSearch__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_ContactSearch___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_ContactSearch___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func startTransfer(recipientId: std.string) -> bridge.Result_std__shared_ptr_Promise_TransferDraft___ {
+    do {
+      let __result = try self.__implementation.startTransfer(recipientId: String(recipientId))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TransferDraft__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TransferDraft__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TransferDraft__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferDraft___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferDraft___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func checkTransferAmount(text: std.string) -> bridge.Result_AmountCheck_ {
+    do {
+      let __result = try self.__implementation.checkTransferAmount(text: String(text))
+      let __resultCpp = __result
+      return bridge.create_Result_AmountCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_AmountCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func reviewTransfer(amount: Double, note: bridge.std__optional_std__string_) -> bridge.Result_std__shared_ptr_Promise_TransferReview___ {
+    do {
+      let __result = try self.__implementation.reviewTransfer(amount: amount, note: { () -> String? in
+        if bridge.has_value_std__optional_std__string_(note) {
+          let __unwrapped = bridge.get_std__optional_std__string_(note)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }())
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TransferReview__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TransferReview__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TransferReview__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferReview___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferReview___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func confirmTransfer(id: std.string, auth: bridge.std__optional_TransferAuth_) -> bridge.Result_std__shared_ptr_Promise_TransferResult___ {
+    do {
+      let __result = try self.__implementation.confirmTransfer(id: String(id), auth: auth.value)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TransferResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TransferResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TransferResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getTransferStatus(id: std.string) -> bridge.Result_std__shared_ptr_Promise_TransferResult___ {
+    do {
+      let __result = try self.__implementation.getTransferStatus(id: String(id))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TransferResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TransferResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TransferResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferResult___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TransferResult___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func setDailyLimit(minor: Double) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.setDailyLimit(minor: minor)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func formatMoney(minor: Double) -> bridge.Result_std__string_ {
     do {
       let __result = try self.__implementation.formatMoney(minor: minor)

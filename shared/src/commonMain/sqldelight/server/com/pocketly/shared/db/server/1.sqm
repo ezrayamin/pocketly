@@ -1,0 +1,16 @@
+-- Schema version 1 → 2 (slice 6, ADR-0014): transfer idempotency keys and pending settlements.
+-- Server.sq holds the same tables for new databases. The JS generator reads this file too.
+
+CREATE TABLE server_transfer_key (
+  idempotency_key TEXT NOT NULL PRIMARY KEY,
+  recipient_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  note TEXT,
+  transaction_id TEXT NOT NULL
+);
+
+CREATE TABLE server_pending_settlement (
+  transaction_id TEXT NOT NULL PRIMARY KEY,
+  resolve_at INTEGER NOT NULL,
+  fails INTEGER NOT NULL
+);

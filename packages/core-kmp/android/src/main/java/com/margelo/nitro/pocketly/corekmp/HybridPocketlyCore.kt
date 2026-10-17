@@ -8,6 +8,7 @@ import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.bridge.Cancellable
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.db.AndroidDatabaseDrivers
+import com.pocketly.shared.domain.Money
 import com.pocketly.shared.security.AndroidBiometricSigner
 import com.pocketly.shared.security.AndroidSecureStore
 
@@ -96,6 +97,24 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
     override fun setAutoLockTimeout(ms: Double): Promise<Unit> =
         Promise.async { core.setAutoLockTimeout(BridgeConversions.toLongExact(ms, "ms")) }
+
+    override fun searchContacts(query: String): Promise<ContactSearch> = Promise.async { core.searchContacts(query).toNitro() }
+
+    override fun startTransfer(recipientId: String): Promise<TransferDraft> =
+        Promise.async { core.startTransfer(recipientId).toNitro() }
+
+    override fun checkTransferAmount(text: String): AmountCheck = core.checkTransferAmount(text).toNitro()
+
+    override fun reviewTransfer(amount: Double, note: String?): Promise<TransferReview> =
+        Promise.async { core.reviewTransfer(Money(BridgeConversions.toLongExact(amount)), note).toNitro() }
+
+    override fun confirmTransfer(id: String, auth: TransferAuth?): Promise<TransferResult> =
+        Promise.async { core.confirmTransfer(id, auth?.toDomain()).toNitro() }
+
+    override fun getTransferStatus(id: String): Promise<TransferResult> = Promise.async { core.getTransferStatus(id).toNitro() }
+
+    override fun setDailyLimit(minor: Double): Promise<Unit> =
+        Promise.async { core.setDailyLimit(Money(BridgeConversions.toLongExact(minor, "dailyLimit"))) }
 
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
 

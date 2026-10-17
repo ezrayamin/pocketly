@@ -75,6 +75,26 @@ namespace margelo::nitro::pocketly { enum class BiometricEnableOutcome; }
 namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
 // Forward declaration of `BiometricUnlockOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class BiometricUnlockOutcome; }
+// Forward declaration of `ContactSearch` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct ContactSearch; }
+// Forward declaration of `Contact` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct Contact; }
+// Forward declaration of `PhoneLookup` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class PhoneLookup; }
+// Forward declaration of `TransferDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferDraft; }
+// Forward declaration of `AmountCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AmountCheck; }
+// Forward declaration of `AmountRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
+// Forward declaration of `TransferReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferReview; }
+// Forward declaration of `TransferResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferResult; }
+// Forward declaration of `TransferState` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferState; }
+// Forward declaration of `TransferAuthOutcome` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -87,6 +107,10 @@ namespace margelo::nitro::pocketly { struct DatasetSeed; }
 namespace margelo::nitro::pocketly { struct TxFilter; }
 // Forward declaration of `BiometricPromptText` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricPromptText; }
+// Forward declaration of `TransferAuth` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferAuth; }
+// Forward declaration of `TransferAuthMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
 
@@ -164,6 +188,26 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JBiometricUnlockResult.hpp"
 #include "BiometricUnlockOutcome.hpp"
 #include "JBiometricUnlockOutcome.hpp"
+#include "ContactSearch.hpp"
+#include "JContactSearch.hpp"
+#include "Contact.hpp"
+#include "JContact.hpp"
+#include "PhoneLookup.hpp"
+#include "JPhoneLookup.hpp"
+#include "TransferDraft.hpp"
+#include "JTransferDraft.hpp"
+#include "AmountCheck.hpp"
+#include "JAmountCheck.hpp"
+#include "AmountRejectReason.hpp"
+#include "JAmountRejectReason.hpp"
+#include "TransferReview.hpp"
+#include "JTransferReview.hpp"
+#include "TransferResult.hpp"
+#include "JTransferResult.hpp"
+#include "TransferState.hpp"
+#include "JTransferState.hpp"
+#include "TransferAuthOutcome.hpp"
+#include "JTransferAuthOutcome.hpp"
 #include "MoneyParseResult.hpp"
 #include "JMoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
@@ -177,6 +221,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JTxFilter.hpp"
 #include "BiometricPromptText.hpp"
 #include "JBiometricPromptText.hpp"
+#include "TransferAuth.hpp"
+#include "JTransferAuth.hpp"
+#include "TransferAuthMethod.hpp"
+#include "JTransferAuthMethod.hpp"
 #include "PriceTick.hpp"
 #include <functional>
 #include "JFunc_void_std__vector_PriceTick_.hpp"
@@ -529,6 +577,106 @@ namespace margelo::nitro::pocketly {
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
         auto __result = jni::static_ref_cast<JBiometricUnlockResult>(__boxedResult);
         __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<ContactSearch>> JHybridPocketlyCoreSpec::searchContacts(const std::string& query) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* query */)>("searchContacts");
+    auto __result = method(_javaPart, jni::make_jstring(query));
+    return [&]() {
+      auto __promise = Promise<ContactSearch>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JContactSearch>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<TransferDraft>> JHybridPocketlyCoreSpec::startTransfer(const std::string& recipientId) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* recipientId */)>("startTransfer");
+    auto __result = method(_javaPart, jni::make_jstring(recipientId));
+    return [&]() {
+      auto __promise = Promise<TransferDraft>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTransferDraft>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  AmountCheck JHybridPocketlyCoreSpec::checkTransferAmount(const std::string& text) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JAmountCheck>(jni::alias_ref<jni::JString> /* text */)>("checkTransferAmount");
+    auto __result = method(_javaPart, jni::make_jstring(text));
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<TransferReview>> JHybridPocketlyCoreSpec::reviewTransfer(double amount, const std::optional<std::string>& note) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(double /* amount */, jni::alias_ref<jni::JString> /* note */)>("reviewTransfer");
+    auto __result = method(_javaPart, amount, note.has_value() ? jni::make_jstring(note.value()) : nullptr);
+    return [&]() {
+      auto __promise = Promise<TransferReview>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTransferReview>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<TransferResult>> JHybridPocketlyCoreSpec::confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* id */, jni::alias_ref<JTransferAuth> /* auth */)>("confirmTransfer");
+    auto __result = method(_javaPart, jni::make_jstring(id), auth.has_value() ? JTransferAuth::fromCpp(auth.value()) : nullptr);
+    return [&]() {
+      auto __promise = Promise<TransferResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTransferResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<TransferResult>> JHybridPocketlyCoreSpec::getTransferStatus(const std::string& id) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* id */)>("getTransferStatus");
+    auto __result = method(_javaPart, jni::make_jstring(id));
+    return [&]() {
+      auto __promise = Promise<TransferResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTransferResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::setDailyLimit(double minor) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(double /* minor */)>("setDailyLimit");
+    auto __result = method(_javaPart, minor);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
         jni::JniException __jniError(__throwable);

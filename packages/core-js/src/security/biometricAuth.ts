@@ -4,9 +4,10 @@ import type {
   BiometricPromptText,
   BiometricStatus,
   BiometricUnlockResult,
+  TransferAuthOutcome,
 } from '@pocketly/core-contract';
 import type { BiometricSigner, SignResult } from './biometricSigner';
-import { unlockMessage, utf8 } from './biometricMessages';
+import { type TransferApproval, transferMessage, unlockMessage, utf8 } from './biometricMessages';
 import { SECURE_KEYS, type PinAuth } from './pinAuth';
 import type { PinCrypto } from './pinCrypto';
 import { toHex } from './pinPolicy';
@@ -110,6 +111,35 @@ export class BiometricAuth {
     // Never touches the PIN counter; a running lockout stays and the user is told about it.
     const pinLockedOut = await this.pin.withStore(() => this.pin.lockedOutNow());
     return { outcome: 'UNLOCKED', pinLockedOut };
+  }
+
+  /**
+   * FR-TRF-04 (ADR-0012 §1, ADR-0014 §3): the biometric key signs this transfer's message
+   * (amount, recipient, idempotency key) and the core verifies it. No challenge: the message
+   * names one attempt, and sending that attempt again is idempotent anyway. Failures follow
+   * unlock(): KEY_INVALIDATED and FAILED turn biometrics off; temporary ones change nothing.
+   */
+  async approveTransfer(approval: TransferApproval, prompt: BiometricPromptText): Promise<TransferAuthOutcome> {
+    const stored = await this.pin.withStore((store) => store.get(SECURE_KEYS.biometricPublicKey));
+    if (stored === undefined) throw new CoreError('NOT_FOUND', 'biometrics are not enabled');
+    const bytes = utf8(transferMessage(approval));
+    let result: SignResult;
+    try {
+      result = await this.signer.sign(bytes, prompt);
+    } catch {
+      return 'UNAVAILABLE';
+    }
+    if (result.kind === 'CANCELLED') return 'CANCELLED';
+    if (result.kind === 'LOCKED_OUT') return 'BIOMETRIC_LOCKED_OUT';
+    if (result.kind === 'INVALIDATED') {
+      await this.disable();
+      return 'KEY_INVALIDATED';
+    }
+    if (!this.crypto.verifyP256(fromHex(stored), bytes, result.signature)) {
+      await this.disable();
+      return 'FAILED';
+    }
+    return 'OK';
   }
 
   /** Logout / reset: the key goes with the other secrets. */

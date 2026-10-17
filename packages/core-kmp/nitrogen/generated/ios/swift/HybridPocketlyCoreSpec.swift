@@ -37,6 +37,13 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func enableBiometrics(pin: String, prompt: BiometricPromptText) throws -> Promise<BiometricEnableResult>
   func disableBiometrics() throws -> Promise<Void>
   func unlockWithBiometrics(prompt: BiometricPromptText) throws -> Promise<BiometricUnlockResult>
+  func searchContacts(query: String) throws -> Promise<ContactSearch>
+  func startTransfer(recipientId: String) throws -> Promise<TransferDraft>
+  func checkTransferAmount(text: String) throws -> AmountCheck
+  func reviewTransfer(amount: Double, note: String?) throws -> Promise<TransferReview>
+  func confirmTransfer(id: String, auth: TransferAuth?) throws -> Promise<TransferResult>
+  func getTransferStatus(id: String) throws -> Promise<TransferResult>
+  func setDailyLimit(minor: Double) throws -> Promise<Void>
   func formatMoney(minor: Double) throws -> String
   func parseMoney(input: String) throws -> MoneyParseResult
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)
