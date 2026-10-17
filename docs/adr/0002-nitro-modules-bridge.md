@@ -45,7 +45,9 @@ Two measurements point the same way:
   figure because each method also brings its structs and enums. Removing 8 benchmark-only
   methods (and their structs) later took 222 KB off it, ~28 KB each (`2026-10-17_mid-02`): call
   it ~30–40 KB per method on arm64. jsCore pays nothing similar:
-  its contract methods are plain JS.
+  its contract methods are plain JS. **Slice 6** (transfers, `2026-10-17_mid-06`): 7 methods with
+  12 new structs and enums added 351 KB (1,318 → 1,668 KB), ~50 KB per method or ~18 KB per
+  bridged method-or-type: new types cost about as much as new methods, so reuse structs too.
 - **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
   batched call (BM-06).
 

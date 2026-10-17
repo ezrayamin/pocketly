@@ -388,10 +388,19 @@ download; one that could use the platform's SQLite from JavaScript too would los
 | skeleton (`2026-10-03`) | 16,025 KB | +822 KB | +822 KB | not measured |
 | Home (`2026-10-04`) | 17,774 KB | +835 KB | +835 KB | +264 KB |
 | slice 4 (`2026-10-05_mid-02`) | 23,319 KB | +918 KB | −645 KB | −423 KB |
+| slice 5, bench code out (`2026-10-17_mid-02`) | 34,503 KB | +752 KB | −10,666 KB | −4,030 KB |
+| slice 6, transfers (`2026-10-17_mid-06`) | 34,604 KB | **+1,085 KB** | −10,333 KB | −3,950 KB |
 
-Roughly fixed while the app grew by 7 MB (navigation, FlashList, op-sqlite). The bridge library
-grew by 101 KB with slice 4's new bridged types and methods (StaleInfo, DatasetSeed,
-`lastStorageMs`), consistent with it being generated per method and struct.
+Roughly fixed while the app grew by 7 MB (navigation, FlashList, op-sqlite) up to slice 4. The
+bridge library grew by 101 KB with slice 4's new bridged types and methods (StaleInfo,
+DatasetSeed, `lastStorageMs`), consistent with it being generated per method and struct. From
+slice 5 the totals include the PIN crypto choice (quick-crypto's OpenSSL, −9.1 MB in jsCore's
+column, ADR-0010 §8), so read the architecture column. **Slice 6 shows it isn't fixed once the
+contract grows:** 7 Nitro methods and 12 new structs and enums added **+351 KB** to the bridge
+library (1,318 → 1,668 KB), ~50 KB per method or ~18 KB per bridged method-or-type, and +31 KB
+of dex; kmpCore's download grew +120 KB for the feature against jsCore's +39 KB (its core is JS
+in the bundle). The architecture's cost tracks the bridged surface, which is the size argument
+for a coarse contract (ADR-0002).
 
 ## Bridge overhead
 Overhead = end-to-end (timed in JS) − compute − storage (timed inside the core). For jsCore it is
