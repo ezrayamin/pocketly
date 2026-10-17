@@ -14,6 +14,12 @@ import { HistoryScreen } from './src/features/history/HistoryScreen';
 import { TransactionDetailScreen } from './src/features/history/TransactionDetailScreen';
 import { HomeScreen } from './src/features/home/HomeScreen';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
+import { SendAmountScreen } from './src/features/send/SendAmountScreen';
+import { onTransferFinished } from './src/features/send/sendEvents';
+import { SendPinScreen } from './src/features/send/SendPinScreen';
+import { SendRecipientScreen } from './src/features/send/SendRecipientScreen';
+import { SendResultScreen } from './src/features/send/SendResultScreen';
+import { SendReviewScreen } from './src/features/send/SendReviewScreen';
 import { applyLaunchArgs, needsSetup, parseLaunchArgs, type LaunchArgs } from './src/launchArgs';
 import type { RootStackParamList } from './src/navigation';
 import { colors } from './src/theme/tokens';
@@ -53,6 +59,9 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
     if (next === 'history') setHistoryVisited(true);
     setTab(next);
   };
+
+  // FR-TRF-07: a finished transfer reloads Home and History behind the result screen.
+  useEffect(() => onTransferFinished(() => setHomeRefresh((n) => n + 1)), []);
 
   // pocketly://dev/... links (ADR-0008): scriptable dev controls for Maestro and runners.
   useEffect(() => {
@@ -100,6 +109,12 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
           <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
           <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
           <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} />
+          <Stack.Screen name="SendRecipient" component={SendRecipientScreen} />
+          <Stack.Screen name="SendAmount" component={SendAmountScreen} />
+          <Stack.Screen name="SendReview" component={SendReviewScreen} />
+          <Stack.Screen name="SendPin" component={SendPinScreen} />
+          {/* A result can't be swiped back into the flow: Back goes Home (product §7.3 rule 3). */}
+          <Stack.Screen name="SendResult" component={SendResultScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (

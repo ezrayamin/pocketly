@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LIVE_DATASET } from '@pocketly/core-contract';
+import { DEFAULT_DAILY_LIMIT_MINOR, LIVE_DATASET } from '@pocketly/core-contract';
 import type { NetworkMode } from '@pocketly/core-contract';
 import { X } from '../../components/icons';
 import { Slider } from '../../components/Slider';
@@ -20,7 +20,7 @@ const MODES: { mode: NetworkMode; label: string; hint: string }[] = [
   { mode: 'NORMAL', label: 'Normal', hint: 'No added latency' },
   { mode: 'SLOW', label: 'Slow', hint: '2–5 s per call' },
   { mode: 'ALWAYS_FAIL', label: 'Always fail', hint: 'Server error' },
-  { mode: 'TIMEOUT', label: 'Timeout', hint: 'No answer, gives up after 10 s' },
+  { mode: 'TIMEOUT', label: 'Timeout', hint: 'No answer: reads give up after 10 s, transfers turn pending after 15 s' },
   { mode: 'OFFLINE', label: 'Offline', hint: 'No connection' },
 ];
 
@@ -44,6 +44,15 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
       setStatus(toUserError(e).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const setLimit = async (minor: number) => {
+    try {
+      await core.setDailyLimit(minor);
+      setStatus(`Daily transfer limit: ${core.formatMoney(minor)}`);
+    } catch (e) {
+      setStatus(toUserError(e).message);
     }
   };
 
@@ -139,6 +148,23 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
             </Text>
           </View>
 
+          <Text style={styles.section}>DAILY TRANSFER LIMIT (FR-TRF-10)</Text>
+          <View style={styles.chips}>
+            {DAILY_LIMITS.map(({ minor, label }) => (
+              <Pressable
+                key={minor}
+                style={styles.chip}
+                onPress={() => setLimit(minor)}
+                accessibilityRole="button"
+                accessibilityLabel={`Daily limit ${label === 'Default' ? core.formatMoney(minor) : label}`}
+                testID={`devmenu-limit-${minor}`}
+              >
+                <Text style={styles.chipText}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.optionHint}>The server's limit; Reset data brings back {core.formatMoney(DEFAULT_DAILY_LIMIT_MINOR)}.</Text>
+
           <Text style={styles.section}>DATA</Text>
           <View style={styles.actions}>
             <Pressable
@@ -172,6 +198,14 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
     </Modal>
   );
 }
+
+/** FR-TRF-10: presets for the fake server's daily transfer limit. */
+const DAILY_LIMITS: { minor: number; label: string }[] = [
+  { minor: DEFAULT_DAILY_LIMIT_MINOR, label: 'Default' },
+  { minor: 100_000, label: '1,000' },
+  { minor: 10_000, label: '100' },
+  { minor: 0, label: 'Reached' },
+];
 
 const AUTO_LOCK_OPTIONS: { ms: number; label: string }[] = [
   { ms: 0, label: 'Immediately' },

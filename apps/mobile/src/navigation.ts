@@ -1,4 +1,4 @@
-import type { Transaction } from '@pocketly/core-contract';
+import type { Transaction, TransferDraft, TransferResult, TransferReview } from '@pocketly/core-contract';
 
 /**
  * Root stack (product.md §7.4, the part built so far): the tab screens, with
@@ -12,4 +12,12 @@ export type RootStackParamList = {
   TransactionDetail: { id: string; tx?: Transaction };
   /** Profile → Security: PIN, then one scan, to turn biometric unlock on (FR-AUTH-04). */
   BiometricSetup: undefined;
+  // Send flow (F5, product §6.1). Root-stack screens, so the tab bar is hidden (§7.3 rule 2).
+  // Params are the core's own answers; the core keeps the attempt (its key) itself.
+  SendRecipient: undefined;
+  SendAmount: { draft: TransferDraft };
+  SendReview: { review: TransferReview };
+  /** PIN fallback (FR-TRF-04). `notice`: why biometrics didn't do it. */
+  SendPin: { review: TransferReview; notice?: string };
+  SendResult: { review: TransferReview; result: TransferResult };
 };

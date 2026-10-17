@@ -1,29 +1,35 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation';
 import { ArrowUpRight, CreditCard, QrCode, ScanLine, type LucideIcon } from '../../../components/icons';
 import { colors } from '../../../theme/tokens';
 
 /**
- * STATIC PLACEHOLDERS for FR-HOME-03. Send (F5), Top-Up (F6), Pay (F7) and Receive (F8)
- * open their flows once those features exist; for now they do nothing.
+ * FR-HOME-03. Send opens its flow (F5). Top-Up (F6), Pay (F7) and Receive (F8) are still
+ * placeholders until those features exist.
  */
-const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean }[] = [
-  { label: 'Send', Icon: ArrowUpRight, primary: true },
+const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: 'SendRecipient' }[] = [
+  { label: 'Send', Icon: ArrowUpRight, primary: true, route: 'SendRecipient' },
   { label: 'Top-Up', Icon: CreditCard },
   { label: 'Pay (QR)', Icon: ScanLine },
   { label: 'Receive', Icon: QrCode },
 ];
 
 export function QuickActions() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
     <View style={styles.row}>
-      {ACTIONS.map(({ label, Icon, primary }) => (
+      {ACTIONS.map(({ label, Icon, primary, route }) => (
         <Pressable
           key={label}
           style={styles.action}
+          onPress={route ? () => navigation.navigate(route) : undefined}
           accessibilityRole="button"
           accessibilityLabel={label}
-          accessibilityHint="Coming soon"
+          accessibilityHint={route ? undefined : 'Coming soon'}
+          testID={`quick-${label.toLowerCase().replace(/[^a-z]/g, '')}`}
         >
           <View style={[styles.circle, primary && styles.circlePrimary]}>
             <Icon color={primary ? colors.onPrimary : colors.textPrimary} size={primary ? 26 : 22} />

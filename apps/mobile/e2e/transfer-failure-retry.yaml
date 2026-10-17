@@ -1,0 +1,37 @@
+# NFR-TEST-04: transfer failure + retry with the same idempotency key (FR-TRF-08).
+# The dev link makes the fake server fail, then lets the retry through.
+#   maestro test -e APP_ID=com.pocketly.js -e PIN=482915 apps/mobile/e2e/transfer-failure-retry.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks were run with adb input (2026-10-17). This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: ALWAYS_FAIL
+      pocketly.network.failureRatePercent: 0
+- tapOn:
+    id: "quick-send"
+- tapOn:
+    id: "contact-u-02"
+- tapOn:
+    id: "amount-key-3"
+- tapOn:
+    id: "amount-key-0"
+- tapOn:
+    id: "amount-review"
+- tapOn:
+    id: "review-confirm"
+- runFlow:
+    file: enter-pin.yaml
+- assertVisible: "Transfer didn't go through"
+- assertVisible: "Trying again is safe. You won't be charged twice."
+- openLink: "pocketly://dev/network?mode=NORMAL"
+- tapOn:
+    id: "result-retry"
+- assertVisible:
+    id: "send-result-success"

@@ -1,0 +1,10 @@
+# Types Pocketly's in-app PIN (env PIN, six digits) on the app's own keypad. Never the phone's.
+appId: ${APP_ID}
+---
+- evalScript: ${output.pin = PIN.split('')}
+- repeat:
+    times: 6
+    commands:
+      - evalScript: ${output.digit = output.pin.shift()}
+      - tapOn:
+          id: "pin-key-${output.digit}"
