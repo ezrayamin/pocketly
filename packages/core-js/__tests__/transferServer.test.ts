@@ -165,6 +165,18 @@ describe('fake server: transfer (FR-FAKE-02/03, FR-TRF-05, ADR-0014 §2)', () =>
     expect((await api.transfer({ recipientId: 'u-01', amount: 500 }, 'k')).id).toBe('trf-1'); // numbering restarts
   });
 
+  it('refuses a transfer to the account\'s own phone, also after a data reset (ADR-0014 §6)', async () => {
+    const api = await openServer();
+    const andi = fixture.directory[0].phone;
+    await api.requestOtp(andi);
+    expect((await api.verifyOtp(andi, '123456')).outcome).toBe('VERIFIED');
+    expect(await error(api.transfer({ recipientId: 'u-01', amount: 500 }, 'self'))).toBe('INVALID_ARGUMENT');
+    expect(await error(api.getTransferByKey('self'))).toBe('NOT_FOUND'); // nothing recorded
+    await api.reset(DEFAULT_DATASET);
+    expect(await error(api.transfer({ recipientId: 'u-01', amount: 500 }, 'self-2'))).toBe('INVALID_ARGUMENT');
+    expect((await api.transfer({ recipientId: 'u-02', amount: 500 }, 'other')).status).toBe('SUCCESS');
+  });
+
   it('searches the directory by name or phone', async () => {
     const api = await openServer();
     expect((await api.searchContacts('dewi')).map((c) => c.userId)).toEqual(['u-04']);

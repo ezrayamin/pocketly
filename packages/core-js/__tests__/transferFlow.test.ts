@@ -7,6 +7,7 @@ import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding'
 import transfer from '@pocketly/core-contract/fixtures/transfer.json';
 import { transferMessage } from '../src/security/biometricMessages';
 import { uuidV4 } from '../src/sync/transferFlow';
+import { MemorySecureStore } from '../src/security/secureStore';
 import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { testCore } from '../testing/testCore';
 
@@ -122,5 +123,49 @@ describe('restart while PENDING (NFR-REL-03)', () => {
     (second as unknown as { backend: { advanceClock(ms: number): void } }).backend.advanceClock(20_000);
     const settled = await second.getTransferStatus(r.id);
     expect(settled).toMatchObject({ state: 'SUCCESS', transaction: { id: 'trf-1' } });
+  });
+});
+
+describe('the verified phone stays in memory (ADR-0014 §6, BM-07 follow-up)', () => {
+  class CountingStore extends MemorySecureStore {
+    reads = 0;
+    override async get(key: string): Promise<string | undefined> {
+      this.reads++;
+      return super.get(key);
+    }
+  }
+
+  it('the Send flow reads no secure storage once auth state is known; OTP and logout update it', async () => {
+    const store = new CountingStore();
+    const core = testCore({ secure: store, pinIterations: 1000 });
+    await core.resetData(DEFAULT_DATASET);
+    await verifyTestPhone(core);
+    await core.setPin(PIN);
+    await core.getAuthState(); // the lock screen does this at launch
+    const before = store.reads;
+    await core.searchContacts('');
+    await core.startTransfer('u-01');
+    expect(store.reads - before).toBe(0);
+
+    await verifyTestPhone(core, transfer.directory[0].phone); // now this install is Andi
+    expect((await core.searchContacts(transfer.directory[0].phone)).phoneLookup).toBe('SELF');
+    await expect(core.startTransfer('u-01')).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+
+    await core.logout();
+    expect((await core.searchContacts(transfer.directory[0].phone)).phoneLookup).toBe('FOUND'); // nobody's phone now
+  });
+
+  it('without a prior read, the first call reads it once', async () => {
+    const store = new CountingStore();
+    const first = testCore({ secure: store, pinIterations: 1000 });
+    await first.resetData(DEFAULT_DATASET);
+    await verifyTestPhone(first);
+    await first.setPin(PIN);
+    const core = testCore({ secure: store, pinIterations: 1000 }); // a restart, no lock screen yet
+    await core.searchContacts('');
+    const after = store.reads;
+    await core.startTransfer('u-01');
+    await core.searchContacts('andi');
+    expect(store.reads - after).toBe(0);
   });
 });

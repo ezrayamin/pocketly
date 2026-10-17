@@ -73,8 +73,7 @@ export class TransferFlow {
   }
 
   async searchContacts(query: string): Promise<ContactSearch> {
-    const self = (await this.deps.pin.getAuthState()).phone;
-    const directory = await this.deps.api.searchContacts(query);
+    const [self, directory] = await Promise.all([this.deps.pin.verifiedPhone(), this.deps.api.searchContacts(query)]);
     const { contacts, phoneLookup } = searchDirectory(query, directory, self);
     const recent =
       query.trim().length === 0
@@ -83,17 +82,26 @@ export class TransferFlow {
     return phoneLookup === undefined ? { recent, contacts } : { recent, contacts, phoneLookup };
   }
 
+  /**
+   * The recipient, this install's phone and a fresh wallet, fetched in parallel (none needs
+   * another; BM-07 first measured them one after the other). Failures are reported in a fixed
+   * order (recipient, phone, wallet), so both cores fail the same way whichever call ends first.
+   */
   async startTransfer(recipientId: string): Promise<TransferDraft> {
-    const self = (await this.deps.pin.getAuthState()).phone;
-    let recipient: Contact;
-    try {
-      recipient = await this.deps.api.getContact(recipientId);
-    } catch (e) {
-      const error = toCoreError(e);
+    const [contact, self, fresh] = await Promise.allSettled([
+      this.deps.api.getContact(recipientId),
+      this.deps.pin.verifiedPhone(),
+      this.deps.fetchWallet(), // FR-TRF-11: fresh, or no transfer
+    ]);
+    if (contact.status === 'rejected') {
+      const error = toCoreError(contact.reason);
       throw error.code === 'NOT_FOUND' ? new CoreError('RECIPIENT_NOT_FOUND', `No user ${recipientId}`) : error;
     }
-    if (recipient.phone === self) throw new CoreError('INVALID_ARGUMENT', 'You can\'t send money to yourself');
-    const wallet = await this.deps.fetchWallet(); // FR-TRF-11: fresh, or no transfer
+    const recipient = contact.value;
+    if (self.status === 'rejected') throw toCoreError(self.reason);
+    if (recipient.phone === self.value) throw new CoreError('INVALID_ARGUMENT', "You can't send money to yourself");
+    if (fresh.status === 'rejected') throw toCoreError(fresh.reason);
+    const wallet = fresh.value;
     const draft = { recipient, balance: wallet.balance, dailyRemaining: Math.max(0, wallet.dailyLimit - wallet.usedToday) };
     this.draft = draft;
     return {

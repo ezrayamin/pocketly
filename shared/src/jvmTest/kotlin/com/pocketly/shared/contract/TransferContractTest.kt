@@ -166,6 +166,15 @@ class TransferContractTest {
     }
 
     @Test
+    fun startingATransferWaitsForOneBackendRoundTripNotTwo() = runBlocking {
+        core.getAuthState()
+        core.setNetworkSimulation(NetworkSimulation(NetworkMode.NORMAL, 0, normalLatencyMs = 200))
+        val started = System.currentTimeMillis()
+        core.startTransfer("u-01")
+        assertTrue(System.currentTimeMillis() - started < 350, "sequential would be ≥ 400 ms") // calls in parallel
+    }
+
+    @Test
     fun theDeveloperMenusDailyLimitAppliesAtTheAmountStep() = runBlocking {
         core.setDailyLimit(Money(10_000))
         assertEquals(10_000 - startUsed, core.startTransfer("u-02").dailyRemaining.minor)

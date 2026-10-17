@@ -106,6 +106,21 @@ Indonesian numbers so phone search uses the same rules as onboarding (ADR-0013).
 recipients come from the replica, so they show without a server call. The user's own verified
 phone is never a recipient (FR-TRF-01): SELF.
 
+**The user's phone is kept in memory** (added 2026-10-17 after BM-07, `2026-10-17_mid-03`). It
+is only used to rule out sending to yourself, and it isn't a secret, but reading it took
+`getAuthState()`'s three secure-storage reads on every Send screen, ~80 ms each in jsCore. Now
+the PIN layer keeps the phone it last read or verified: `getAuthState` (the lock screen calls it
+at launch and on every lock) and `verifyOtp` set it; `resetAuth`, logout and any wipe drop it.
+It isn't cleared when the app locks: the core doesn't see locks (they happen in the UI), telling
+it would cost a Nitro method, and nothing changes the phone except OTP and a wipe, which already
+update it. The fake server also refuses a transfer to the account's own phone (it remembers the
+phone it verified by OTP), so the rule no longer depends on the client alone.
+
+**`startTransfer` fetches in parallel** (same day, same session): the recipient lookup, the
+phone and the fresh wallet don't depend on each other, so one backend round trip instead of
+two. Failures are still reported in a fixed order (recipient, phone, wallet), so both cores
+fail the same way whichever call ends first.
+
 ### 7. The Send flow in the app
 
 Screens follow the "Pocketly Send Flow" design: recipient → amount → review → (system

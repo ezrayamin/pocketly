@@ -33,6 +33,8 @@ import com.pocketly.shared.domain.Wallet
 import com.pocketly.shared.security.BiometricAuthenticator
 import com.pocketly.shared.security.PinAuthenticator
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -77,27 +79,36 @@ internal class TransferFlow(
         attempts.clear()
     }
 
-    suspend fun searchContacts(query: String): ContactSearchResult {
-        val self = pin.getAuthState().phone
+    suspend fun searchContacts(query: String): ContactSearchResult = coroutineScope {
+        val selfPhone = async { pin.verifiedPhone() }
         val directory = api.searchContacts(query)
+        val self = selfPhone.await()
         val match = ContactSearch.search(query, directory, self)
         val recent = if (query.trim().isEmpty()) {
             cache.recentRecipients(TransferPolicy.RECENT_CONTACTS_LIMIT + 1L).filter { it.phone != self }.take(TransferPolicy.RECENT_CONTACTS_LIMIT)
         } else {
             emptyList()
         }
-        return ContactSearchResult(recent, match.contacts, match.phoneLookup)
+        ContactSearchResult(recent, match.contacts, match.phoneLookup)
     }
 
+    /**
+     * The recipient, this install's phone and a fresh wallet, fetched in parallel (none needs
+     * another; BM-07 first measured them one after the other). Failures are reported in a fixed
+     * order (recipient, phone, wallet), so both cores fail the same way whichever call ends first.
+     */
     suspend fun startTransfer(recipientId: String): TransferDraft {
-        val self = pin.getAuthState().phone
-        val recipient = try {
-            api.getContact(recipientId)
-        } catch (e: CoreException) {
-            throw if (e.code == ErrorCode.NOT_FOUND) CoreException(ErrorCode.RECIPIENT_NOT_FOUND, "No user $recipientId") else e
+        val (contact, self, fresh) = coroutineScope {
+            val contact = async { attempt { api.getContact(recipientId) } }
+            val self = async { attempt { pin.verifiedPhone() } }
+            val wallet = async { attempt { fetchWallet() } } // FR-TRF-11: fresh, or no transfer
+            Triple(contact.await(), self.await(), wallet.await())
         }
-        if (recipient.phone == self) throw CoreException(ErrorCode.INVALID_ARGUMENT, "You can't send money to yourself")
-        val wallet = fetchWallet() // FR-TRF-11: fresh, or no transfer
+        val recipient = contact.getOrElse { e ->
+            throw if (e is CoreException && e.code == ErrorCode.NOT_FOUND) CoreException(ErrorCode.RECIPIENT_NOT_FOUND, "No user $recipientId") else e
+        }
+        if (recipient.phone == self.getOrThrow()) throw CoreException(ErrorCode.INVALID_ARGUMENT, "You can't send money to yourself")
+        val wallet = fresh.getOrThrow()
         val limits = AmountLimits(wallet.balance, Money(maxOf(0L, wallet.dailyLimit.minor - wallet.usedToday.minor)))
         draft = Draft(recipient, limits)
         return TransferDraft(recipient, limits.balance, limits.dailyRemaining, Money(TransferPolicy.MIN_AMOUNT), TransferPolicy.maxAmount(limits))
@@ -260,6 +271,13 @@ internal class TransferFlow(
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
+
+    /** A core failure as a value, so parallel calls can be reported in a fixed order. */
+    private suspend fun <T> attempt(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: CoreException) {
+        Result.failure(e)
+    }
 
     private fun currentDraft(): Draft = draft ?: throw CoreException(ErrorCode.NOT_FOUND, "No transfer started")
 

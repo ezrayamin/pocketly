@@ -21,6 +21,8 @@ import com.pocketly.shared.security.BiometricMessages
 import com.pocketly.shared.security.FakeBiometricSigner
 import com.pocketly.shared.security.FakeBiometricSigner.Scan
 import com.pocketly.shared.security.MemorySecureStore
+import com.pocketly.shared.security.SecureStore
+import com.pocketly.shared.domain.PhoneLookup
 import com.pocketly.shared.sync.TransferFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -145,6 +147,53 @@ class TransferFlowTest {
         second.advanceServerClock(20_000)
         val settled = second.getTransferStatus(r.id)
         assertEquals(TransferState.SUCCESS to "trf-1", settled.state to settled.transaction?.id)
+    }
+
+    // ── the verified phone stays in memory (ADR-0014 §6, BM-07 follow-up) ──
+
+    private class CountingStore(private val inner: MemorySecureStore = MemorySecureStore()) : SecureStore by inner {
+        var reads = 0
+        override fun get(key: String): String? {
+            reads++
+            return inner.get(key)
+        }
+    }
+
+    @Test
+    fun theSendFlowReadsNoSecureStorageOnceAuthStateIsKnown() = runBlocking {
+        val store = CountingStore()
+        val c = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), store, pinIterations = 1000)
+        c.resetData(DatasetConfig.DEFAULT)
+        c.verifyTestPhone()
+        c.setPin(PIN)
+        c.getAuthState() // the lock screen does this at launch
+        val before = store.reads
+        c.searchContacts("")
+        c.startTransfer("u-01")
+        assertEquals(0, store.reads - before)
+
+        val andi = "+6281234567781"
+        c.verifyTestPhone(andi) // now this install is Andi
+        assertEquals(PhoneLookup.SELF, c.searchContacts(andi).phoneLookup)
+        assertEquals(ErrorCode.INVALID_ARGUMENT, assertFailsWith<CoreException> { c.startTransfer("u-01") }.code)
+
+        c.logout()
+        assertEquals(PhoneLookup.FOUND, c.searchContacts(andi).phoneLookup) // nobody's phone now
+    }
+
+    @Test
+    fun withoutAPriorReadTheFirstCallReadsItOnce() = runBlocking {
+        val store = CountingStore()
+        val first = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), store, pinIterations = 1000)
+        first.resetData(DatasetConfig.DEFAULT)
+        first.verifyTestPhone()
+        first.setPin(PIN)
+        val c = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), store, pinIterations = 1000)
+        c.searchContacts("")
+        val after = store.reads
+        c.startTransfer("u-01")
+        c.searchContacts("andi")
+        assertEquals(0, store.reads - after)
     }
 
     private companion object {

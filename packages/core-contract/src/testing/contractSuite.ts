@@ -664,6 +664,14 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
           expect(core.checkTransferAmount('1.234')).toEqual({ ok: false, reason: 'TOO_MANY_DECIMALS', acceptInput: false });
         });
 
+        it('starting a transfer waits for one backend round trip, not two (calls in parallel)', async () => {
+          await core.getAuthState();
+          core.setNetworkSimulation({ ...NETWORK_NORMAL, normalLatencyMs: 200 });
+          const started = Date.now();
+          await core.startTransfer('u-01');
+          expect(Date.now() - started).toBeLessThan(350); // sequential: ≥ 400
+        });
+
         it('the developer menu\'s daily limit applies at the amount step (FR-TRF-10)', async () => {
           await core.setDailyLimit(10_000);
           const draft = await core.startTransfer('u-02');

@@ -21,6 +21,7 @@ import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.OtpSendResult
+import com.pocketly.shared.domain.OtpVerifyOutcome
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 import com.pocketly.shared.domain.TransactionType
@@ -61,7 +62,12 @@ internal class FakeWalletApi(
 
     override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify {
         network.beforeCall()
-        return otp.verify(phone, code)
+        return otp.verify(phone, code).also {
+            if (it.result.outcome == OtpVerifyOutcome.VERIFIED) {
+                store.setMeta(META_ACCOUNT_PHONE, phone)
+                accountPhone = phone
+            }
+        }
     }
 
     @Volatile
@@ -70,6 +76,8 @@ internal class FakeWalletApi(
     @Volatile
     private var dailyLimit = SeedData.DAILY_LIMIT
     private var transfers = 0
+    @Volatile
+    private var accountPhone: String? = null
 
     /** Anything that reads and then writes server state runs one at a time (calls arrive in parallel). */
     private val serial = Mutex()
@@ -93,6 +101,7 @@ internal class FakeWalletApi(
         simulatedIncoming = store.getMeta(META_SIMULATED_INCOMING)?.toInt() ?: 0
         dailyLimit = store.getMeta(META_DAILY_LIMIT)?.toLong()?.let(::Money) ?: SeedData.DAILY_LIMIT
         transfers = store.getMeta(META_TRANSFERS)?.toInt() ?: 0
+        accountPhone = store.getMeta(META_ACCOUNT_PHONE)
     }
 
     override fun reset(config: DatasetConfig) {
@@ -116,7 +125,7 @@ internal class FakeWalletApi(
                 META_SIMULATED_INCOMING to "0",
                 META_DAILY_LIMIT to SeedData.DAILY_LIMIT.minor.toString(),
                 META_TRANSFERS to "0",
-            ),
+            ) + listOfNotNull(accountPhone?.let { META_ACCOUNT_PHONE to it }), // the account outlives a dataset reset
         )
     }
 
@@ -181,6 +190,7 @@ internal class FakeWalletApi(
         if (TransferPolicy.normalizeNote(request.note) != request.note) throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid note")
         val recipient = DIRECTORY.firstOrNull { it.userId == request.recipientId }
             ?: throw CoreException(ErrorCode.RECIPIENT_NOT_FOUND, "No user ${request.recipientId}")
+        if (recipient.phone == accountPhone) throw CoreException(ErrorCode.INVALID_ARGUMENT, "You can't send money to yourself")
 
         val now = now()
         val remaining = maxOf(0L, dailyLimit.minor - usedToday(now))
@@ -293,6 +303,9 @@ internal class FakeWalletApi(
         private const val META_SIMULATED_INCOMING = "simulatedIncoming"
         private const val META_DAILY_LIMIT = "dailyLimit"
         private const val META_TRANSFERS = "transfers"
+
+        /** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
+        private const val META_ACCOUNT_PHONE = "accountPhone"
 
         /** FR-FAKE-01: the server's users, as contacts. */
         private val DIRECTORY: List<Contact> = SeedData.CONTACTS.map { Contact(it.id, it.name, it.phone!!) }

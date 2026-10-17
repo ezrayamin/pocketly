@@ -23,6 +23,8 @@ const META_FROZEN_NOW = 'frozenNowMillis';
 const META_SIMULATED_INCOMING = 'simulatedIncoming';
 const META_DAILY_LIMIT = 'dailyLimit';
 const META_TRANSFERS = 'transfers';
+/** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
+const META_ACCOUNT_PHONE = 'accountPhone';
 
 /** FR-FAKE-01: the server's users, as contacts. */
 const DIRECTORY: readonly Contact[] = CONTACTS.map((c) => ({ userId: c.id, name: c.name, phone: c.phone! }));
@@ -39,6 +41,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   private simulatedIncoming = 0;
   private dailyLimit = DAILY_LIMIT;
   private transfers = 0;
+  private accountPhone: string | undefined;
   /**
    * Kotlin runs backend calls in parallel; here they interleave at every await. Anything that
    * reads and then writes server state runs one at a time through this chain.
@@ -63,7 +66,12 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
 
   async verifyOtp(phone: string, code: string): Promise<ServerOtpVerify> {
     await this.network.beforeCall();
-    return this.otp.verify(phone, code);
+    const result = this.otp.verify(phone, code);
+    if (result.outcome === 'VERIFIED') {
+      await this.store.setMeta(META_ACCOUNT_PHONE, phone);
+      this.accountPhone = phone;
+    }
+    return result;
   }
 
   now(): number {
@@ -82,6 +90,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     this.simulatedIncoming = Number((await this.store.getMeta(META_SIMULATED_INCOMING)) ?? 0);
     this.dailyLimit = Number((await this.store.getMeta(META_DAILY_LIMIT)) ?? DAILY_LIMIT);
     this.transfers = Number((await this.store.getMeta(META_TRANSFERS)) ?? 0);
+    this.accountPhone = await this.store.getMeta(META_ACCOUNT_PHONE);
   }
 
   async reset(config: ServerDataset): Promise<void> {
@@ -109,6 +118,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
         [META_SIMULATED_INCOMING]: '0',
         [META_DAILY_LIMIT]: String(DAILY_LIMIT),
         [META_TRANSFERS]: '0',
+        // The account outlives a dataset reset.
+        ...(this.accountPhone !== undefined ? { [META_ACCOUNT_PHONE]: this.accountPhone } : {}),
       });
     });
   }
@@ -181,6 +192,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     if (normalizeNote(request.note) !== request.note) throw new CoreError('INVALID_ARGUMENT', 'Invalid note');
     const recipient = DIRECTORY.find((c) => c.userId === request.recipientId);
     if (!recipient) throw new CoreError('RECIPIENT_NOT_FOUND', `No user ${request.recipientId}`);
+    if (recipient.phone === this.accountPhone) throw new CoreError('INVALID_ARGUMENT', "You can't send money to yourself");
 
     const now = this.now();
     const refused = exceededLimit(request.amount, {

@@ -228,6 +228,19 @@ class TransferServerTest {
     }
 
     @Test
+    fun refusesATransferToTheAccountsOwnPhoneAlsoAfterAReset() = runBlocking {
+        val api = openServer()
+        val andi = directory[0].phone
+        api.requestOtp(andi)
+        assertEquals(com.pocketly.shared.domain.OtpVerifyOutcome.VERIFIED, api.verifyOtp(andi, "123456").result.outcome)
+        assertEquals(ErrorCode.INVALID_ARGUMENT, error { api.transfer(TransferRequest("u-01", Money(500)), "self") })
+        assertEquals(ErrorCode.NOT_FOUND, error { api.getTransferByKey("self") }) // nothing recorded
+        api.reset(DatasetConfig.DEFAULT)
+        assertEquals(ErrorCode.INVALID_ARGUMENT, error { api.transfer(TransferRequest("u-01", Money(500)), "self-2") })
+        assertEquals(TransactionStatus.SUCCESS, api.transfer(TransferRequest("u-02", Money(500)), "other").status)
+    }
+
+    @Test
     fun searchesTheDirectory() = runBlocking {
         val api = openServer()
         assertEquals(listOf("u-04"), api.searchContacts("dewi").map { it.userId })
