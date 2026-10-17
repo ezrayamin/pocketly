@@ -59,8 +59,14 @@
   and making the amount step's two backend calls in parallel cut the app's step time by **25%
   in jsCore (1.97 → 1.48 s) and 19% in kmpCore (2.20 → 1.79 s)** (`2026-10-17_mid-05`, replicated
   by mid-04), and the secure-storage difference disappeared. What's left is the PIN (+340 ms), a
-  crypto library choice, which also makes kmpCore's CPU +4 points and its process ~28 MB larger
-  after the unlock (clean heap pages Android takes back on a memory trim, `2026-10-17_mid-07`).
+  crypto library choice, which also makes kmpCore's CPU +4 points and its RSS ~28 MB higher right
+  after a PIN unlock. That isn't a lasting cost: it's freed heap Android takes back on a memory
+  trim, after which kmpCore uses 5–7 MB *less* PSS than jsCore (`2026-10-17_mid-07`).
+- **Memory tells one story across the project.** Heavy JVM work (BM-04's repeated parsing, the
+  PIN's PBKDF2) leaves freed pages in the ART heap that RSS still counts; at steady state
+  kmpCore is slightly smaller, mostly because jsCore maps more native code from its APK (BM-08's
+  size difference, showing up in memory). Memory cost is therefore read as PSS after a trim or in
+  the background, not as Flashlight's RSS peak.
 - **Still open:** streams (BM-05), where KMP should keep the JS thread free.
 
 ## Setup
@@ -259,7 +265,9 @@ every ~3.4 ms on the device, lined up with the harness's phase markers. Session
 
 **Reading it.** KMP doesn't make the process bigger at rest. Parsing large payloads in Kotlin
 leaves memory behind that ART doesn't return quickly, which matters on low-end phones (not
-measured yet) and is probably linked to the parse slowdown above. The ingest itself adds only a
+measured yet) and is probably linked to the parse slowdown above. They are the same kind of
+pages (private clean) as those the PIN unlock leaves in BM-07, which a memory trim returned in
+full (`2026-10-17_mid-07`); BM-04's weren't trim-tested. The ingest itself adds only a
 few MB at its peak in either build; kmpCore's figure is within the ~2 MB of swapped-in zygote
 pages it gets in every round.
 
@@ -340,10 +348,35 @@ builds. Unlocking first (mid-03 skipped the lock screen) shows kmpCore's process
 during the flow (Flashlight's RSS). A follow-up check (`2026-10-17_mid-07`, `dumpsys meminfo`,
 n = 3) puts it in the Dalvik heap as **clean pages**: both builds hold the same ~6.3 MB of live
 Java objects after the unlock, but javax.crypto's PBKDF2 grew kmpCore's heap and left 45 MB of
-freed pages mapped. Android's `RUNNING_CRITICAL` trim returns all of it (kmpCore then 2.8 MB
-*below* jsCore, the same in the background). It's memory ART gives back when asked, as in
-BM-04's memory rounds, so it costs little; and it comes from the crypto library, not the
-architecture. Flashlight's RSS-based `ramMax` counts such pages, so it overstates this cost.
+freed pages mapped. Android's `RUNNING_CRITICAL` trim returns all of it. It's memory ART gives
+back when asked, as in BM-04's memory rounds, so it costs little; and it comes from the crypto
+library, not the architecture. Flashlight's RSS-based `ramMax` counts such pages, so it
+overstates this cost.
+
+**Memory cost at steady state** (`2026-10-17_mid-07`, total PSS, kmpCore − jsCore, each of the
+3 rounds):
+
+| State | Total PSS | of which Code |
+|---|---|---|
+| Cold start, no unlock | −5.6 / −4.1 / −4.1 MB | −3.6 / −3.5 / −3.4 MB |
+| Right after the PIN unlock (what BM-07's +28 MB RSS sees) | +32.8 / +29.2 / +29.5 MB | −3.9 / −3.8 / −3.8 MB |
+| After a `RUNNING_CRITICAL` trim | **−7.2 / −4.8 / −7.1 MB** | −3.9 / −3.9 / −3.8 MB |
+| 10 s in the background | **−6.4 / −4.7 / −6.9 MB** | −3.1 / −3.7 / −3.2 MB |
+
+Once the freed heap is returned, kmpCore uses 5–7 MB *less* PSS than jsCore, about what it
+already uses less before any unlock. Most of it (3–4 MB) is mapped code, and the detailed rows
+put that in `.apk mmap` (round 1, trimmed: 19.9 vs 15.9 MB): native libraries and the Hermes
+bundle are stored uncompressed and mapped straight from the APK. jsCore's APK maps
+`libQuickCrypto.so` (OpenSSL, 9.1 MB) and `libop-sqlite.so` (1.6 MB), which kmpCore doesn't
+ship, and a JS bundle 0.7 MB larger; kmpCore maps `libPocketlyCoreKmp.so` (1.7 MB) instead.
+That's BM-08's size finding (the storage and crypto choices, ADR-0009 and ADR-0010) showing up in
+memory. Which files' pages are resident can't be split further without root (`/proc/<pid>/maps`
+is denied to `adb shell`). The rest of the gap is small amounts of Java and native heap.
+
+So **memory cost is read as PSS after a trim or in the background**; BM-07's +28 MB is the
+moment right after the unlock, not what the app keeps. This covers the PIN path only: a
+biometric unlock doesn't run PBKDF2, so kmpCore's extra heap shouldn't appear there (not
+measured).
 
 **Replication.** mid-04, the first run after the fixes, gives the same picture: sum of steps
 1.46 vs 1.79 s, PIN +344 ms, peak RSS +25.9 MB, recipients −5 ms. Its CPU rows had a CV over 10%
@@ -457,6 +490,9 @@ See BM-08 above.
   swap-in noise; the ~60 MB retained after the warm-up imports is not. That retained memory is
   measured after a benchmark workload (repeated 1.3 MB imports), not at rest.
 - The phone's OS was updated between `2026-10-05` and `2026-10-11` (16.0.19.3 → 16.0.21.0).
+- Memory: Flashlight's `ramMax` (BM-02, BM-07) and BM-04's samples are RSS, which counts freed
+  heap pages until Android asks for them back. The steady-state comparison (PSS after a trim or
+  in the background) comes from one 3-round check (`2026-10-17_mid-07`), not a §4.3 session.
 
 ## Found by benchmarking
 BM-02 crashed `jsCore` mid-scroll on its first attempt: *"Unable to find parentView for tag"*,

@@ -52,3 +52,31 @@ Where the extra sits right after the unlock (round 1, detailed `dumpsys meminfo`
 - n = 3 per build and state; a check, not a §4.3 session (no restart, no statistics).
 - One trigger tested (`RUNNING_CRITICAL`) plus backgrounding; real memory pressure on a smaller
   phone wasn't simulated.
+
+## Addendum: the steady-state gap
+After the trim and in the background, kmpCore isn't just back to jsCore's size, it's below it.
+Per round, kmpCore − jsCore, from `unlock-memory/summary.csv` (App Summary rows):
+
+| State | Total PSS | Code PSS | Java Heap PSS | Native Heap PSS |
+|---|---|---|---|---|
+| A no unlock | −5.6 / −4.1 / −4.1 MB | −3.6 / −3.5 / −3.4 MB | −0.5 / −0.9 / −0.9 MB | +0.6 / −0.2 / −0.1 MB |
+| C trimmed | −7.2 / −4.8 / −7.1 MB | −3.9 / −3.9 / −3.8 MB | −1.8 / −0.2 / −1.8 MB | −0.3 / −0.7 / −0.4 MB |
+| D background | −6.4 / −4.7 / −6.9 MB | −3.1 / −3.7 / −3.2 MB | −1.6 / −0.6 / −1.0 MB | −1.2 / −1.3 / −0.0 MB |
+
+- **4.7–7.2 MB less PSS in kmpCore** after the trim or in the background (round 2 is the small
+  one in both states), and 4.1–5.6 MB less before any unlock: a baseline difference, not
+  something the trim creates.
+- **Code is 3.1–3.9 MB of it**, in every state and round (round 1, trimmed: 24.0 vs 20.2 MB).
+  The detailed rows put it in `.apk mmap` (19.9 vs 15.9 MB), not `.so mmap` (3.4 MB in both);
+  `.art mmap` is 3.4 vs 2.4 MB and `.dex mmap` 3.9 vs 4.3 MB.
+- **Why `.apk mmap`:** native libraries and the Hermes bundle are stored uncompressed in the
+  APK and mapped from it directly. Uncompressed entries only jsCore's arm64 APK has:
+  `libQuickCrypto.so` 9,132 KB (OpenSSL), `libop-sqlite.so` 1,564 KB, and its bundle is
+  2,511 KB vs 1,794 KB; kmpCore has `libPocketlyCoreKmp.so` 1,668 KB instead. The same libraries
+  as BM-08's size split (`2026-10-17_mid-06`): the storage and crypto choices show up in memory as
+  well as in size. Only part of each file is resident, and which part can't be read:
+  `/proc/<pid>/maps` is denied to `adb shell` on this build, so the split per file is not
+  measured.
+- **For the report:** memory cost is PSS after a trim or in the background. BM-07's +27.9 MB
+  (RSS, right after the unlock) sits next to these rows: a moment, not what the app keeps.
+- **Scope:** the PIN path only. A biometric unlock doesn't run PBKDF2; not measured here.
