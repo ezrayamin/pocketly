@@ -56,10 +56,11 @@
   both builds. The first session found two library effects: kmpCore ~80–90 ms faster on each step
   that read secure storage (react-native-sensitive-info's extra Keystore round trips), and ~390 ms
   slower on the PIN (javax.crypto vs quick-crypto's OpenSSL). Keeping the user's phone in memory
-  and making the amount step's two backend calls in parallel cut the app's step time by **26%
-  in jsCore (1.97 → 1.46 s) and 19% in kmpCore (2.20 → 1.79 s)**, and the secure-storage
-  difference disappeared (5 and 13 ms, not meaningful). What's left is the PIN (+344 ms), a crypto
-  library choice, and kmpCore's process starting ~26 MB larger after the PIN unlock.
+  and making the amount step's two backend calls in parallel cut the app's step time by **25%
+  in jsCore (1.97 → 1.48 s) and 19% in kmpCore (2.20 → 1.79 s)** (`2026-10-17_mid-05`, replicated
+  by mid-04), and the secure-storage difference disappeared. What's left is the PIN (+340 ms), a
+  crypto library choice, which also makes kmpCore's CPU +4 points and its process ~28 MB larger
+  after the unlock.
 - **Still open:** streams (BM-05), where KMP should keep the JS thread free.
 
 ## Setup
@@ -318,22 +319,33 @@ hash, which costs ~600 ms of JVM work per flow where quick-crypto spends ~50 ms 
 201 ms in BM-11 is mostly waiting on secure storage); GC adds +0.3 points. Per-thread totals
 account for all of Flashlight's +4.1 points.
 
-**Measured, then fixed** (session `2026-10-17_mid-04`, same method, unlocking on the lock
-screen before each flow, ADR-0014 §6). The two steps that read secure storage now read the
-phone from memory, and the amount step's backend calls run in parallel:
+**Measured, then fixed** (session `2026-10-17_mid-05`, same method, unlocking on the lock screen
+before each flow, ADR-0014 §6; `2026-10-17_mid-04` replicates it). The two steps that read
+secure storage now read the phone from memory, and the amount step's backend calls run in
+parallel:
 
-| Step (median) | jsCore mid-03 → mid-04 | kmpCore mid-03 → mid-04 | kmpCore − jsCore |
+| Step (median) | jsCore mid-03 → mid-05 | kmpCore mid-03 → mid-05 | kmpCore − jsCore, mid-03 → mid-05 |
 |---|---|---|---|
-| Send → recipients on screen | 521.5 → 362.1 ms | 440.8 → 355.5 ms | −78 → −5 ms (not meaningful) |
-| Contact → amount screen | 785.1 → 385.8 ms | 694.9 → 387.2 ms | −91 → −13 ms (not meaningful) |
-| PIN → result | 622.1 → 628.4 ms | 997.1 → 965.5 ms | +387 → +344 ms |
-| **Sum of steps** | **1,966.9 → 1,459.8 ms** | **2,198.3 → 1,787.2 ms** | +216 → +332 ms |
+| Send → recipients on screen | 521.5 → 361.6 ms | 440.8 → 357.3 ms | −78 → −4 ms (not meaningful) |
+| Contact → amount screen | 785.1 → 418.2 ms | 694.9 → 385.6 ms | −91 → −33 ms (see below) |
+| PIN → result | 622.1 → 629.8 ms | 997.1 → 962.8 ms | +387 → +340 ms |
+| **Sum of steps** | **1,966.9 → 1,477.8 ms (−25%)** | **2,198.3 → 1,785.7 ms (−19%)** | +216 → +301 ms |
+| CPU, all threads | 26.0 → 27.9% | 29.8 → 31.8% | +3.8 → **+4.0 points** |
+| Peak RSS | 269.9 → 262.7 MB | 266.5 → 290.8 MB | −1.7 → **+27.9 MB** |
 
-The library difference on secure storage is gone; the PIN remains. Unlocking first also shows
-kmpCore's process ~26 MB larger during the flow (291.8 vs 265.3 MB peak RSS; equal in mid-03,
-which skipped the lock screen): the PIN check's JVM work grows the ART heap and it stays, as in
-BM-04's memory rounds. This session's CPU rows are not quoted: one disturbed kmpCore iteration
-pushed their CV over 10% (§4.3 asks for a rerun).
+The library difference on secure storage is gone; the PIN remains (+340 ms, the javax.crypto vs
+quick-crypto gap of BM-11). The extra CPU is all kmpCore's coroutine pool (the PIN hash, +3.9)
+and GC (+0.4), less quick-crypto's thread (−0.4); JS, UI and Render threads are the same in both
+builds. Unlocking first (mid-03 skipped the lock screen) shows kmpCore's process ~28 MB larger
+during the flow: the PIN check's JVM work grows the ART heap and it stays, as in BM-04's memory
+rounds.
+
+**Replication.** mid-04, the first run after the fixes, gives the same picture: sum of steps
+1.46 vs 1.79 s, PIN +344 ms, peak RSS +25.9 MB, recipients −5 ms. Its CPU rows had a CV over 10%
+from one kmpCore iteration disturbed by something outside the app, so §4.3 asked for a rerun:
+mid-05, same code and method, has no CV warning on any metric. The amount step is the one thing
+the two disagree on (kmpCore −13 ms in mid-04, not meaningful; −33 ms in mid-05, meaningful by
+the rule): not a finding until a third session or a trace settles it.
 
 **How the step times are taken.** Each "-shown" mark is the screen's first JS effect after its
 data arrived: after React commits, before the frame reaches the screen, like BM-01's original
