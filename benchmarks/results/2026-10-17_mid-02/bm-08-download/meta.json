@@ -1,0 +1,1 @@
+{ "tool": "bundletool-all-1.18.3.jar", "command": "get-size total --dimensions=ABI", "unit": "bytes" }
