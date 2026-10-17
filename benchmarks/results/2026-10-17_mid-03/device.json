@@ -1,0 +1,12 @@
+{
+  "model": "V2538",
+  "manufacturer": "vivo",
+  "chipset": "SM7750",
+  "ramMb": 7311,
+  "androidVersion": "16",
+  "sdkInt": 36,
+  "buildNumber": "PD2529DF_EX_A_16.0.21.0.W20",
+  "capturedAt": "2026-10-17T13:51:45Z",
+  "display": { "settingHz": 120, "renderFrameRateHzAtCapture": 120, "supportedModesHz": [60,90,120], "expectedHz": 120, "refreshSettings": { "system.peak_refresh_rate": "120.0", "global.vivo_screen_refresh_rate_mode": "120" } },
+  "temperatureLog": [{ "at": "2026-10-17T13:51:45Z", "tenthsCelsius": 349, "batteryPct": 92 }]
+}
