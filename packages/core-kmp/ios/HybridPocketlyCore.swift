@@ -64,7 +64,8 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       failureRatePercent: try convert.toIntExact(value: simulation.failureRatePercent, field: "failureRatePercent"),
       normalLatencyMs: try convert.toIntExact(value: simulation.normalLatencyMs ?? 0, field: "normalLatencyMs"),
       readTimeoutMs: try convert.toIntExact(value: simulation.readTimeoutMs ?? 10_000, field: "readTimeoutMs"),
-      seed: try convert.toIntExact(value: simulation.seed ?? 1, field: "seed")
+      seed: try convert.toIntExact(value: simulation.seed ?? 1, field: "seed"),
+      writeTimeoutMs: try convert.toIntExact(value: simulation.writeTimeoutMs ?? 15_000, field: "writeTimeoutMs")
     ))
   }
 
@@ -75,6 +76,7 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       failureRatePercent: Double(s.failureRatePercent),
       normalLatencyMs: Double(s.normalLatencyMs),
       readTimeoutMs: Double(s.readTimeoutMs),
+      writeTimeoutMs: Double(s.writeTimeoutMs),
       seed: Double(s.seed)
     )
   }
@@ -205,6 +207,80 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     }
   }
 
+  // MARK: P2P transfer (F5, ADR-0014)
+
+  func searchContacts(query: String) throws -> Promise<ContactSearch> {
+    return Promise.async { [core] in
+      let r = try await core.searchContacts(query: query)
+      return ContactSearch(
+        recent: r.recent.map { $0.toNitro() },
+        contacts: r.contacts.map { $0.toNitro() },
+        phoneLookup: r.phoneLookup.map { PhoneLookup(fromString: $0.name)! }
+      )
+    }
+  }
+
+  func startTransfer(recipientId: String) throws -> Promise<TransferDraft> {
+    return Promise.async { [core] in
+      let d = try await core.startTransfer(recipientId: recipientId)
+      return TransferDraft(
+        recipient: d.recipient.toNitro(),
+        balance: Double(d.balance),
+        dailyRemaining: Double(d.dailyRemaining),
+        minAmount: Double(d.minAmount),
+        maxAmount: Double(d.maxAmount)
+      )
+    }
+  }
+
+  func checkTransferAmount(text: String) throws -> AmountCheck {
+    let c = try core.checkTransferAmount(text: text)
+    return AmountCheck(
+      ok: c.ok,
+      minor: c.minorUnits.map { Double($0.int64Value) },
+      reason: c.reason.map { AmountRejectReason(fromString: $0.name)! },
+      acceptInput: c.acceptInput,
+      remainingBalance: c.remainingBalanceMinor.map { Double($0.int64Value) }
+    )
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func reviewTransfer(amount: Double, note: String?) throws -> Promise<TransferReview> {
+    return Promise.async { [core, convert] in
+      let r = try await core.reviewTransfer(amount: try convert.toLongExact(value: amount, field: "amount"), note: note)
+      return TransferReview(
+        id: r.id,
+        idempotencyKey: r.idempotencyKey,
+        recipient: r.recipient.toNitro(),
+        amount: Double(r.amount),
+        fee: Double(r.fee),
+        note: r.note,
+        balanceAfter: Double(r.balanceAfter)
+      )
+    }
+  }
+
+  func confirmTransfer(id: String, auth: TransferAuth?) throws -> Promise<TransferResult> {
+    let kAuth = auth.map { a in
+      PocketlyShared.TransferAuth(
+        method: PocketlyShared.TransferAuthMethod.entries.first { $0.name == a.method.stringValue }!,
+        pin: a.pin,
+        prompt: a.prompt.map { PocketlyShared.BiometricPromptText(title: $0.title, subtitle: $0.subtitle, cancel: $0.cancel) }
+      )
+    }
+    return Promise.async { [core] in try await core.confirmTransfer(id: id, auth: kAuth).toNitro() }
+  }
+
+  func getTransferStatus(id: String) throws -> Promise<TransferResult> {
+    return Promise.async { [core] in try await core.getTransferStatus(id: id).toNitro() }
+  }
+
+  func setDailyLimit(minor: Double) throws -> Promise<Void> {
+    return Promise.async { [core, convert] in
+      try await core.setDailyLimit(minor: try convert.toLongExact(value: minor, field: "dailyLimit"))
+    }
+  }
+
   func parseMoney(input: String) throws -> MoneyParseResult {
     let r = core.parseMoney(input: input)
     return MoneyParseResult(
@@ -280,6 +356,28 @@ private extension PocketlyShared.Transaction {
       failureReason: failureReason.map { ErrorCode(fromString: $0.name)! },
       createdAt: Double(createdAt),
       updatedAt: Double(updatedAt)
+    )
+  }
+}
+
+private extension PocketlyShared.Contact {
+  func toNitro() -> Contact {
+    Contact(userId: userId, name: name, phone: phone)
+  }
+}
+
+private extension PocketlyShared.TransferResult {
+  func toNitro() -> TransferResult {
+    TransferResult(
+      id: id,
+      state: TransferState(fromString: state.name)!,
+      auth: TransferAuthOutcome(fromString: auth.name)!,
+      transaction: transaction?.toNitro(),
+      failureReason: failureReason.map { ErrorCode(fromString: $0.name)! },
+      retryable: retryable.map { $0.boolValue },
+      attemptsLeft: attemptsLeft.map { Double($0.int32Value) },
+      lockedUntil: lockedUntil.map { Double($0.int64Value) },
+      balance: balanceMinor.map { Double($0.int64Value) }
     )
   }
 }

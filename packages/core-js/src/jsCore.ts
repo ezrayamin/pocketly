@@ -8,11 +8,13 @@ import {
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
+  AmountCheck,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
   BiometricStatus,
   BiometricUnlockResult,
+  ContactSearch,
   Core,
   DatasetConfig,
   ErrorCode,
@@ -29,6 +31,10 @@ import type {
   Subscription,
   Transaction,
   TransactionPage,
+  TransferAuth,
+  TransferDraft,
+  TransferResult,
+  TransferReview,
   TxFilter,
   UnlockResult,
   Wallet,
@@ -50,6 +56,7 @@ import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
+import { TransferFlow } from './sync/transferFlow';
 
 const now: () => number =
   typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -99,12 +106,16 @@ export class JsCore implements Core {
   storageMs = 0;
   private readonly pin: PinAuth;
   private readonly biometric: BiometricAuth;
+  private readonly transfers: TransferFlow;
 
   constructor(options: JsCoreOptions) {
     const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone, options.clock ?? Date.now);
     const cache = new CacheStore(options.cache);
     this.backend = backend;
-    this.api = new TimeoutWalletApi(backend, () => backend.network.get().readTimeoutMs!);
+    this.api = new TimeoutWalletApi(backend, (kind) => {
+      const simulation = backend.network.get();
+      return (kind === 'write' ? simulation.writeTimeoutMs : simulation.readTimeoutMs)!;
+    });
     this.cache = cache;
     this.ledgerSync = new LedgerSync(this.api, cache);
     this.ready = (async () => {
@@ -128,6 +139,15 @@ export class JsCore implements Core {
       iterations: options.pinIterations,
     });
     this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
+    this.transfers = new TransferFlow({
+      api: this.api,
+      cache,
+      pin: this.pin,
+      biometric: this.biometric,
+      fetchWallet: () => this.fetchWallet(),
+      randomBytes: (size) => options.crypto.randomBytes(size),
+      clock: options.clock ?? Date.now,
+    });
   }
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -138,6 +158,7 @@ export class JsCore implements Core {
   private async reset(config: ServerDataset): Promise<void> {
     await this.ready;
     await this.backend.reset(config);
+    this.transfers.reset();
     await this.cache.clear();
     try {
       await this.ledgerSync.sync();
@@ -248,6 +269,7 @@ export class JsCore implements Core {
   async logout(): Promise<void> {
     // The replica first: if the secrets then fail to go, nothing of the history is left behind.
     await this.ready;
+    this.transfers.reset();
     await this.cache.clear();
     await this.biometric.reset();
   }
@@ -293,6 +315,40 @@ export class JsCore implements Core {
 
   setAutoLockTimeout(ms: number): Promise<void> {
     return this.pin.setAutoLockTimeout(ms);
+  }
+
+  async searchContacts(query: string): Promise<ContactSearch> {
+    await this.ready;
+    return this.transfers.searchContacts(query);
+  }
+
+  async startTransfer(recipientId: string): Promise<TransferDraft> {
+    await this.ready;
+    return this.transfers.startTransfer(recipientId);
+  }
+
+  checkTransferAmount(text: string): AmountCheck {
+    return this.transfers.checkTransferAmount(text);
+  }
+
+  async reviewTransfer(amount: number, note?: string): Promise<TransferReview> {
+    await this.ready;
+    return this.transfers.reviewTransfer(amount, note);
+  }
+
+  async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
+    await this.ready;
+    return this.transfers.confirmTransfer(id, auth);
+  }
+
+  async getTransferStatus(id: string): Promise<TransferResult> {
+    await this.ready;
+    return this.transfers.getTransferStatus(id);
+  }
+
+  async setDailyLimit(minor: number): Promise<void> {
+    await this.ready;
+    await this.backend.setDailyLimit(minor);
   }
 
   formatMoney(minor: number): string {

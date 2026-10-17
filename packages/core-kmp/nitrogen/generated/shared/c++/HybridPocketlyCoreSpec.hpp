@@ -47,6 +47,18 @@ namespace margelo::nitro::pocketly { struct BiometricEnableResult; }
 namespace margelo::nitro::pocketly { struct BiometricPromptText; }
 // Forward declaration of `BiometricUnlockResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct BiometricUnlockResult; }
+// Forward declaration of `ContactSearch` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct ContactSearch; }
+// Forward declaration of `TransferDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferDraft; }
+// Forward declaration of `AmountCheck` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AmountCheck; }
+// Forward declaration of `TransferReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferReview; }
+// Forward declaration of `TransferResult` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferResult; }
+// Forward declaration of `TransferAuth` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TransferAuth; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -74,6 +86,12 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "BiometricEnableResult.hpp"
 #include "BiometricPromptText.hpp"
 #include "BiometricUnlockResult.hpp"
+#include "ContactSearch.hpp"
+#include "TransferDraft.hpp"
+#include "AmountCheck.hpp"
+#include "TransferReview.hpp"
+#include "TransferResult.hpp"
+#include "TransferAuth.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -136,6 +154,13 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) = 0;
       virtual std::shared_ptr<Promise<void>> disableBiometrics() = 0;
       virtual std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) = 0;
+      virtual std::shared_ptr<Promise<ContactSearch>> searchContacts(const std::string& query) = 0;
+      virtual std::shared_ptr<Promise<TransferDraft>> startTransfer(const std::string& recipientId) = 0;
+      virtual AmountCheck checkTransferAmount(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<TransferReview>> reviewTransfer(double amount, const std::optional<std::string>& note) = 0;
+      virtual std::shared_ptr<Promise<TransferResult>> confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) = 0;
+      virtual std::shared_ptr<Promise<TransferResult>> getTransferStatus(const std::string& id) = 0;
+      virtual std::shared_ptr<Promise<void>> setDailyLimit(double minor) = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;

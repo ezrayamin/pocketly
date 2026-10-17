@@ -32,6 +32,9 @@ data class NetworkSimulation(
   val readTimeoutMs: Double?,
   @DoNotStrip
   @Keep
+  val writeTimeoutMs: Double?,
+  @DoNotStrip
+  @Keep
   val seed: Double?
 ) {
   /* primary constructor */
@@ -43,6 +46,7 @@ data class NetworkSimulation(
       && Objects.deepEquals(this.failureRatePercent, other.failureRatePercent)
       && Objects.deepEquals(this.normalLatencyMs, other.normalLatencyMs)
       && Objects.deepEquals(this.readTimeoutMs, other.readTimeoutMs)
+      && Objects.deepEquals(this.writeTimeoutMs, other.writeTimeoutMs)
       && Objects.deepEquals(this.seed, other.seed)
   }
 
@@ -52,6 +56,7 @@ data class NetworkSimulation(
       failureRatePercent,
       normalLatencyMs,
       readTimeoutMs,
+      writeTimeoutMs,
       seed
     ).contentDeepHashCode()
   }
@@ -64,8 +69,8 @@ data class NetworkSimulation(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, seed: Double?): NetworkSimulation {
-      return NetworkSimulation(mode, failureRatePercent, normalLatencyMs, readTimeoutMs, seed)
+    private fun fromCpp(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?): NetworkSimulation {
+      return NetworkSimulation(mode, failureRatePercent, normalLatencyMs, readTimeoutMs, writeTimeoutMs, seed)
     }
   }
 }

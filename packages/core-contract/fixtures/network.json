@@ -5,6 +5,7 @@
     "failureRatePercent": 0,
     "normalLatencyMs": 0,
     "readTimeoutMs": 10000,
+    "writeTimeoutMs": 15000,
     "seed": 1
   },
   "invalid": [
@@ -38,6 +39,16 @@
       "mode": "NORMAL",
       "failureRatePercent": 0,
       "readTimeoutMs": 60001
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "writeTimeoutMs": 99
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "writeTimeoutMs": 60001
     }
   ],
   "modeErrors": [

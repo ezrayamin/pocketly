@@ -1,9 +1,12 @@
 package com.margelo.nitro.pocketly.corekmp
 
 import com.pocketly.shared.bridge.BridgeConversions
+import com.pocketly.shared.domain.AmountCheck as KAmountCheck
 import com.pocketly.shared.domain.BalanceCheck as KBalanceCheck
 import com.pocketly.shared.domain.Category as KCategory
 import com.pocketly.shared.domain.CategoryTotal as KCategoryTotal
+import com.pocketly.shared.domain.Contact as KContact
+import com.pocketly.shared.domain.ContactSearchResult as KContactSearch
 import com.pocketly.shared.domain.Counterparty as KCounterparty
 import com.pocketly.shared.domain.CounterpartyKind as KCounterpartyKind
 import com.pocketly.shared.domain.DatasetConfig as KDatasetConfig
@@ -31,6 +34,11 @@ import com.pocketly.shared.domain.Transaction as KTransaction
 import com.pocketly.shared.domain.TransactionPage as KTransactionPage
 import com.pocketly.shared.domain.TransactionStatus as KTransactionStatus
 import com.pocketly.shared.domain.TransactionType as KTransactionType
+import com.pocketly.shared.domain.TransferAuth as KTransferAuth
+import com.pocketly.shared.domain.TransferAuthMethod as KTransferAuthMethod
+import com.pocketly.shared.domain.TransferDraft as KTransferDraft
+import com.pocketly.shared.domain.TransferResult as KTransferResult
+import com.pocketly.shared.domain.TransferReview as KTransferReview
 import com.pocketly.shared.domain.TxFilter as KTxFilter
 import com.pocketly.shared.domain.Wallet as KWallet
 
@@ -51,6 +59,7 @@ internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
     normalLatencyMs = normalLatencyMs?.let { BridgeConversions.toIntExact(it, "normalLatencyMs") } ?: 0,
     readTimeoutMs = readTimeoutMs?.let { BridgeConversions.toIntExact(it, "readTimeoutMs") } ?: 10_000,
     seed = seed?.let { BridgeConversions.toIntExact(it, "seed") } ?: 1,
+    writeTimeoutMs = writeTimeoutMs?.let { BridgeConversions.toIntExact(it, "writeTimeoutMs") } ?: 15_000,
 )
 
 internal fun KNetworkSimulation.toNitro() = NetworkSimulation(
@@ -58,8 +67,11 @@ internal fun KNetworkSimulation.toNitro() = NetworkSimulation(
     failureRatePercent = failureRatePercent.toDouble(),
     normalLatencyMs = normalLatencyMs.toDouble(),
     readTimeoutMs = readTimeoutMs.toDouble(),
+    writeTimeoutMs = writeTimeoutMs.toDouble(),
     seed = seed.toDouble(),
 )
+
+internal fun TransferAuth.toDomain() = KTransferAuth(KTransferAuthMethod.valueOf(method.name), pin, prompt?.toDomain())
 
 internal fun TxFilter.toDomain() = KTxFilter(
     types = types?.map { KTransactionType.valueOf(it.name) },
@@ -160,3 +172,45 @@ internal fun KBiometricEnableResult.toNitro() =
 internal fun KBiometricUnlockResult.toNitro() = BiometricUnlockResult(BiometricUnlockOutcome.valueOf(outcome.name), pinLockedOut)
 
 internal fun KPriceTick.toNitro() = PriceTick(symbol, price.minor.toDouble(), changeBps.toDouble(), seq.toDouble())
+
+// ── P2P transfer (F5, ADR-0014) ─────────────────────────────────────────────
+
+private fun KContact.toNitro() = Contact(userId, name, phone)
+
+internal fun KContactSearch.toNitro() = ContactSearch(
+    recent = Array(recent.size) { recent[it].toNitro() },
+    contacts = Array(contacts.size) { contacts[it].toNitro() },
+    phoneLookup = phoneLookup?.let { PhoneLookup.valueOf(it.name) },
+)
+
+internal fun KTransferDraft.toNitro() = TransferDraft(
+    recipient.toNitro(),
+    balance.minor.toDouble(),
+    dailyRemaining.minor.toDouble(),
+    minAmount.minor.toDouble(),
+    maxAmount.minor.toDouble(),
+)
+
+internal fun KAmountCheck.toNitro() = AmountCheck(
+    ok = ok,
+    minor = minor?.minor?.toDouble(),
+    reason = reason?.let { AmountRejectReason.valueOf(it.name) },
+    acceptInput = acceptInput,
+    remainingBalance = remainingBalance?.minor?.toDouble(),
+)
+
+internal fun KTransferReview.toNitro() = TransferReview(
+    id, idempotencyKey, recipient.toNitro(), amount.minor.toDouble(), fee.minor.toDouble(), note, balanceAfter.minor.toDouble(),
+)
+
+internal fun KTransferResult.toNitro() = TransferResult(
+    id = id,
+    state = TransferState.valueOf(state.name),
+    auth = TransferAuthOutcome.valueOf(auth.name),
+    transaction = transaction?.toNitro(),
+    failureReason = failureReason?.let { ErrorCode.valueOf(it.name) },
+    retryable = retryable,
+    attemptsLeft = attemptsLeft?.toDouble(),
+    lockedUntil = lockedUntil?.toDouble(),
+    balance = balance?.minor?.toDouble(),
+)

@@ -20,6 +20,9 @@ data class Counterparty(
 
 data class Contact(val userId: String, val name: String, val phone: String)
 
+/** FR-TRF-01: a typed phone number is a contact, nobody, or this install's own phone. */
+enum class PhoneLookup { FOUND, NOT_FOUND, SELF }
+
 /** Data from the local replica because the server was unreachable (ADR-0009). */
 data class StaleInfo(val reason: ErrorCode, val cachedAt: EpochMillis)
 
@@ -143,6 +146,8 @@ data class NetworkSimulation(
     /** Client-side read timeout (NFR-REL-01, ADR-0007). Same default as READ_TIMEOUT_MS. */
     val readTimeoutMs: Int = 10_000,
     val seed: Int = 1,
+    /** Client-side transfer timeout (FR-TRF-09, ADR-0014). Same default as TRANSFER_TIMEOUT_MS. */
+    val writeTimeoutMs: Int = TransferPolicy.TIMEOUT_MS.toInt(),
 ) {
     companion object {
         val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
@@ -210,3 +215,49 @@ data class OtpSendResult(val outcome: OtpSendOutcome, val resendAt: EpochMillis)
 enum class OtpVerifyOutcome { VERIFIED, WRONG_CODE, COOLDOWN, EXPIRED, NO_CODE }
 
 data class OtpVerifyResult(val outcome: OtpVerifyOutcome, val attemptsLeft: Int? = null, val retryAt: EpochMillis? = null)
+
+// ── P2P transfer (F5, FR-TRF-01..11; ADR-0014) ──────────────────────────
+
+/** searchContacts. Mirrors core-contract's ContactSearch (the name is taken by data.ContactSearch). */
+data class ContactSearchResult(val recent: List<Contact>, val contacts: List<Contact>, val phoneLookup: PhoneLookup?)
+
+data class TransferDraft(
+    val recipient: Contact,
+    val balance: Money,
+    val dailyRemaining: Money,
+    val minAmount: Money,
+    val maxAmount: Money,
+)
+
+data class TransferReview(
+    /** The attempt's id: its idempotency key. */
+    val id: String,
+    val idempotencyKey: String,
+    val recipient: Contact,
+    val amount: Money,
+    val fee: Money,
+    val note: String?,
+    val balanceAfter: Money,
+)
+
+enum class TransferAuthMethod { BIOMETRIC, PIN }
+
+data class TransferAuth(val method: TransferAuthMethod, val pin: String? = null, val prompt: BiometricPromptText? = null)
+
+enum class TransferAuthOutcome { OK, NOT_REQUIRED, CANCELLED, WRONG_PIN, PIN_LOCKED_OUT, BIOMETRIC_LOCKED_OUT, KEY_INVALIDATED, FAILED, UNAVAILABLE }
+
+/** Mirrors core-contract's TransferResult; see its comments for which fields each state sets. */
+data class TransferResult(
+    val id: String,
+    val state: TransferState,
+    val auth: TransferAuthOutcome,
+    val transaction: Transaction? = null,
+    val failureReason: ErrorCode? = null,
+    val retryable: Boolean? = null,
+    val attemptsLeft: Int? = null,
+    val lockedUntil: EpochMillis? = null,
+    val balance: Money? = null,
+) {
+    /** [balance] unwrapped for Swift: a nullable value class is exported as an opaque `id`. */
+    val balanceMinor: Long? get() = balance?.minor
+}

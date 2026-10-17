@@ -81,3 +81,21 @@ export const OTP_TTL_MS = 5 * 60_000;
 /** A biometric unlock challenge must be signed within this long, once. */
 export const BIOMETRIC_CHALLENGE_TTL_MS = 60_000;
 export const BIOMETRIC_NONCE_BYTES = 32;
+
+// ── P2P transfer (F5; ADR-0014). Kotlin: shared/.../domain/TransferPolicy.kt ──
+
+/** FR-TRF-02: the smallest transfer, 1.00. */
+export const TRANSFER_MIN_MINOR = 100;
+/** product §6.1: transfers are free. */
+export const TRANSFER_FEE_MINOR = 0;
+/** FR-TRF-10: the fake server's daily limit until changed (developer menu: setDailyLimit). */
+export const DEFAULT_DAILY_LIMIT_MINOR = 500_000;
+/** FR-TRF-09: a transfer with no answer after this long is PENDING (NetworkSimulation.writeTimeoutMs). */
+export const TRANSFER_TIMEOUT_MS = 15_000;
+/** Longest note either core accepts, in UTF-16 code units; one line only. */
+export const TRANSFER_NOTE_MAX_LENGTH = 100;
+/** FR-TRF-01: how many recent recipients searchContacts('') returns. */
+export const RECENT_CONTACTS_LIMIT = 4;
+/** FR-FAKE-05: a transfer the server holds as PENDING settles this long after it arrived. */
+export const PENDING_RESOLVE_MIN_MS = 5_000;
+export const PENDING_RESOLVE_MAX_MS = 20_000;

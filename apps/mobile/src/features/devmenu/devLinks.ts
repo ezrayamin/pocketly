@@ -9,11 +9,12 @@ import { core } from '../../core';
  *   pocketly://dev/network?mode=NORMAL&failureRatePercent=0&normalLatencyMs=300
  *   pocketly://dev/reset
  *   pocketly://dev/incoming
+ *   pocketly://dev/limit?minor=100000           (FR-TRF-10: the server's daily transfer limit)
  *
  * Network params not given keep their current value. Only active when DEV_TOOLS_ENABLED.
  */
 const LINK = /^pocketly:\/\/dev\/([a-z]+)\/?(?:\?(.*))?$/;
-const NUMBER_PARAMS = ['failureRatePercent', 'normalLatencyMs', 'readTimeoutMs', 'seed'] as const;
+const NUMBER_PARAMS = ['failureRatePercent', 'normalLatencyMs', 'readTimeoutMs', 'writeTimeoutMs', 'seed'] as const;
 
 export type DevLinkResult = { action: string; detail: string };
 
@@ -53,6 +54,11 @@ export async function applyDevLink(url: string): Promise<DevLinkResult | null> {
     case 'reset':
       await core.resetData(LIVE_DATASET);
       return { action, detail: 'wallet reset to seeded data' };
+    case 'limit': {
+      const minor = Number(parseQuery(query).minor);
+      await core.setDailyLimit(minor); // validates
+      return { action, detail: `daily limit ${core.formatMoney(minor)}` };
+    }
     case 'incoming': {
       const tx = await core.simulateIncomingTransfer();
       return { action, detail: `${tx.id} ${core.formatMoney(tx.amount)}` };

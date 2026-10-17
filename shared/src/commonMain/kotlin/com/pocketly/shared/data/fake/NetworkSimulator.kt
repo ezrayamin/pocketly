@@ -4,6 +4,7 @@ import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.NetworkMode
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.TransferPolicy
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -13,7 +14,8 @@ import kotlin.concurrent.Volatile
 /**
  * FR-FAKE-04: latency, failures and offline mode for the fake backend (developer menu).
  * Draw order is fixed (latency roll, then failure roll, for every NORMAL/SLOW/ALWAYS_FAIL
- * call) so both cores produce the same sequence for the same seed.
+ * call; a delay roll, then an outcome roll, for a transfer in TIMEOUT mode) so both cores
+ * produce the same sequence for the same seed.
  * Mirrors packages/core-js/src/data/fake/networkSimulator.ts.
  */
 internal class NetworkSimulator {
@@ -29,6 +31,26 @@ internal class NetworkSimulator {
     }
 
     fun get(): NetworkSimulation = simulation
+
+    /** FR-FAKE-05: how long the server holds a TIMEOUT-mode transfer as PENDING, and whether it then fails. */
+    data class Hold(val holdMs: Long, val fails: Boolean)
+
+    /**
+     * Runs before a transfer reaches the server. In TIMEOUT mode the request arrives but its answer
+     * never does: returns the [Hold]. Otherwise as [beforeCall], and returns null.
+     */
+    suspend fun beforeTransfer(): Hold? {
+        val sim = simulation
+        if (sim.mode != NetworkMode.TIMEOUT) {
+            beforeCall()
+            return null
+        }
+        return rngLock.withLock {
+            val span = (TransferPolicy.PENDING_RESOLVE_MAX_MS - TransferPolicy.PENDING_RESOLVE_MIN_MS + 1).toInt()
+            val holdMs = TransferPolicy.PENDING_RESOLVE_MIN_MS + rng.nextInt(span)
+            Hold(holdMs, fails = rng.nextInt(100) < sim.failureRatePercent)
+        }
+    }
 
     /** Runs before every backend call: waits, then maybe fails. Never returns in TIMEOUT. */
     suspend fun beforeCall() {
@@ -62,6 +84,9 @@ internal class NetworkSimulator {
         }
         if (s.readTimeoutMs !in 100..60_000) {
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "readTimeoutMs must be an integer 100..60000")
+        }
+        if (s.writeTimeoutMs !in 100..60_000) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "writeTimeoutMs must be an integer 100..60000")
         }
     }
 

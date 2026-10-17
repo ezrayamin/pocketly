@@ -1,0 +1,7 @@
+{ "scenario": "BM-07", "warmup": 1, "blocks": 5, "iterationsPerBlock": 2,
+  "order": "alternating blocks js,kmp", "coolDownToC": 40,
+  "tool": "Flashlight test (--skipRestart, prepare/verify outside the measured command) + adb input at fixed times (bm-07-flow.sh); step latencies from the app's own marks",
+  "measured": "Send tap → result shown: recipient Andi, amount 150, review, PIN (biometrics off), taps 1.5 s apart, 4 s after the PIN",
+  "dataset": { "seed": 42, "transactionCount": 200 }, "network": { "mode": "NORMAL", "normalLatencyMs": 300 }, "build": "perf",
+  "adbTransport": "default",
+  "at": "2026-10-17T14:50:08Z" }

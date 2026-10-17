@@ -27,6 +27,23 @@ CREATE TABLE server_meta (
   value TEXT NOT NULL
 );
 
+-- FR-TRF-05, FR-FAKE-02/03 (ADR-0014): every transfer key the server applied, with its request.
+-- Added in schema version 2 (1.sqm).
+CREATE TABLE server_transfer_key (
+  idempotency_key TEXT NOT NULL PRIMARY KEY,
+  recipient_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  note TEXT,
+  transaction_id TEXT NOT NULL
+);
+
+-- FR-FAKE-05: transfers held as PENDING (TIMEOUT mode) and when they settle. Version 2.
+CREATE TABLE server_pending_settlement (
+  transaction_id TEXT NOT NULL PRIMARY KEY,
+  resolve_at INTEGER NOT NULL,
+  fails INTEGER NOT NULL
+);
+
 insertTransaction:
 INSERT OR REPLACE INTO server_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -53,6 +70,32 @@ WHERE created_at >= ? AND type IN ('TRANSFER_OUT', 'QR_PAYMENT') AND status IN (
 
 deleteAllTransactions:
 DELETE FROM server_transaction;
+
+updateTransactionStatus:
+UPDATE server_transaction SET status = ?, failure_reason = ?, updated_at = ? WHERE id = ?;
+
+insertTransferKey:
+INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id)
+VALUES (?, ?, ?, ?, ?);
+
+getTransferKey:
+SELECT * FROM server_transfer_key WHERE idempotency_key = ?;
+
+deleteAllTransferKeys:
+DELETE FROM server_transfer_key;
+
+insertSettlement:
+INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails) VALUES (?, ?, ?);
+
+-- Oldest first, so settling several at once keeps their order.
+dueSettlements:
+SELECT * FROM server_pending_settlement WHERE resolve_at <= ? ORDER BY resolve_at, transaction_id;
+
+deleteSettlement:
+DELETE FROM server_pending_settlement WHERE transaction_id = ?;
+
+deleteAllSettlements:
+DELETE FROM server_pending_settlement;
 
 getMeta:
 SELECT value FROM server_meta WHERE key = ?;

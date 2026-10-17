@@ -38,6 +38,13 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("enableBiometrics", &HybridPocketlyCoreSpec::enableBiometrics);
       prototype.registerHybridMethod("disableBiometrics", &HybridPocketlyCoreSpec::disableBiometrics);
       prototype.registerHybridMethod("unlockWithBiometrics", &HybridPocketlyCoreSpec::unlockWithBiometrics);
+      prototype.registerHybridMethod("searchContacts", &HybridPocketlyCoreSpec::searchContacts);
+      prototype.registerHybridMethod("startTransfer", &HybridPocketlyCoreSpec::startTransfer);
+      prototype.registerHybridMethod("checkTransferAmount", &HybridPocketlyCoreSpec::checkTransferAmount);
+      prototype.registerHybridMethod("reviewTransfer", &HybridPocketlyCoreSpec::reviewTransfer);
+      prototype.registerHybridMethod("confirmTransfer", &HybridPocketlyCoreSpec::confirmTransfer);
+      prototype.registerHybridMethod("getTransferStatus", &HybridPocketlyCoreSpec::getTransferStatus);
+      prototype.registerHybridMethod("setDailyLimit", &HybridPocketlyCoreSpec::setDailyLimit);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);
       prototype.registerHybridMethod("subscribePrices", &HybridPocketlyCoreSpec::subscribePrices);

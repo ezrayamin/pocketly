@@ -3,6 +3,7 @@ package com.pocketly.shared.data
 import app.cash.sqldelight.db.SqlDriver
 import com.pocketly.shared.data.db.Rows.toDomain
 import com.pocketly.shared.db.cache.CacheDatabase
+import com.pocketly.shared.domain.Contact
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
@@ -33,8 +34,38 @@ internal class CacheStore(driver: SqlDriver) {
         q.deleteSyncMeta()
     }
 
+    /** Server rows in; a placeholder whose server row has arrived goes (ADR-0014 §4). */
     fun upsertMany(transactions: List<Transaction>) = db.transaction {
         transactions.forEach { tx -> write(tx, ifAbsent = false) }
+        q.dropSettledPlaceholders()
+    }
+
+    fun upsert(tx: Transaction) = upsertMany(listOf(tx))
+
+    fun delete(id: String) {
+        q.deleteTransaction(id)
+    }
+
+    /** The server's row for this key if the replica has it, else the app's placeholder. */
+    fun getByIdempotencyKey(key: String): Transaction? = q.getByIdempotencyKey(key).executeAsOneOrNull()?.toDomain()
+
+    /** FR-TRF-01: people this wallet sent to, most recent first. */
+    fun recentRecipients(limit: Long): List<Contact> = q.recentRecipients(limit).executeAsList().map {
+        Contact(it.counterparty_id!!, it.counterparty_name!!, it.counterparty_phone!!)
+    }
+
+    /**
+     * Optimistic wallet update (product §6.1 step 8): what a transfer just did to the balance and
+     * today's usage, until the next refresh brings the server's numbers. Keeps cachedAt.
+     */
+    fun adjustWallet(balanceDelta: Long, usedDelta: Long): Wallet? {
+        val (cached, cachedAt) = getWallet() ?: return null
+        val wallet = cached.copy(
+            balance = Money(cached.balance.minor + balanceDelta),
+            usedToday = Money(maxOf(0L, cached.usedToday.minor + usedDelta)),
+        )
+        upsertWallet(wallet, cachedAt)
+        return wallet
     }
 
     /** BM-04 write step: inserts rows whose id isn't cached yet; returns how many were inserted. */
@@ -106,13 +137,16 @@ internal class CacheStore(driver: SqlDriver) {
         }
     }
 
-    private companion object {
-        val CURSOR = Regex("""^(\d+):(.+)$""")
-        const val META_SYNC_TOKEN = "syncToken"
-        const val META_LAST_SYNCED_AT = "lastSyncedAt"
-        const val META_INSTALL_ID = "installId"
+    companion object {
+        /** ADR-0014 §4: ids of the app's own pending rows, until the server's row replaces them. */
+        const val PLACEHOLDER_PREFIX = "local-"
+
+        private val CURSOR = Regex("""^(\d+):(.+)$""")
+        private const val META_SYNC_TOKEN = "syncToken"
+        private const val META_LAST_SYNCED_AT = "lastSyncedAt"
+        private const val META_INSTALL_ID = "installId"
 
         /** ",A,B," for the shared SQL's instr() filter; "" = no filter. */
-        fun filterList(values: List<String>?) = if (values.isNullOrEmpty()) "" else values.joinToString(",", ",", ",")
+        private fun filterList(values: List<String>?) = if (values.isNullOrEmpty()) "" else values.joinToString(",", ",", ",")
     }
 }

@@ -45,11 +45,12 @@ namespace margelo::nitro::pocketly {
     double failureRatePercent     SWIFT_PRIVATE;
     std::optional<double> normalLatencyMs     SWIFT_PRIVATE;
     std::optional<double> readTimeoutMs     SWIFT_PRIVATE;
+    std::optional<double> writeTimeoutMs     SWIFT_PRIVATE;
     std::optional<double> seed     SWIFT_PRIVATE;
 
   public:
     NetworkSimulation() = default;
-    explicit NetworkSimulation(NetworkMode mode, double failureRatePercent, std::optional<double> normalLatencyMs, std::optional<double> readTimeoutMs, std::optional<double> seed): mode(mode), failureRatePercent(failureRatePercent), normalLatencyMs(normalLatencyMs), readTimeoutMs(readTimeoutMs), seed(seed) {}
+    explicit NetworkSimulation(NetworkMode mode, double failureRatePercent, std::optional<double> normalLatencyMs, std::optional<double> readTimeoutMs, std::optional<double> writeTimeoutMs, std::optional<double> seed): mode(mode), failureRatePercent(failureRatePercent), normalLatencyMs(normalLatencyMs), readTimeoutMs(readTimeoutMs), writeTimeoutMs(writeTimeoutMs), seed(seed) {}
 
   public:
     friend bool operator==(const NetworkSimulation& lhs, const NetworkSimulation& rhs) = default;
@@ -69,6 +70,7 @@ namespace margelo::nitro {
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "failureRatePercent"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "normalLatencyMs"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs"))),
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed")))
       );
     }
@@ -78,6 +80,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "failureRatePercent"), JSIConverter<double>::toJSI(runtime, arg.failureRatePercent));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "normalLatencyMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.normalLatencyMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.readTimeoutMs));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.writeTimeoutMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "seed"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.seed));
       return obj;
     }
@@ -93,6 +96,7 @@ namespace margelo::nitro {
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "failureRatePercent")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "normalLatencyMs")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs")))) return false;
+      if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed")))) return false;
       return true;
     }

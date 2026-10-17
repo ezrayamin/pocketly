@@ -143,6 +143,38 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const ContactSearch& /* result */)>
+  Func_void_ContactSearch create_Func_void_ContactSearch(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_ContactSearch::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const ContactSearch& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const TransferDraft& /* result */)>
+  Func_void_TransferDraft create_Func_void_TransferDraft(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_TransferDraft::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const TransferDraft& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const TransferReview& /* result */)>
+  Func_void_TransferReview create_Func_void_TransferReview(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_TransferReview::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const TransferReview& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const TransferResult& /* result */)>
+  Func_void_TransferResult create_Func_void_TransferResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_TransferResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const TransferResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::function<void(const std::vector<PriceTick>& /* ticks */)>
   Func_void_std__vector_PriceTick_ create_Func_void_std__vector_PriceTick_(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_PriceTick_::fromUnsafe(swiftClosureWrapper);

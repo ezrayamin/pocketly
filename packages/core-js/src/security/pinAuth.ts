@@ -100,6 +100,12 @@ export class PinAuth {
   private readonly iterations: number;
   private queue: Promise<unknown> = Promise.resolve();
   private bound = false;
+  /**
+   * The verified phone once read (ADR-0014 §6): undefined = not read yet, null = none. Not a
+   * secret, and it only changes through rememberVerifiedPhone or a wipe, which update it here,
+   * so transfers don't read secure storage for it on every screen.
+   */
+  private phone: string | null | undefined;
 
   constructor(options: PinAuthOptions) {
     this.store = guarded(options.store);
@@ -156,6 +162,7 @@ export class PinAuth {
     return this.serial(async () => {
       const pinSet = (await this.readRecord()) !== undefined;
       const phone = (await this.readSession())?.phone;
+      this.phone = phone ?? null;
       const now = this.clock();
       const { failedAttempts, lockedUntil } = await this.readLockout(now, pinSet);
       const state: AuthState = lockedUntil > now ? { pinSet, failedAttempts, lockedUntil } : { pinSet, failedAttempts };
@@ -181,6 +188,7 @@ export class PinAuth {
 
   resetAuth(): Promise<void> {
     return this.serial(async () => {
+      this.phone = undefined;
       await this.store.clear();
       await this.store.set(SECURE_KEYS.installId, (await this.marker.get())!);
     });
@@ -188,7 +196,24 @@ export class PinAuth {
 
   /** ADR-0013: after VERIFIED, the phone (and the server's session token) belong to this install. */
   rememberVerifiedPhone(phone: string, token: string): Promise<void> {
-    return this.serial(() => this.store.set(SECURE_KEYS.session, JSON.stringify({ phone, token, pinCreated: false })));
+    return this.serial(async () => {
+      await this.store.set(SECURE_KEYS.session, JSON.stringify({ phone, token, pinCreated: false }));
+      this.phone = phone;
+    });
+  }
+
+  /**
+   * This install's verified phone (E.164), or undefined. From memory after the first read: the
+   * lock screen's getAuthState fills it at launch, so the Send flow doesn't touch secure storage.
+   */
+  async verifiedPhone(): Promise<string | undefined> {
+    if (this.phone !== undefined) return this.phone ?? undefined;
+    return this.serial(async () => {
+      await this.readRecord(); // a corrupt PIN record is dealt with first, as in getAuthState
+      const phone = (await this.readSession())?.phone;
+      this.phone = phone ?? null;
+      return phone;
+    });
   }
 
   /**
@@ -242,6 +267,7 @@ export class PinAuth {
     const installed = await this.marker.get();
     if (installed !== undefined && installed === (await this.store.get(SECURE_KEYS.installId))) return;
     // Secrets left by an earlier install (or none at all): start clean.
+    this.phone = undefined;
     await this.store.clear();
     const id = installed ?? toHex(this.crypto.randomBytes(16));
     if (installed === undefined) await this.marker.set(id);
@@ -254,6 +280,7 @@ export class PinAuth {
     if (encoded === undefined) return undefined;
     const record = decodePinRecord(encoded, PIN_SALT_BYTES, PIN_HASH_BYTES);
     if (record === undefined) {
+      this.phone = undefined;
       await this.store.clear();
       await this.store.set(SECURE_KEYS.installId, (await this.marker.get())!);
     }

@@ -9,6 +9,10 @@ import type { SqlQuery } from './sql.generated';
  */
 export type SqlValue = string | number | null;
 export type SqlRow = Record<string, SqlValue>;
+export interface SqlCommand {
+  sql: string;
+  values: readonly SqlValue[];
+}
 
 export interface SqlDriver {
   /** DDL / pragmas. */
@@ -18,6 +22,8 @@ export interface SqlDriver {
   run(sql: string, values: readonly SqlValue[]): Promise<number>;
   /** The same statement for many value lists, in one transaction. Returns total rows affected. */
   runMany(sql: string, rows: readonly (readonly SqlValue[])[]): Promise<number>;
+  /** Different statements in one transaction: all of them apply, or none (Kotlin: `db.transaction {}`). */
+  batch(commands: readonly SqlCommand[]): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -37,13 +43,29 @@ export function bind(query: SqlQuery, params: Readonly<Record<string, SqlValue>>
   return [...values];
 }
 
-/** Creates the schema on a new database (PRAGMA user_version 0 → 1). */
-export async function migrate(driver: SqlDriver, schema: readonly string[]): Promise<void> {
+/**
+ * Like SQLDelight's driver: a new database (PRAGMA user_version 0) gets the current schema; an
+ * older one runs `<n>.sqm` for each version n it's behind. Each step is one transaction.
+ */
+export async function migrate(
+  driver: SqlDriver,
+  schema: readonly string[],
+  version = 1,
+  migrations: Readonly<Record<number, readonly string[]>> = {},
+): Promise<void> {
   const [row] = await driver.query('PRAGMA user_version', []);
-  if (Number(row?.user_version ?? 0) === 0) {
-    for (const statement of schema) {
-      await driver.exec(statement);
-    }
-    await driver.exec('PRAGMA user_version = 1');
+  const current = Number(row?.user_version ?? 0);
+  if (current === 0) {
+    await inTransaction(driver, schema, version);
+    return;
   }
+  for (let from = current; from < version; from++) {
+    const steps = migrations[from];
+    if (steps === undefined) throw new CoreError('SERVER_ERROR', `no migration from schema version ${from}`);
+    await inTransaction(driver, steps, from + 1);
+  }
+}
+
+function inTransaction(driver: SqlDriver, statements: readonly string[], version: number): Promise<void> {
+  return driver.batch([...statements, `PRAGMA user_version = ${version}`].map((sql) => ({ sql, values: [] })));
 }

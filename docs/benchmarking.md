@@ -161,6 +161,23 @@ Record each device's **model, chipset, RAM, Android version and build number** i
   points, not by CV.** A few frames move a 0.8% rate by a third, so its CV says nothing about
   the environment. `collect.ts` doesn't flag their CV; the shift and its CI are in points.
   (Added 2026-10-11, during that session's write-up.)
+- **Rates under 5% are judged in absolute percentage points, for meaningfulness too** (added
+  2026-10-17, before the BM-07 rerun). The rule above covered only the CV; a relative change
+  still decided "meaningful", so a thread's CPU going from 4.6% to 4.2% (−0.4 points, −8.9%)
+  counted as a difference. Now, when both builds' medians are under 5% (janky frames, a thread's
+  CPU), a difference is meaningful only if the medians differ by **at least 1 point** and the
+  IQRs don't overlap.
+- **Short BM-07 steps are frame-quantized** (added 2026-10-17, before the BM-07 rerun). A step
+  shorter than ~3 frames (median under 50 ms at the app's 60 Hz) moves by whole frames: a frame
+  or two of scheduling is a large share of 20–30 ms. The CV rule doesn't apply to them, and a
+  difference is meaningful only if the shift is **at least one frame (16.7 ms)** with
+  non-overlapping IQRs. Longer steps follow the normal rules.
+- **A difference becomes a finding only when it is meaningful in two sessions** (added
+  2026-10-17, after BM-07's `mid-04` and `mid-05`). One session that passes the rule above (>5%
+  with non-overlapping IQRs, or a special case) is reported as *open*, with both sessions' numbers,
+  until a second session on the same code (or a trace that explains it) agrees. Example: BM-07's
+  amount step, kmpCore −13 ms in `mid-04` (not meaningful) and −33 ms in `mid-05` (meaningful):
+  open. Results already confirmed across sessions (for instance BM-02's control) stay as they are.
 - **Keep every iteration that completed; exclude only failed ones**, and report how many were
   excluded. Flashlight: status `SUCCESS` is kept even if its trace lost events (that affects
   the frame-time trace of that iteration, not whether it ran). Harness: a cold start whose
@@ -393,6 +410,25 @@ iOS has no equivalent yet.
   could be avoided by hashing in chunks that yield to the event loop (e.g. via `setTimeout`),
   which keeps the UI responsive but makes the total longer; the total time is the real problem
   either way. Report it as a what-if next to BM-11, never as the shipped unlock time. Touches no secrets, so any install works.
+- **BM-07 drives the flow with adb input, and the app times its own steps** (decided 2026-10-17,
+  before any BM-07 session). Maestro 2.11's driver died on the first tap on the vivo V2538, as in
+  BM-02. `bm-07-run.sh` runs `bm-07-flow.sh` under Flashlight: the cold start with launch
+  arguments (dataset reset to seed 42 / 200 entries, `normalLatencyMs` 300) and an unlock on the
+  lock screen with the in-app PIN, as every real session starts (`skipLock` until
+  `2026-10-17_mid-03`; changed with ADR-0014's in-memory phone, which the lock screen's auth read
+  fills), is the `--beforeEachCommand`; the measured `--testCommand` taps Send → Andi → 150 → Review → Confirm
+  → PIN at fixed times (1.5 s apart, 4 s after the PIN), reading nothing from the phone, so every
+  iteration makes the same gestures and FPS/CPU cover the same window; the `--afterEachCommand`
+  checks the result is Sent. Because the pacing is fixed, `flowMs` (Flashlight's iteration time)
+  says little; the comparison is in the **step latencies** the app records itself with
+  `performance.now()` (perf bundles only, `src/bench/flowMarks.tsx`): Send tap → recipients on
+  screen, contact tap → amount screen, Review tap → review screen, Confirm tap → PIN screen, and
+  PIN complete → result (PBKDF2 × 600,000, as BM-11, plus the 300 ms submit), with `appTotal`
+  their sum. The result screen renders the marks in a hidden element that the runner reads with
+  `uiautomator` after the measured window: logcat is not used because this ROM rate-limits app
+  logging (`persist.log.ratelimit=1`) and dropped the marks. Biometrics stay off (the prompt
+  needs a finger). Same rounds as BM-02: 5 alternating blocks × 2 iterations per build, one
+  calibration flow and one warm-up per build first, the 40 °C gate between blocks.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
 ## 7. Results Storage

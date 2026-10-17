@@ -9,6 +9,7 @@ import com.pocketly.shared.domain.BiometricUnlockOutcome
 import com.pocketly.shared.domain.BiometricUnlockResult
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
+import com.pocketly.shared.domain.TransferAuthOutcome
 import com.pocketly.shared.domain.UnlockOutcome
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -133,6 +134,40 @@ class BiometricAuthenticator(
                 }
                 // Never touches the PIN counter; a running lockout stays and the user is told about it.
                 return BiometricUnlockResult(BiometricUnlockOutcome.UNLOCKED, pinLockedOut = pin.withStore { pin.lockedOutNow() })
+            }
+        }
+    }
+
+    /**
+     * FR-TRF-04 (ADR-0012 §1, ADR-0014 §3): the biometric key signs this transfer's message
+     * (amount, recipient, idempotency key) and the core verifies it. No challenge: the message
+     * names one attempt, and sending that attempt again is idempotent anyway. Failures follow
+     * [unlock]: KEY_INVALIDATED and FAILED turn biometrics off; temporary ones change nothing.
+     */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun approveTransfer(amount: Long, recipientId: String, idempotencyKey: String, prompt: BiometricPromptText): TransferAuthOutcome {
+        val stored = pin.withStore { it.get(PinAuthenticator.KEY_BIOMETRIC_PUBLIC_KEY) }
+            ?: throw CoreException(ErrorCode.NOT_FOUND, "biometrics are not enabled")
+        val bytes = BiometricMessages.transfer(amount, recipientId, idempotencyKey).encodeToByteArray()
+        val result = try {
+            signer.sign(bytes, prompt)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return TransferAuthOutcome.UNAVAILABLE
+        }
+        return when (result) {
+            SignResult.Cancelled -> TransferAuthOutcome.CANCELLED
+            SignResult.LockedOut -> TransferAuthOutcome.BIOMETRIC_LOCKED_OUT
+            SignResult.Invalidated -> {
+                disable()
+                TransferAuthOutcome.KEY_INVALIDATED
+            }
+            is SignResult.Signed -> if (crypto.verifyP256(stored.hexToByteArray(), bytes, result.signature)) {
+                TransferAuthOutcome.OK
+            } else {
+                disable()
+                TransferAuthOutcome.FAILED
             }
         }
     }

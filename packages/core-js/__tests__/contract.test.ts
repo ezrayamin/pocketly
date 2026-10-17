@@ -8,5 +8,6 @@ runContractSuite('core-js', () => {
     core,
     bench: createBench(core),
     resetDataWithExtras: (config, extraTransactions) => core['reset']({ ...config, extraTransactions }),
+    advanceServerClock: (ms) => core['backend'].advanceClock(ms),
   };
 });

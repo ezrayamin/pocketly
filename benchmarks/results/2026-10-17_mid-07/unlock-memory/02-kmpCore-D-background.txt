@@ -1,0 +1,68 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 2470781 Realtime: 2470781
+
+** MEMINFO in pid 32668 [com.pocketly.kmp] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap    14223    14116       12     9292    15600    35424    25881     6002
+  Dalvik Heap     7164     4644      180      418    10848    12598     6299     6299
+ Dalvik Other      533      440        0     1053     1016                           
+        Stack      404      404        0      456      408                           
+       Ashmem       19        0        0        0     1168                           
+      Gfx dev        0        0        0        0        4                           
+    Other dev      119        0       36        0     1120                           
+     .so mmap     3462       96       28      199    45604                           
+    .jar mmap     1999        0       28        0    47920                           
+    .apk mmap    15535       12    15084      576    17556                           
+    .ttf mmap      474        0       52        0     1320                           
+    .dex mmap     4339        0     4328        4     5116                           
+    .oat mmap      561        0        0        0    18732                           
+    .art mmap     1957      208      216      786    21128                           
+   Other mmap      183        4        0        0     1964                           
+    GL mtrack      384      384        0        0      384                           
+      Unknown     5354     5088      196     3880     5968                           
+        TOTAL    73374    25396    20160    16664   195856    48022    32180    12301
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:     5068                          31976
+         Native Heap:    14116                          15600
+                Code:    19628                         136368
+               Stack:      404                            408
+            Graphics:      384                            388
+       Private Other:     5956
+              System:    27818
+             Unknown:                                   11116
+ 
+           TOTAL PSS:    73374            TOTAL RSS:   195856       TOTAL SWAP PSS:    16664
+ 
+ Objects
+               Views:      267         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       48        AssetManagers:        0
+       Local Binders:       21        Proxy Binders:       69
+       Parcel memory:       10         Parcel count:       42
+    Death Recipients:        3             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+   Bitmap (malloced):       26                           2547
+    Other (malloced):     1925                            182
+ Other (nonmalloced):      115                             84
+ 
+ SQL
+         MEMORY_USED:      327
+  PAGECACHE_OVERFLOW:      178          MALLOC_SIZE:       46
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b) cache hits cache misses cache size  Dbname
+PER CONNECTION STATS
+         4       80            110   236    36    12  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db
+         4       72            123   218    38    12  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db
+POOL STATS
+     cache hits  cache misses    cache size  Dbname
+            236            37           273  /data/user/0/com.pocketly.kmp/databases/pocketly-server.db
+            218            39           257  /data/user/0/com.pocketly.kmp/databases/pocketly-cache.db

@@ -1,0 +1,43 @@
+# NFR-TEST-04: transfer success (F5). Perf build of either core, onboarded with Pocketly's
+# in-app test PIN, biometrics off.
+#   maestro test -e APP_ID=com.pocketly.kmp -e PIN=482915 apps/mobile/e2e/transfer-success.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks were run with adb input (2026-10-17). This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+- assertVisible:
+    id: "balance"
+- tapOn:
+    id: "quick-send"
+- tapOn:
+    id: "contact-u-01"
+- tapOn:
+    id: "amount-key-1"
+- tapOn:
+    id: "amount-key-5"
+- tapOn:
+    id: "amount-key-0"
+- assertVisible: "Review $150.00"
+- tapOn:
+    id: "amount-review"
+- assertVisible: "Confirm and send"
+- tapOn:
+    id: "review-confirm"
+- runFlow:
+    file: enter-pin.yaml
+- assertVisible:
+    id: "send-result-success"
+- assertVisible: "Sent"
+- tapOn:
+    id: "result-done"
+- assertVisible:
+    id: "balance"

@@ -1,5 +1,5 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
+import type { Contact, Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
 import { CACHE_SCHEMA, CACHE_SQL } from './db/sql.generated';
 import { rowToTransaction, transactionValues } from './db/rows';
 import { bind, migrate, type SqlDriver } from './db/sqlDriver';
@@ -8,6 +8,9 @@ const CURSOR = /^(\d+):(.+)$/;
 const META_SYNC_TOKEN = 'syncToken';
 const META_LAST_SYNCED_AT = 'lastSyncedAt';
 const META_INSTALL_ID = 'installId';
+
+/** ADR-0014 §4: ids of the app's own pending rows, until the server's row replaces them. */
+export const PLACEHOLDER_PREFIX = 'local-';
 
 /** ",A,B," for the shared SQL's instr() filter; '' = no filter. */
 function filterList(values: readonly string[] | undefined): string {
@@ -42,8 +45,49 @@ export class CacheStore {
     await this.db.run(CACHE_SQL.deleteSyncMeta.sql, []);
   }
 
+  /** Server rows in; a placeholder whose server row has arrived goes (ADR-0014 §4). */
   async upsertMany(transactions: readonly Transaction[]): Promise<void> {
     await this.db.runMany(CACHE_SQL.upsertTransaction.sql, transactions.map(transactionValues));
+    await this.db.run(CACHE_SQL.dropSettledPlaceholders.sql, []);
+  }
+
+  async upsert(tx: Transaction): Promise<void> {
+    await this.upsertMany([tx]);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.db.run(CACHE_SQL.deleteTransaction.sql, [id]);
+  }
+
+  /** The server's row for this key if the replica has it, else the app's placeholder. */
+  async getByIdempotencyKey(key: string): Promise<Transaction | undefined> {
+    const [row] = await this.db.query(CACHE_SQL.getByIdempotencyKey.sql, [key]);
+    return row ? rowToTransaction(row) : undefined;
+  }
+
+  /** FR-TRF-01: people this wallet sent to, most recent first. */
+  async recentRecipients(limit: number): Promise<Contact[]> {
+    return (await this.db.query(CACHE_SQL.recentRecipients.sql, [limit])).map((r) => ({
+      userId: r.counterparty_id as string,
+      name: r.counterparty_name as string,
+      phone: r.counterparty_phone as string,
+    }));
+  }
+
+  /**
+   * Optimistic wallet update (product §6.1 step 8): what a transfer just did to the balance and
+   * today's usage, until the next refresh brings the server's numbers. Keeps cachedAt.
+   */
+  async adjustWallet(balanceDelta: number, usedDelta: number): Promise<Wallet | undefined> {
+    const cached = await this.getWallet();
+    if (cached === undefined) return undefined;
+    const wallet = {
+      ...cached.wallet,
+      balance: cached.wallet.balance + balanceDelta,
+      usedToday: Math.max(0, cached.wallet.usedToday + usedDelta),
+    };
+    await this.upsertWallet(wallet, cached.cachedAt);
+    return wallet;
   }
 
   /** BM-04 write step: inserts rows whose id isn't cached yet; returns how many were inserted. */

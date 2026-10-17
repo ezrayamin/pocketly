@@ -143,7 +143,14 @@ function collectStartup(dir: string, scenario: string, rows: Row[], verdicts: st
   for (const [metric, byBuild] of Object.entries(values)) compare(scenario, metric, 'ms', byBuild, rows, verdicts);
 }
 
-/** Stats per build, kmpCore − jsCore shift, and the §4.3 verdict (>5% and non-overlapping IQRs). */
+/** §4.3: rates under 5% are judged in points; this many make a difference. */
+const RATE_MIN_POINTS = 1;
+/** §4.3: one frame at the 60 Hz the app renders at on the V2538 (BM-02 note). */
+const FRAME_MS = 1000 / 60;
+/** §4.3: BM-07 steps shorter than this (~3 frames) are frame-quantized. */
+const FRAME_QUANTIZED_MS = 50;
+
+/** Stats per build, kmpCore − jsCore shift, and the §4.3 verdict (>5% and non-overlapping IQRs, or a special case). */
 function compare(scenario: string, metric: string, unit: string, byBuild: Record<Build, number[]>, rows: Row[], verdicts: string[]) {
   const s = { jsCore: stats(byBuild.jsCore), kmpCore: stats(byBuild.kmpCore) };
   for (const build of BUILDS) rows.push({ scenario, metric, build, unit, stats: s[build] });
@@ -152,19 +159,33 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
   const overlap = s.kmpCore.p25 <= s.jsCore.p75 && s.jsCore.p25 <= s.kmpCore.p75;
   const p = mannWhitney(byBuild.jsCore, byBuild.kmpCore);
   const hl = hodgesLehmann(byBuild.jsCore, byBuild.kmpCore);
-  // §4.3: for timings, the CV rule applies only above a 2 ms median (timer precision); rates
-  // under 5% (janky frames) are judged in percentage points, not by CV.
-  const noisy = BUILDS.filter(
-    (b) => s[b].cv > 0.1 && (unit !== 'ms' || s[b].median > 2) && (unit !== '%' || s[b].median >= 5),
-  );
-  const meaningful = Math.abs(diff) > 0.05 && !overlap;
+  // §4.3 special cases (both written down before the sessions that use them):
+  // - rates under 5% (janky frames, a thread's CPU): judged in percentage points, not relative
+  //   change or CV; meaningful at ≥ RATE_MIN_POINTS with non-overlapping IQRs.
+  // - BM-07 steps under FRAME_QUANTIZED_MS (~3 frames at 60 Hz): frame-quantized, so no CV rule;
+  //   meaningful at ≥ one frame with non-overlapping IQRs.
+  // - other timings: the CV rule applies only above a 2 ms median (timer precision).
+  const rate = unit === '%' && BUILDS.every((b) => s[b].median < 5);
+  const frames = unit === 'ms' && metric.startsWith('step') && BUILDS.every((b) => s[b].median < FRAME_QUANTIZED_MS);
+  const noisy = BUILDS.filter((b) => s[b].cv > 0.1 && !rate && !frames && (unit !== 'ms' || s[b].median > 2));
+  const delta = s.kmpCore.median - s.jsCore.median;
+  const meaningful = rate
+    ? Math.abs(delta) >= RATE_MIN_POINTS && !overlap
+    : frames
+      ? Math.abs(hl.shift) >= FRAME_MS && !overlap
+      : Math.abs(diff) > 0.05 && !overlap;
+  const rule = rate
+    ? `rate < 5%: ≥ ${RATE_MIN_POINTS} point and non-overlapping IQRs`
+    : frames
+      ? `step < ${FRAME_QUANTIZED_MS} ms: ≥ one frame (${FRAME_MS.toFixed(1)} ms) and non-overlapping IQRs`
+      : '>5% and non-overlapping IQRs';
   const signed = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
   comparisons.push({ scenario, metric, unit, diffPct: diff * 100, shift: hl.shift, low: hl.low, high: hl.high, p, meaningful });
   verdicts.push(
     `${scenario} ${metric}: kmpCore vs jsCore median ${diff >= 0 ? '+' : ''}${(diff * 100).toFixed(1)}%, ` +
       `shift ${signed(hl.shift)} ${unit} (95% CI ${signed(hl.low)} to ${signed(hl.high)} ${unit}), ` +
       `IQRs ${overlap ? 'overlap' : "don't overlap"}, Mann-Whitney p=${p.toFixed(3)} → ` +
-      `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: >5% and non-overlapping IQRs)` +
+      `${meaningful ? 'MEANINGFUL difference' : 'no meaningful difference'} (rule: ${rule})` +
       (noisy.length ? ` · ⚠ CV > 10% for ${noisy.join(', ')}: rerun per §4.3` : ''),
   );
 }
@@ -174,7 +195,9 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
  * successful iteration. Each measure is a ~500 ms sample: fps (UI frames), cpu.perName (% per
  * thread, 100% = one core), ram (MB). mqt_v_js is React Native's JS thread.
  */
-const FLASHLIGHT_METRICS: { metric: string; unit: string; of: (m: FlashlightMeasure[]) => number }[] = [
+const FLASHLIGHT_METRICS: { metric: string; unit: string; of: (m: FlashlightMeasure[], time: number) => number }[] = [
+  // BM-07 only: the measured command's duration, from the Send tap to the result.
+  { metric: 'flowMs', unit: 'ms', of: (_m, time) => time },
   { metric: 'fps', unit: 'fps', of: (m) => mean(m.map((x) => x.fps)) },
   { metric: 'cpuTotal', unit: '%', of: (m) => mean(m.map((x) => sum(Object.values(x.cpu.perName)))) },
   { metric: 'cpuJsThread', unit: '%', of: (m) => mean(m.map((x) => x.cpu.perName.mqt_v_js ?? 0)) },
@@ -194,14 +217,15 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
   for (const file of readdirSync(raw).filter((f) => /^\d+-(jsCore|kmpCore)\.json$/.test(f)).sort()) {
     const build = file.split('-')[1].replace('.json', '') as Build;
     const data = JSON.parse(readFileSync(join(raw, file), 'utf8'));
-    for (const it of data.iterations as { status: string; measures: FlashlightMeasure[] }[]) {
+    for (const it of data.iterations as { status: string; time: number; measures: FlashlightMeasure[] }[]) {
       if (it.status !== 'SUCCESS' || it.measures.length === 0) {
         failed++;
         continue;
       }
       for (const { metric, of } of FLASHLIGHT_METRICS) {
+        if (metric === 'flowMs' && scenario !== 'BM-07') continue;
         values[metric] ??= { jsCore: [], kmpCore: [] };
-        values[metric][build].push(of(it.measures));
+        values[metric][build].push(of(it.measures, it.time));
       }
     }
   }
@@ -211,6 +235,53 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
   if (failed) verdicts.push(`${scenario}: ${failed} iteration(s) not SUCCESS, excluded`);
   collectGfxinfo(raw, scenario, rows, verdicts);
   collectTemperatures(raw, scenario, verdicts);
+  if (scenario === 'BM-07') collectFlowMarks(raw, scenario, rows, verdicts);
+}
+
+/**
+ * BM-07 step marks (bm-07-flow.sh verify → <scenario>/marks/<block>-<build>/<n>.txt, lines
+ * `flow-mark <name> <ms>` from performance.now(), read off the result screen). Each step is the app's own latency from the
+ * input to the next screen with its data: the driver's pacing and think time are left out.
+ * `appTotal` adds the steps up; Flashlight's per-iteration `time` (flowMs) includes them.
+ */
+const FLOW_STEPS: { metric: string; from: string; to: string }[] = [
+  { metric: 'stepRecipients', from: 'send-tap', to: 'recipients-shown' },
+  { metric: 'stepAmount', from: 'contact-tap', to: 'amount-shown' },
+  { metric: 'stepReview', from: 'review-tap', to: 'review-shown' },
+  { metric: 'stepPin', from: 'confirm-tap', to: 'pin-shown' },
+  { metric: 'stepConfirm', from: 'pin-complete', to: 'result-shown-SUCCESS' },
+];
+
+function collectFlowMarks(raw: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const dir = join(raw, 'marks');
+  if (!existsSync(dir)) return;
+  const values: Record<string, Record<Build, number[]>> = {};
+  let incomplete = 0;
+  for (const run of readdirSync(dir).filter((d) => /^\d+-(jsCore|kmpCore)$/.test(d)).sort()) {
+    const build = run.split('-')[1] as Build;
+    for (const file of readdirSync(join(dir, run)).filter((f) => /^\d+\.txt$/.test(f)).sort()) {
+      const marks = new Map<string, number>();
+      for (const line of readFileSync(join(dir, run, file), 'utf8').split('\n')) {
+        const m = /^flow-mark (\S+) ([\d.]+)/.exec(line.trim());
+        if (m && !marks.has(m[1])) marks.set(m[1], Number(m[2]));
+      }
+      const steps = FLOW_STEPS.map(({ from, to }) => (marks.get(to) ?? NaN) - (marks.get(from) ?? NaN));
+      if (steps.some((v) => !Number.isFinite(v))) {
+        incomplete++;
+        continue;
+      }
+      FLOW_STEPS.forEach(({ metric }, i) => {
+        values[metric] ??= { jsCore: [], kmpCore: [] };
+        values[metric][build].push(steps[i]);
+      });
+      values.appTotal ??= { jsCore: [], kmpCore: [] };
+      values.appTotal[build].push(sum(steps));
+    }
+  }
+  for (const metric of [...FLOW_STEPS.map((s) => s.metric), 'appTotal']) {
+    if (values[metric]) compare(scenario, metric, 'ms', values[metric], rows, verdicts);
+  }
+  if (incomplete) verdicts.push(`${scenario}: ${incomplete} iteration(s) with missing step marks, excluded`);
 }
 
 /**
@@ -552,6 +623,7 @@ function main() {
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectStartup(dir, 'BM-01-lock', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
+  collectFlashlight(dir, 'BM-07', rows, verdicts);
   for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);

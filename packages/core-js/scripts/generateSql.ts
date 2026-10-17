@@ -6,8 +6,8 @@
  *   yarn sql:generate        write the file
  *   yarn sql:generate --check  fail if it's out of date (CI)
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 const ROOT = resolve(__dirname, '../../..');
 const SOURCES = {
@@ -57,9 +57,26 @@ export interface SqlQuery {
   readonly params: readonly string[] | number;
 }
 `;
+/**
+ * SQLDelight migrations: `<n>.sqm` upgrades schema version n to n + 1, and the current version
+ * is the highest n + 1 (1 with none). New databases are created from the .sq file instead.
+ */
+function migrations(sqPath: string): Record<number, string[]> {
+  const dir = join(ROOT, dirname(sqPath));
+  const result: Record<number, string[]> = {};
+  for (const file of readdirSync(dir).filter((f) => /^\d+\.sqm$/.test(f)).sort()) {
+    result[Number(file.replace('.sqm', ''))] = parse(readFileSync(join(dir, file), 'utf8')).schema;
+  }
+  return result;
+}
+
 for (const [name, path] of Object.entries(SOURCES)) {
   const { schema, queries } = parse(readFileSync(join(ROOT, path), 'utf8'));
+  const upgrades = migrations(path);
+  const version = Math.max(0, ...Object.keys(upgrades).map(Number)) + 1;
   out += `\n/** ${path} */\nexport const ${name}_SCHEMA: readonly string[] = ${JSON.stringify(schema, null, 2)};\n`;
+  out += `\n/** Schema version (SQLDelight's: highest .sqm + 1). */\nexport const ${name}_VERSION = ${version};\n`;
+  out += `\n/** <n>.sqm: from version n to n + 1. */\nexport const ${name}_MIGRATIONS: Readonly<Record<number, readonly string[]>> = ${JSON.stringify(upgrades, null, 2)};\n`;
   out += `\nexport const ${name}_SQL = ${JSON.stringify(queries, null, 2)} as const satisfies Record<string, SqlQuery>;\n`;
 }
 

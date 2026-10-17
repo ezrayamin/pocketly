@@ -78,6 +78,13 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<BiometricEnableResult>> enableBiometrics(const std::string& pin, const BiometricPromptText& prompt) override;
     std::shared_ptr<Promise<void>> disableBiometrics() override;
     std::shared_ptr<Promise<BiometricUnlockResult>> unlockWithBiometrics(const BiometricPromptText& prompt) override;
+    std::shared_ptr<Promise<ContactSearch>> searchContacts(const std::string& query) override;
+    std::shared_ptr<Promise<TransferDraft>> startTransfer(const std::string& recipientId) override;
+    AmountCheck checkTransferAmount(const std::string& text) override;
+    std::shared_ptr<Promise<TransferReview>> reviewTransfer(double amount, const std::optional<std::string>& note) override;
+    std::shared_ptr<Promise<TransferResult>> confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) override;
+    std::shared_ptr<Promise<TransferResult>> getTransferStatus(const std::string& id) override;
+    std::shared_ptr<Promise<void>> setDailyLimit(double minor) override;
     std::string formatMoney(double minor) override;
     MoneyParseResult parseMoney(const std::string& input) override;
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;

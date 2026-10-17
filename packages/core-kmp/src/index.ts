@@ -6,11 +6,13 @@ import {
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
+  AmountCheck,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
   BiometricStatus,
   BiometricUnlockResult,
+  ContactSearch,
   Core,
   DatasetConfig,
   MoneyParseResult,
@@ -25,6 +27,10 @@ import type {
   Subscription,
   Transaction,
   TransactionPage,
+  TransferAuth,
+  TransferDraft,
+  TransferResult,
+  TransferReview,
   TxFilter,
   UnlockResult,
   Wallet,
@@ -151,6 +157,41 @@ export class KmpCore implements Core {
 
   unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult> {
     return this.native.unlockWithBiometrics(prompt).catch(rethrow);
+  }
+
+  async searchContacts(query: string): Promise<ContactSearch> {
+    const r = await this.native.searchContacts(query).catch(rethrow);
+    return withoutUndefined({ recent: r.recent, contacts: r.contacts, phoneLookup: r.phoneLookup });
+  }
+
+  startTransfer(recipientId: string): Promise<TransferDraft> {
+    return this.native.startTransfer(recipientId).catch(rethrow);
+  }
+
+  checkTransferAmount(text: string): AmountCheck {
+    let c: AmountCheck;
+    try {
+      c = this.native.checkTransferAmount(text);
+    } catch (e) {
+      throw toCoreError(e);
+    }
+    return withoutUndefined({ ok: c.ok, minor: c.minor, reason: c.reason, acceptInput: c.acceptInput, remainingBalance: c.remainingBalance });
+  }
+
+  async reviewTransfer(amount: number, note?: string): Promise<TransferReview> {
+    return withoutUndefined(await this.native.reviewTransfer(amount, note).catch(rethrow));
+  }
+
+  async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
+    return withoutUndefined(await this.native.confirmTransfer(id, auth).catch(rethrow));
+  }
+
+  async getTransferStatus(id: string): Promise<TransferResult> {
+    return withoutUndefined(await this.native.getTransferStatus(id).catch(rethrow));
+  }
+
+  setDailyLimit(minor: number): Promise<void> {
+    return this.native.setDailyLimit(minor).catch(rethrow);
   }
 
   formatMoney(minor: number): string {

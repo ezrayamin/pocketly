@@ -2,11 +2,13 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // NFR-ARCH-05: struct/enum types are NOT redeclared here. Nitrogen resolves them from
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
+  AmountCheck,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
   BiometricStatus,
   BiometricUnlockResult,
+  ContactSearch,
   DatasetSeed,
   MoneyParseResult,
   NetworkSimulation,
@@ -18,6 +20,10 @@ import type {
   SpendingSummary,
   Transaction,
   TransactionPage,
+  TransferAuth,
+  TransferDraft,
+  TransferResult,
+  TransferReview,
   TxFilter,
   UnlockResult,
   Wallet,
@@ -66,6 +72,15 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   enableBiometrics(pin: string, prompt: BiometricPromptText): Promise<BiometricEnableResult>;
   disableBiometrics(): Promise<void>;
   unlockWithBiometrics(prompt: BiometricPromptText): Promise<BiometricUnlockResult>;
+
+  // F5 (ADR-0014). Seven methods, kept coarse (ADR-0002): one struct per answer.
+  searchContacts(query: string): Promise<ContactSearch>;
+  startTransfer(recipientId: string): Promise<TransferDraft>;
+  checkTransferAmount(text: string): AmountCheck;
+  reviewTransfer(amount: number, note: string | undefined): Promise<TransferReview>;
+  confirmTransfer(id: string, auth: TransferAuth | undefined): Promise<TransferResult>;
+  getTransferStatus(id: string): Promise<TransferResult>;
+  setDailyLimit(minor: number): Promise<void>;
 
   formatMoney(minor: number): string;
   parseMoney(input: string): MoneyParseResult;

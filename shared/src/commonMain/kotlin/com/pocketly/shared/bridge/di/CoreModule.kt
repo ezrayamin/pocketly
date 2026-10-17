@@ -2,6 +2,7 @@ package com.pocketly.shared.bridge.di
 
 import com.pocketly.shared.bridge.PocketlyCore
 import com.pocketly.shared.data.CacheStore
+import com.pocketly.shared.data.CallKind
 import com.pocketly.shared.data.TimeZoneHolder
 import com.pocketly.shared.data.TimeoutWalletApi
 import com.pocketly.shared.data.WalletApi
@@ -28,19 +29,27 @@ internal fun coreModule(
     db: CoroutineDispatcher,
     pin: (InstallMarker) -> PinAuthenticator,
     biometric: (PinAuthenticator) -> BiometricAuthenticator,
-    /** The device clock (or a test clock) for the fake server's OTP side (ADR-0013). */
+    /** The device clock (or a test clock) for the fake server's OTP side (ADR-0013) and pending transfer rows. */
     clock: () -> Long,
+    /** Secure random for idempotency keys (ADR-0014). */
+    randomBytes: (Int) -> ByteArray,
 ) = module {
     single { TimeZoneHolder() }
     // ADR-0009: two databases, two files. Only the fake backend touches the server's.
-    single { FakeWalletApi(ServerStore(drivers.server()), get(), clock) }
+    single { FakeWalletApi(ServerStore(drivers.server()), get(), clock, serverDispatcher = db) }
     single { CacheStore(drivers.cache()) }
     // NFR-REL-01: the core only talks to the backend through a timeout.
     single<WalletApi> {
         val backend = get<FakeWalletApi>()
-        TimeoutWalletApi(backend) { backend.networkSimulation.readTimeoutMs.toLong() }
+        TimeoutWalletApi(backend) { kind ->
+            val simulation = backend.networkSimulation
+            (if (kind == CallKind.WRITE) simulation.writeTimeoutMs else simulation.readTimeoutMs).toLong()
+        }
     }
     single {
-        PocketlyCore(api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db, pin = pin, biometric = biometric)
+        PocketlyCore(
+            api = get(), backend = get(), cache = get(), timeZone = get(), initialDataset = initialDataset, db = db,
+            pin = pin, biometric = biometric, randomBytes = randomBytes, clock = clock,
+        )
     }
 }

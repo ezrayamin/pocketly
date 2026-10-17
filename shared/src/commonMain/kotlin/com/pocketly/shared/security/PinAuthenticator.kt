@@ -15,6 +15,7 @@ import kotlinx.serialization.json.put
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 
 /**
  * Where the current install's id lives outside secure storage: somewhere the OS deletes with the
@@ -89,6 +90,7 @@ class PinAuthenticator(
     suspend fun getAuthState(): AuthState = serial {
         val pinSet = readRecord() != null
         val phone = readSession()?.phone
+        cachedPhone = phone ?: NO_PHONE
         val now = clock()
         val state = readLockout(now, pinSet)
         AuthState(pinSet, state.failedAttempts, state.lockedUntil.takeIf { it > now }, phone)
@@ -117,6 +119,20 @@ class PinAuthenticator(
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
     suspend fun rememberVerifiedPhone(phone: String, token: String) = serial {
         store.put(KEY_SESSION, Session(phone, token, pinCreated = false).encode())
+        cachedPhone = phone
+    }
+
+    /**
+     * This install's verified phone (E.164), or null. From memory after the first read: the lock
+     * screen's getAuthState fills it at launch, so the Send flow doesn't touch secure storage.
+     */
+    @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
+    suspend fun verifiedPhone(): String? {
+        cachedPhone?.let { return it.takeIf { p -> p != NO_PHONE } }
+        return serial {
+            readRecord() // a corrupt PIN record is dealt with first, as in getAuthState
+            readSession()?.phone.also { cachedPhone = it ?: NO_PHONE }
+        }
     }
 
     /**
@@ -142,6 +158,13 @@ class PinAuthenticator(
         return readLockout(now, pinSet = true).lockedUntil > now
     }
 
+    /**
+     * The verified phone once read (ADR-0014 §6): null = not read yet, [NO_PHONE] = none. Not a
+     * secret, and it only changes through [rememberVerifiedPhone] or a wipe, which update it here.
+     */
+    @Volatile
+    private var cachedPhone: String? = null
+
     /** Runs [block] on [work] after every earlier call has finished, bound to this install. */
     private suspend fun <T> serial(block: suspend () -> T): T = withContext(work) {
         mutex.withLock {
@@ -157,12 +180,14 @@ class PinAuthenticator(
         val installed = marker.get()
         if (installed != null && installed == store.get(KEY_INSTALL_ID)) return
         // Secrets left by an earlier install (or none at all): start clean.
+        cachedPhone = null
         store.clear()
         val id = installed ?: crypto.randomBytes(16).toHex().also { marker.set(it) }
         store.put(KEY_INSTALL_ID, id)
     }
 
     private suspend fun wipe() {
+        cachedPhone = null
         store.clear()
         store.put(KEY_INSTALL_ID, marker.get()!!)
     }
@@ -224,6 +249,9 @@ class PinAuthenticator(
          * has been created yet, or while the PIN it created exists: losing the PIN record ends it.
          */
         const val KEY_SESSION = "session"
+
+        /** [cachedPhone]: read, and there is none (no E.164 number is empty). */
+        private const val NO_PHONE = ""
     }
 }
 

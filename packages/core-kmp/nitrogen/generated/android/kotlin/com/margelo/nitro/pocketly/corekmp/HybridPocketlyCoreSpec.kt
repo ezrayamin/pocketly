@@ -128,6 +128,34 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun searchContacts(query: String): Promise<ContactSearch>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun startTransfer(recipientId: String): Promise<TransferDraft>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun checkTransferAmount(text: String): AmountCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun reviewTransfer(amount: Double, note: String?): Promise<TransferReview>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun confirmTransfer(id: String, auth: TransferAuth?): Promise<TransferResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getTransferStatus(id: String): Promise<TransferResult>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setDailyLimit(minor: Double): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun formatMoney(minor: Double): String
   
   @DoNotStrip

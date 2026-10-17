@@ -68,6 +68,31 @@ LIMIT :limit;
 allTransactions:
 SELECT * FROM cache_transaction ORDER BY created_at DESC, id DESC;
 
+-- ADR-0014 §4: a transfer attempt's rows (the server's, or the app's local- placeholder), server's first.
+getByIdempotencyKey:
+SELECT * FROM cache_transaction WHERE idempotency_key = ?
+ORDER BY (id LIKE 'local-%'), updated_at DESC
+LIMIT 1;
+
+-- A placeholder goes once the server's row for the same key is in the replica.
+dropSettledPlaceholders:
+DELETE FROM cache_transaction
+WHERE id LIKE 'local-%'
+  AND idempotency_key IN (SELECT idempotency_key FROM cache_transaction WHERE id NOT LIKE 'local-%');
+
+deleteTransaction:
+DELETE FROM cache_transaction WHERE id = ?;
+
+-- FR-TRF-01: people this wallet sent to (pending or done), most recent first.
+recentRecipients:
+SELECT counterparty_id, counterparty_name, counterparty_phone, MAX(created_at) AS last_sent
+FROM cache_transaction
+WHERE type = 'TRANSFER_OUT' AND status IN ('SUCCESS', 'PENDING')
+  AND counterparty_kind = 'USER' AND counterparty_phone IS NOT NULL
+GROUP BY counterparty_id, counterparty_name, counterparty_phone
+ORDER BY last_sent DESC, counterparty_id
+LIMIT ?;
+
 countTransactions:
 SELECT COUNT(*) AS n FROM cache_transaction;
 
