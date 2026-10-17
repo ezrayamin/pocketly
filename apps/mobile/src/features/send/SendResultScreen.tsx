@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Share, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { FlowMarksProbe, flowMark } from '@pocketly/bench-app';
 import type { TransferResult } from '@pocketly/core-contract';
 import { Check, CircleAlert, CircleX, Clock, Copy, Share2 } from '../../components/icons';
 import { core } from '../../core';
@@ -32,6 +33,8 @@ export function SendResultScreen({ navigation, route }: Props) {
   const amount = core.formatMoney(review.amount);
   const tx = result.transaction;
   const copy = resultCopy(result);
+
+  useEffect(() => flowMark(`result-shown-${route.params.result.state}`), [route.params.result.state]); // BM-07
 
   // FR-TRF-07: balance and history update behind this screen.
   useEffect(() => {
@@ -195,6 +198,7 @@ export function SendResultScreen({ navigation, route }: Props) {
         )}
         {result.state === 'FAILED' && <TextButton label="Cancel" onPress={done} testID="result-cancel" />}
       </View>
+      {FlowMarksProbe && <FlowMarksProbe key={result.state} />}
       {retrying && <ProcessingView amount={amount} recipient={review.recipient.name} />}
     </SafeAreaView>
   );

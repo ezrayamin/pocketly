@@ -6,4 +6,12 @@ import type { BenchScenario } from './harness';
  * scenarios, no screen. Type-only imports keep the harness itself out of the bundle.
  */
 export const BENCH_SCENARIOS: readonly BenchScenario[] = [];
-export const BenchScreen: ComponentType<{ scenario: BenchScenario; runs: number; warmup: number; memory: boolean }> | null = null;
+export const BenchScreen: ComponentType<{
+  scenario: BenchScenario;
+  runs: number;
+  warmup: number;
+  memory: boolean;
+}> | null = null;
+/** BM-07 step marks: nothing outside perf bundles. */
+export const flowMark: (name: string) => void = () => {};
+export const FlowMarksProbe: ComponentType | null = null;

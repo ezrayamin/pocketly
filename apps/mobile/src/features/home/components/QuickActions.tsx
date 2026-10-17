@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { flowMark } from '@pocketly/bench-app';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../../navigation';
 import { ArrowUpRight, CreditCard, QrCode, ScanLine, type LucideIcon } from '../../../components/icons';
@@ -25,7 +26,14 @@ export function QuickActions() {
         <Pressable
           key={label}
           style={styles.action}
-          onPress={route ? () => navigation.navigate(route) : undefined}
+          onPress={
+            route
+              ? () => {
+                  flowMark('send-tap');
+                  navigation.navigate(route);
+                }
+              : undefined
+          }
           accessibilityRole="button"
           accessibilityLabel={label}
           accessibilityHint={route ? undefined : 'Coming soon'}

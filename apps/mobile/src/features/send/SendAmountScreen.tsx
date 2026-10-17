@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { flowMark } from '@pocketly/bench-app';
 import type { AmountCheck } from '@pocketly/core-contract';
 import { TRANSFER_NOTE_MAX_LENGTH } from '@pocketly/core-contract';
 import { CircleAlert } from '../../components/icons';
@@ -36,6 +37,7 @@ export function SendAmountScreen({ navigation, route }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const current = useMemo(() => check(text), [text]);
+  useEffect(() => flowMark('amount-shown'), []); // BM-07
   const fmt = (minor: number) => core.formatMoney(minor);
 
   const type = (key: string) => {
@@ -46,6 +48,7 @@ export function SendAmountScreen({ navigation, route }: Props) {
   const sendMax = () => setText(fmt(draft.maxAmount).replace(/[$,]/g, ''));
 
   const review = async () => {
+    flowMark('review-tap');
     if (!current.ok || current.minor === undefined) return;
     setBusy(true);
     setError(null);

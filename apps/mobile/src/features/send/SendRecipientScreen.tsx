@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { flowMark } from '@pocketly/bench-app';
 import type { Contact, ContactSearch } from '@pocketly/core-contract';
 import { Avatar } from '../../components/Avatar';
 import { ChevronRight, Search, UserSearch, WifiOff, X } from '../../components/icons';
@@ -29,6 +30,12 @@ export function SendRecipientScreen({ navigation }: Props) {
   const [attempt, setAttempt] = useState(0);
   const latest = useRef(0);
 
+  // BM-07: the list is on screen once the first search has answered.
+  const shown = result !== null;
+  useEffect(() => {
+    if (shown) flowMark('recipients-shown');
+  }, [shown]);
+
   useEffect(() => {
     const ticket = ++latest.current;
     const timer = setTimeout(
@@ -50,6 +57,7 @@ export function SendRecipientScreen({ navigation }: Props) {
   const choose = useCallback(
     async (contact: Contact) => {
       if (opening) return;
+      flowMark('contact-tap');
       setOpening(contact.userId);
       try {
         const draft = await core.startTransfer(contact.userId);

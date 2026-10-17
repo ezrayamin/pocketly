@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { flowMark } from '@pocketly/bench-app';
 import type { BiometricStatus } from '@pocketly/core-contract';
 import { Avatar } from '../../components/Avatar';
 import { core } from '../../core';
@@ -27,11 +28,14 @@ export function SendReviewScreen({ navigation, route }: Props) {
   const { sending, confirm } = useConfirmTransfer(review, navigation);
   const amount = core.formatMoney(review.amount);
 
+  useEffect(() => flowMark('review-shown'), []); // BM-07
+
   useEffect(() => {
     core.getBiometricStatus().then(setBiometrics, () => setBiometrics(null));
   }, []);
 
   const onConfirm = async () => {
+    flowMark('confirm-tap');
     setError(null);
     if (!biometrics?.enabled || !biometrics.available) {
       navigation.navigate('SendPin', { review });

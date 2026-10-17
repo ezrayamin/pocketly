@@ -1,0 +1,43 @@
+# BM-07: full transfer flow, Home → Send → amount → review → PIN → result (docs/benchmarking.md §6).
+# Perf build, onboarded with Pocketly's in-app test PIN, biometrics off. Every launch resets the
+# fake server's data (so the balance and today's limit are the same each run) and fixes its
+# latency at 300 ms. Maestro 2.11 dies on the vivo V2538 here, so sessions use
+# benchmarks/scripts/bm-07-run.sh (adb input + the app's own step marks) instead; this flow is
+# for devices where Maestro works.
+#   maestro test -e APP_ID=com.pocketly.kmp -e PIN=482915 benchmarks/maestro/bm-07-transfer.yaml
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+      pocketly.network.normalLatencyMs: 300
+- assertVisible:
+    id: "balance"
+- tapOn:
+    id: "quick-send"
+- tapOn:
+    id: "contact-u-01"
+- tapOn:
+    id: "amount-key-1"
+- tapOn:
+    id: "amount-key-5"
+- tapOn:
+    id: "amount-key-0"
+- tapOn:
+    id: "amount-review"
+- tapOn:
+    id: "review-confirm"
+- runFlow:
+    file: ../../apps/mobile/e2e/enter-pin.yaml
+- assertVisible:
+    id: "send-result-success"
+- tapOn:
+    id: "result-done"
+- assertVisible:
+    id: "balance"

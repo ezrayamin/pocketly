@@ -31,6 +31,7 @@ CHECKS=(
   "libPocketlyCoreKmpBench.so|lib|libPocketlyCoreKmpBench\\.so|kmpCore"
   "@noble/hashes|bundle|Hash should be wrapped by utils\\.createHasher|jsCore"
   "benchmark harness|bundle|bench-chunk|jsCore kmpCore"
+  "BM-07 flow marks|bundle|flow-marks|jsCore kmpCore"
   "BenchCore (staged ingest)|bundle|no ingest payload staged|jsCore"
   "PocketlyBench object|bundle|PocketlyBench|kmpCore"
   # Same contract index in both bundles; only jsCore's perf bench imports benchConstants.ts.

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { flowMark } from '@pocketly/bench-app';
 import type { BiometricStatus } from '@pocketly/core-contract';
 import { core } from '../../core';
 import type { RootStackParamList } from '../../navigation';
@@ -30,12 +31,15 @@ export function SendPinScreen({ navigation, route }: Props) {
   const { sending, confirm } = useConfirmTransfer(review, navigation);
   const clearRef = useRef<() => void>(() => {});
 
+  useEffect(() => flowMark('pin-shown'), []); // BM-07
+
   useEffect(() => {
     core.getBiometricStatus().then(setBiometrics, () => setBiometrics(null));
   }, []);
 
   const onComplete = useCallback(
     async (pin: string) => {
+      flowMark('pin-complete');
       setMessage(null);
       try {
         const result = await confirm({ method: 'PIN', pin });

@@ -5,3 +5,4 @@
  */
 export { BENCH_SCENARIOS } from './harness';
 export { BenchScreen } from './BenchScreen';
+export { FlowMarksProbe, flowMark } from './flowMarks';

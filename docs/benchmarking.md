@@ -393,6 +393,23 @@ iOS has no equivalent yet.
   could be avoided by hashing in chunks that yield to the event loop (e.g. via `setTimeout`),
   which keeps the UI responsive but makes the total longer; the total time is the real problem
   either way. Report it as a what-if next to BM-11, never as the shipped unlock time. Touches no secrets, so any install works.
+- **BM-07 drives the flow with adb input, and the app times its own steps** (decided 2026-10-17,
+  before any BM-07 session). Maestro 2.11's driver died on the first tap on the vivo V2538, as in
+  BM-02. `bm-07-run.sh` runs `bm-07-flow.sh` under Flashlight: the cold start with launch
+  arguments (dataset reset to seed 42 / 200 entries, `normalLatencyMs` 300, `skipLock`) is the
+  `--beforeEachCommand`; the measured `--testCommand` taps Send → Andi → 150 → Review → Confirm
+  → PIN at fixed times (1.5 s apart, 4 s after the PIN), reading nothing from the phone, so every
+  iteration makes the same gestures and FPS/CPU cover the same window; the `--afterEachCommand`
+  checks the result is Sent. Because the pacing is fixed, `flowMs` (Flashlight's iteration time)
+  says little; the comparison is in the **step latencies** the app records itself with
+  `performance.now()` (perf bundles only, `src/bench/flowMarks.tsx`): Send tap → recipients on
+  screen, contact tap → amount screen, Review tap → review screen, Confirm tap → PIN screen, and
+  PIN complete → result (PBKDF2 × 600,000, as BM-11, plus the 300 ms submit), with `appTotal`
+  their sum. The result screen renders the marks in a hidden element that the runner reads with
+  `uiautomator` after the measured window: logcat is not used because this ROM rate-limits app
+  logging (`persist.log.ratelimit=1`) and dropped the marks. Biometrics stay off (the prompt
+  needs a finger). Same rounds as BM-02: 5 alternating blocks × 2 iterations per build, one
+  calibration flow and one warm-up per build first, the 40 °C gate between blocks.
 - **BM-09** is reported as extra rows ("jsCore + profile", "kmpCore + profile"), not mixed into BM-01.
 
 ## 7. Results Storage

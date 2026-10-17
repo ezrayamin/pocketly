@@ -174,7 +174,9 @@ function compare(scenario: string, metric: string, unit: string, byBuild: Record
  * successful iteration. Each measure is a ~500 ms sample: fps (UI frames), cpu.perName (% per
  * thread, 100% = one core), ram (MB). mqt_v_js is React Native's JS thread.
  */
-const FLASHLIGHT_METRICS: { metric: string; unit: string; of: (m: FlashlightMeasure[]) => number }[] = [
+const FLASHLIGHT_METRICS: { metric: string; unit: string; of: (m: FlashlightMeasure[], time: number) => number }[] = [
+  // BM-07 only: the measured command's duration, from the Send tap to the result.
+  { metric: 'flowMs', unit: 'ms', of: (_m, time) => time },
   { metric: 'fps', unit: 'fps', of: (m) => mean(m.map((x) => x.fps)) },
   { metric: 'cpuTotal', unit: '%', of: (m) => mean(m.map((x) => sum(Object.values(x.cpu.perName)))) },
   { metric: 'cpuJsThread', unit: '%', of: (m) => mean(m.map((x) => x.cpu.perName.mqt_v_js ?? 0)) },
@@ -194,14 +196,15 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
   for (const file of readdirSync(raw).filter((f) => /^\d+-(jsCore|kmpCore)\.json$/.test(f)).sort()) {
     const build = file.split('-')[1].replace('.json', '') as Build;
     const data = JSON.parse(readFileSync(join(raw, file), 'utf8'));
-    for (const it of data.iterations as { status: string; measures: FlashlightMeasure[] }[]) {
+    for (const it of data.iterations as { status: string; time: number; measures: FlashlightMeasure[] }[]) {
       if (it.status !== 'SUCCESS' || it.measures.length === 0) {
         failed++;
         continue;
       }
       for (const { metric, of } of FLASHLIGHT_METRICS) {
+        if (metric === 'flowMs' && scenario !== 'BM-07') continue;
         values[metric] ??= { jsCore: [], kmpCore: [] };
-        values[metric][build].push(of(it.measures));
+        values[metric][build].push(of(it.measures, it.time));
       }
     }
   }
@@ -211,6 +214,53 @@ function collectFlashlight(dir: string, scenario: string, rows: Row[], verdicts:
   if (failed) verdicts.push(`${scenario}: ${failed} iteration(s) not SUCCESS, excluded`);
   collectGfxinfo(raw, scenario, rows, verdicts);
   collectTemperatures(raw, scenario, verdicts);
+  if (scenario === 'BM-07') collectFlowMarks(raw, scenario, rows, verdicts);
+}
+
+/**
+ * BM-07 step marks (bm-07-flow.sh verify → <scenario>/marks/<block>-<build>/<n>.txt, lines
+ * `flow-mark <name> <ms>` from performance.now(), read off the result screen). Each step is the app's own latency from the
+ * input to the next screen with its data: the driver's pacing and think time are left out.
+ * `appTotal` adds the steps up; Flashlight's per-iteration `time` (flowMs) includes them.
+ */
+const FLOW_STEPS: { metric: string; from: string; to: string }[] = [
+  { metric: 'stepRecipients', from: 'send-tap', to: 'recipients-shown' },
+  { metric: 'stepAmount', from: 'contact-tap', to: 'amount-shown' },
+  { metric: 'stepReview', from: 'review-tap', to: 'review-shown' },
+  { metric: 'stepPin', from: 'confirm-tap', to: 'pin-shown' },
+  { metric: 'stepConfirm', from: 'pin-complete', to: 'result-shown-SUCCESS' },
+];
+
+function collectFlowMarks(raw: string, scenario: string, rows: Row[], verdicts: string[]) {
+  const dir = join(raw, 'marks');
+  if (!existsSync(dir)) return;
+  const values: Record<string, Record<Build, number[]>> = {};
+  let incomplete = 0;
+  for (const run of readdirSync(dir).filter((d) => /^\d+-(jsCore|kmpCore)$/.test(d)).sort()) {
+    const build = run.split('-')[1] as Build;
+    for (const file of readdirSync(join(dir, run)).filter((f) => /^\d+\.txt$/.test(f)).sort()) {
+      const marks = new Map<string, number>();
+      for (const line of readFileSync(join(dir, run, file), 'utf8').split('\n')) {
+        const m = /^flow-mark (\S+) ([\d.]+)/.exec(line.trim());
+        if (m && !marks.has(m[1])) marks.set(m[1], Number(m[2]));
+      }
+      const steps = FLOW_STEPS.map(({ from, to }) => (marks.get(to) ?? NaN) - (marks.get(from) ?? NaN));
+      if (steps.some((v) => !Number.isFinite(v))) {
+        incomplete++;
+        continue;
+      }
+      FLOW_STEPS.forEach(({ metric }, i) => {
+        values[metric] ??= { jsCore: [], kmpCore: [] };
+        values[metric][build].push(steps[i]);
+      });
+      values.appTotal ??= { jsCore: [], kmpCore: [] };
+      values.appTotal[build].push(sum(steps));
+    }
+  }
+  for (const metric of [...FLOW_STEPS.map((s) => s.metric), 'appTotal']) {
+    if (values[metric]) compare(scenario, metric, 'ms', values[metric], rows, verdicts);
+  }
+  if (incomplete) verdicts.push(`${scenario}: ${incomplete} iteration(s) with missing step marks, excluded`);
 }
 
 /**
@@ -552,6 +602,7 @@ function main() {
   collectStartup(dir, 'BM-09', rows, verdicts);
   collectStartup(dir, 'BM-01-lock', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
+  collectFlashlight(dir, 'BM-07', rows, verdicts);
   for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);
     collectMemory(join(dir, scenario.toLowerCase()), scenario, rows, verdicts);
