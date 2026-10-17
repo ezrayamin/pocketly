@@ -341,6 +341,7 @@ iOS has no equivalent yet.
 | ID | Scenario | Metrics | Tool | Tests |
 |---|---|---|---|---|
 | **BM-01** | **Cold start → Home rendered** with 200 cached transactions | Time to initial display, time to fully drawn | Platform startup logs (§5 note) | H6 |
+| **BM-01-lock** | **Cold start → lock screen drawn** (added 2026-10-16), **release** builds, onboarded installs, biometrics off | Time to initial display, time to fully drawn (the lock screen's marker) | Platform startup logs, `TARGET=lock bm-01-startup.sh` | H6 |
 | **BM-02** | **Scroll History, 1,000 items** (fling top → bottom ×3) | UI FPS, CPU per thread (JS, UI, Render), RAM. Flashlight has no JS FPS or frame overrun on Android | Flashlight + adb input (§5 note) | H4 (control) |
 | **BM-03** | **Spending summary from 10,000 ledger entries** (group by category and day, totals, balance check) | End-to-end ms, compute ms | In-app harness | H1 |
 | **BM-04** | **Ingest 5,000 transactions** from JSON → validate → write to SQLite cache | End-to-end ms, peak memory | In-app harness + `dumpsys meminfo` | H1 |
@@ -358,6 +359,17 @@ iOS has no equivalent yet.
 - **BM-02 is the control.** If the two builds differ noticeably, the setup is skewed (different dependencies, a debug build, etc.). Fix it before trusting any other result.
 - **BM-04 vs BM-04b** (added 2026-10-11): BM-04 passes the 1.3 MB payload from JS into the core inside the timed call, which is the path when data starts in JS. In a KMP app whose core owns the network, the response arrives in Kotlin and never crosses the bridge; BM-04b measures that path. Report both.
 - **BM-04 must follow BM-PAR-03.** The storage libraries differ (§3.3), so report "parse + validate" (`lastComputeMs`) and "write to DB" (`lastStorageMs`) as separate numbers.
+- **BM-01-lock is what users see first** (decided 2026-10-16, before any BM-01-lock session).
+  Since slice 5 every cold start opens on the lock screen (FR-LOCK-01), which is the same screen
+  in both builds, while BM-01 needs `pocketly.skipLock` on perf builds to reach Home. Release
+  builds ignore launch arguments, so BM-01-lock measures them as shipped: the lock screen renders
+  `<FullyDrawnMarker />` and reports "fully drawn" (Home mounts only after unlock, so nothing
+  else can report first). Before it reaches the screen, each core reads its auth state from
+  secure storage (`getAuthState`). Both builds must be onboarded with biometrics off, or the
+  biometric prompt would sit over the screen; the runner installs the release APKs over the
+  onboarded apps (`adb install -r`, same ids and signing key) and never uninstalls. Same rounds
+  and order as BM-01 (alternating, 2 warm-up + 20 measured, compilation `verify`). The PIN entry
+  itself is not timed here (BM-11).
 - **BM-01 reads the replica.** Data persists across launches (ADR-0009). The first launch after a fresh install seeds the fake server and syncs all 200 entries into an empty replica; later launches show the cached data, then sync a zero-entry delta. That first launch is one of the discarded warm-up runs, so the measured runs are all "cached" starts.
 - **BM-02** uses the perf build with `pocketly.tab=history` and `pocketly.transactionCount=1000` (§5.3). Pages of 20 load from the replica while scrolling, as in normal use. Only the scrolling is measured (§5 note); its frame rate reflects the fling cadence as well as rendering, so compare builds within a run, not against 60 fps.
 - **BM-06** compares the cost of chatty and batched bridge calls. The batched result tells you how to design the bridge API, which belongs in an ADR.

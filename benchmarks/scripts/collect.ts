@@ -545,6 +545,7 @@ function main() {
   const extra: string[] = [];
   collectStartup(dir, 'BM-01', rows, verdicts);
   collectStartup(dir, 'BM-09', rows, verdicts);
+  collectStartup(dir, 'BM-01-lock', rows, verdicts);
   collectFlashlight(dir, 'BM-02', rows, verdicts);
   for (const scenario of ['BM-03', 'BM-04', 'BM-04b', 'BM-06', 'BM-10', 'BM-11']) {
     collectHarness(dir, scenario, rows, verdicts);

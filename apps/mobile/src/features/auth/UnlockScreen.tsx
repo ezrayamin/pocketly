@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { toCoreError } from '@pocketly/core-contract';
 import type { BiometricKind } from '@pocketly/core-contract';
 import { core } from '../../core';
+import { FullyDrawnMarker } from '../../FullyDrawnMarker';
 import { toUserError } from '../errors';
 import { biometricNoun, biometricUnlockMessage, unlockPrompt } from './biometricCopy';
 import { lockoutNotice, wrongPinNotice } from './pinCopy';
@@ -139,33 +140,38 @@ export function UnlockScreen({
     );
 
   return (
-    <PinScreen
-      testID="unlock"
-      title="Enter your PIN"
-      subtitle="Pocketly is locked for your security"
-      shield
-      message={
-        locked
-          ? { tone: 'error', ...lockoutNotice(remaining) }
-          : busy
-            ? { tone: 'info', text: 'Checking…' }
-            : message
-      }
-      count={locked ? 0 : entry.count}
-      busy={busy}
-      locked={locked || scanning}
-      biometricAction={
-        biometricOn && !busy && !scanning
-          ? { label: `Unlock with ${biometricNoun(biometric?.kind)}`, onPress: scanBiometrics, testID: 'pin-use-biometrics' }
-          : undefined
-      }
-      shakeToken={shakeToken}
-      onDigit={(d) => {
-        if (message && message.tone !== 'info') setMessage(null);
-        entry.press(d);
-      }}
-      onErase={entry.erase}
-      action={{ label: 'Forgot PIN?', onPress: forgot, testID: 'pin-forgot' }}
-    />
+    <>
+      {/* BM-01-lock: on a cold start the lock screen is the first full screen (Home mounts
+          only after unlock), so it reports "fully drawn" (benchmarking.md). */}
+      <FullyDrawnMarker />
+      <PinScreen
+        testID="unlock"
+        title="Enter your PIN"
+        subtitle="Pocketly is locked for your security"
+        shield
+        message={
+          locked
+            ? { tone: 'error', ...lockoutNotice(remaining) }
+            : busy
+              ? { tone: 'info', text: 'Checking…' }
+              : message
+        }
+        count={locked ? 0 : entry.count}
+        busy={busy}
+        locked={locked || scanning}
+        biometricAction={
+          biometricOn && !busy && !scanning
+            ? { label: `Unlock with ${biometricNoun(biometric?.kind)}`, onPress: scanBiometrics, testID: 'pin-use-biometrics' }
+            : undefined
+        }
+        shakeToken={shakeToken}
+        onDigit={(d) => {
+          if (message && message.tone !== 'info') setMessage(null);
+          entry.press(d);
+        }}
+        onErase={entry.erase}
+        action={{ label: 'Forgot PIN?', onPress: forgot, testID: 'pin-forgot' }}
+      />
+    </>
   );
 }

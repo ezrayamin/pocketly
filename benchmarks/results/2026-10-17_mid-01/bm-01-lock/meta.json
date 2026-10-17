@@ -1,0 +1,6 @@
+{ "scenario": "BM-01-LOCK", "warmup": 2, "measured": 20,
+  "compilation": "none", "order": "alternating js,kmp per round",
+  "tool": "am start -W + ActivityTaskManager Displayed/Fully drawn (platform startup logs)",
+  "settleSecondsBeforeLaunch": 2, "pageCacheDropped": false,
+  "build": "release", "target": "lock",
+  "launchArgs": {} }
