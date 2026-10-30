@@ -55,7 +55,8 @@ export type Category =
  * requirements §4.3, plus contract-level codes: NOT_FOUND, INVALID_ARGUMENT,
  * SECURE_STORAGE_UNAVAILABLE (ADR-0010: secure storage can't be used right now, e.g. the device
  * is locked; nothing was wiped, stay locked and retry), and PAYMENT_DECLINED (ADR-0015: the
- * payment method refused a top-up; a recorded FAILED transaction, not retryable).
+ * payment method refused a top-up; a recorded FAILED transaction, not retryable), and QR_EXPIRED /
+ * QR_ALREADY_PAID (ADR-0016 §4: a dynamic code's payment request expired, or was paid already).
  */
 export type ErrorCode =
   | 'INSUFFICIENT_FUNDS'
@@ -69,7 +70,9 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'INVALID_ARGUMENT'
   | 'SECURE_STORAGE_UNAVAILABLE'
-  | 'PAYMENT_DECLINED';
+  | 'PAYMENT_DECLINED'
+  | 'QR_EXPIRED'
+  | 'QR_ALREADY_PAID';
 
 export type CounterpartyKind = 'USER' | 'MERCHANT' | 'PAYMENT_METHOD';
 
@@ -527,7 +530,7 @@ export type TransferAuthOutcome =
   | 'UNAVAILABLE';
 
 /**
- * confirmTransfer / getTransferStatus, for a transfer or a top-up. `state` follows requirements §3.2:
+ * confirmTransfer / getTransferStatus, for any kind of attempt: transfer, top-up or QR payment. `state` follows requirements §3.2:
  * - DRAFT: not authorized (see `auth`); nothing was sent.
  * - SUCCESS: `transaction` is the server's.
  * - FAILED: `failureReason` and `retryable` (FR-TRF-08); the balance is as before.
@@ -568,5 +571,66 @@ export interface TopUpReview {
   /** TOP_UP_FEE_MINOR: always 0 for now. */
   fee: MinorUnits;
   /** balance + amount, the balance once the top-up succeeds. */
+  balanceAfter: MinorUnits;
+}
+
+// ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────────
+
+/** What a scanned code is for: paying a merchant (F7), or sending to a Pocketly user (My QR, F8). */
+export type QrKind = 'MERCHANT' | 'USER';
+
+/**
+ * parseQr's refusals. TOO_LONG: over QR_MAX_LENGTH. UNSUPPORTED_VERSION: a Pocketly code of a
+ * version this app doesn't read. UNKNOWN_KIND: a Pocketly code that is neither `pay` nor `user`.
+ * MALFORMED: anything else (another app's code, bad or missing or extra parameters).
+ */
+export type QrRejectReason = 'TOO_LONG' | 'MALFORMED' | 'UNSUPPORTED_VERSION' | 'UNKNOWN_KIND';
+
+/**
+ * parseQr (FR-QR-02): what a code says, IDs only (ADR-0016 §3). Names and amounts come from the
+ * server (startQrPayment, startTransfer), never from the code.
+ */
+export interface QrCode {
+  ok: boolean;
+  /** Set when `ok` is false. */
+  reason?: QrRejectReason;
+  kind?: QrKind;
+  /** MERCHANT only. */
+  merchantId?: string;
+  /** MERCHANT, dynamic code only: the server's payment request (it holds the amount). */
+  requestId?: string;
+  /** USER only: pass it to startTransfer. */
+  userId?: string;
+}
+
+/** startQrPayment: the merchant and the limits the amount step needs, all fresh from the server. */
+export interface QrPaymentDraft {
+  /** The server's merchant (kind MERCHANT): its name is what the user sees. */
+  merchant: Counterparty;
+  /** Dynamic code only. */
+  requestId?: string;
+  /** Dynamic code only: the request's amount, locked (FR-QR-03). Static: the user types it. */
+  amount?: MinorUnits;
+  /** Dynamic code only: when the request stops being payable (server clock). */
+  expiresAt?: EpochMillis;
+  balance: MinorUnits;
+  /** dailyLimit − usedToday, never negative: QR payments count toward the daily limit. */
+  dailyRemaining: MinorUnits;
+  /** TRANSFER_MIN_MINOR. */
+  minAmount: MinorUnits;
+  /** min(balance, dailyRemaining). */
+  maxAmount: MinorUnits;
+}
+
+/** reviewQrPayment: what the user confirms. The idempotency key exists from here on. */
+export interface QrPaymentReview {
+  /** The attempt's id. Pass it to confirmTransfer, with auth (as a transfer). */
+  id: string;
+  idempotencyKey: string;
+  merchant: Counterparty;
+  requestId?: string;
+  amount: MinorUnits;
+  /** TRANSFER_FEE_MINOR: always 0 for now. */
+  fee: MinorUnits;
   balanceAfter: MinorUnits;
 }

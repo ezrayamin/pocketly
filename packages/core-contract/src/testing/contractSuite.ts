@@ -34,6 +34,7 @@ import {
   PIN_PBKDF2_ITERATIONS,
   PIN_RECORD_VERSION,
   PIN_SALT_BYTES,
+  QR_MAX_LENGTH,
   TOP_UP_FEE_MINOR,
   TOP_UP_MAX_MINOR,
   TOP_UP_MIN_MINOR,
@@ -51,6 +52,7 @@ import money from '../../fixtures/money.json';
 import network from '../../fixtures/network.json';
 import phoneFixture from '../../fixtures/phone.json';
 import pin from '../../fixtures/pin.json';
+import qrFixture from '../../fixtures/qr.json';
 import { TEST_PHONE, verifyTestPhone } from './onboarding';
 import timeZones from '../../fixtures/time-zones.json';
 import topUpFixture from '../../fixtures/topup.json';
@@ -1097,6 +1099,173 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         const review = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
         await core.logout();
         await expectCoreError(core.confirmTransfer(review.id), 'NOT_FOUND');
+      });
+    });
+
+    describe('QR Pay & My QR (F7, F8, FR-QR-01..05, ADR-0016)', () => {
+      const PIN = '482915';
+      const START = golden.defaultDataset.wallet; // balance 1459085, usedToday 1578
+      const KEY = new RegExp(qrFixture.params.idempotencyKeyPattern);
+      const CORNER_COFFEE = { kind: 'MERCHANT' as const, id: 'm-01', name: 'Corner Coffee' };
+      const pinAuth = { method: 'PIN' as const, pin: PIN };
+      const wallet = () => core.getWallet();
+      const balance = async () => (await core.getWallet()).balance;
+      const now = DEFAULT_DATASET.nowMillis!;
+      const OFFLINE: NetworkSimulation = { mode: 'OFFLINE', failureRatePercent: 0 };
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+      });
+
+      describe('parseQr (FR-QR-02)', () => {
+        it.each(qrFixture.parse.cases)('parseQr($input)', ({ input, expected }) => {
+          expect(core.parseQr(input)).toEqual(expected);
+        });
+
+        it.each(qrFixture.parse.tooLong.cases)('a $length-unit code is $reason', ({ length, reason }) => {
+          const { prefix } = qrFixture.parse.tooLong;
+          expect(core.parseQr(prefix + 'x'.repeat(length - prefix.length))).toEqual({ ok: false, reason });
+        });
+
+        it('needs no server, and the limit is the fixture\'s', () => {
+          expect(QR_MAX_LENGTH).toBe(qrFixture.params.maxLength);
+          core.setNetworkSimulation(OFFLINE);
+          expect(core.parseQr('pocketly://pay/v1?m=m-01').ok).toBe(true);
+        });
+      });
+
+      describe('paying a merchant (FR-QR-03/04)', () => {
+        it('static code: the server names the merchant, the user types the amount, the PIN approves it', async () => {
+          const before = await wallet();
+          const draft = await core.startQrPayment('m-01');
+          const remaining = DEFAULT_DAILY_LIMIT_MINOR - START.usedToday;
+          expect(draft).toEqual({
+            merchant: CORNER_COFFEE,
+            balance: START.balance,
+            dailyRemaining: remaining,
+            minAmount: TRANSFER_MIN_MINOR,
+            maxAmount: remaining,
+          });
+          expect(core.checkTransferAmount('12.5')).toMatchObject({ ok: true, minor: 1_250 });
+          const review = await core.reviewQrPayment(1_250);
+          expect(review).toEqual({
+            id: review.idempotencyKey,
+            idempotencyKey: review.idempotencyKey,
+            merchant: CORNER_COFFEE,
+            amount: 1_250,
+            fee: 0,
+            balanceAfter: START.balance - 1_250,
+          });
+          expect(review.idempotencyKey).toMatch(KEY);
+          await expectCoreError(core.confirmTransfer(review.id), 'INVALID_ARGUMENT'); // money leaves: approval needed
+
+          const paid = await core.confirmTransfer(review.id, pinAuth);
+          expect(paid).toMatchObject({ state: 'SUCCESS', auth: 'OK', balance: START.balance - 1_250 });
+          expect(paid.transaction).toMatchObject({
+            id: 'qrp-1',
+            idempotencyKey: review.idempotencyKey,
+            type: 'QR_PAYMENT',
+            category: 'FOOD',
+            amount: 1_250,
+            counterparty: CORNER_COFFEE,
+            status: 'SUCCESS',
+          });
+          const after = await wallet();
+          expect([after.balance, after.usedToday]).toEqual([before.balance - 1_250, before.usedToday + 1_250]);
+          expect((await core.getTransactions()).items[0]).toEqual(paid.transaction);
+        });
+
+        it('dynamic code: the amount is the request\'s, locked, and the code pays once', async () => {
+          const draft = await core.startQrPayment('m-01', 'pr-0001');
+          expect(draft).toMatchObject({ merchant: CORNER_COFFEE, requestId: 'pr-0001', amount: 1_250, expiresAt: now + 31_536_000_000 });
+          await expectCoreError(core.reviewQrPayment(1_000), 'INVALID_ARGUMENT');
+          const review = await core.reviewQrPayment(1_250);
+          expect(review.requestId).toBe('pr-0001');
+          expect((await core.confirmTransfer(review.id, pinAuth)).state).toBe('SUCCESS');
+          await expectCoreError(core.startQrPayment('m-01', 'pr-0001'), 'QR_ALREADY_PAID');
+        });
+
+        it('a refusal doesn\'t use up a dynamic code', async () => {
+          const draft = await core.startQrPayment('m-05', 'pr-0004');
+          expect(draft.amount).toBe(2_000_000);
+          expect(draft.maxAmount).toBeLessThan(2_000_000);
+          await expectCoreError(core.reviewQrPayment(2_000_000), 'INSUFFICIENT_FUNDS');
+          await expect(core.startQrPayment('m-05', 'pr-0004')).resolves.toMatchObject({ requestId: 'pr-0004' });
+        });
+
+        it.each(qrFixture.lookup.cases.filter((c) => 'error' in c.expect))(
+          'startQrPayment($merchantId, $requestId) is $expect.error',
+          async ({ merchantId, requestId, expect: e }) => {
+            await expectCoreError(core.startQrPayment(merchantId, requestId), (e as { error: CoreError['code'] }).error);
+          },
+        );
+
+        it('offline, QR payments can\'t start (as FR-TRF-11)', async () => {
+          await core.getWallet();
+          core.setNetworkSimulation(OFFLINE);
+          await expectCoreError(core.startQrPayment('m-01'), 'NETWORK_UNAVAILABLE');
+        });
+
+        it('one draft at a time: a QR payment replaces a transfer\'s, and the other way round', async () => {
+          await core.startTransfer('u-01');
+          await core.startQrPayment('m-03');
+          await expectCoreError(core.reviewTransfer(1_000), 'NOT_FOUND');
+          await core.startTransfer('u-01');
+          await expectCoreError(core.reviewQrPayment(1_000), 'NOT_FOUND');
+        });
+
+        it('QR payments, transfers and top-ups are numbered separately', async () => {
+          await core.startTransfer('u-01');
+          const transfer = await core.reviewTransfer(1_000);
+          expect((await core.confirmTransfer(transfer.id, pinAuth)).transaction!.id).toBe('trf-1');
+          await core.startQrPayment('m-03');
+          const qr = await core.reviewQrPayment(500);
+          expect((await core.confirmTransfer(qr.id, pinAuth)).transaction!.id).toBe('qrp-1');
+        });
+
+        it('a held payment keeps the code paid; it settles like a transfer', async () => {
+          await core.startQrPayment('m-01', 'pr-0001');
+          const review = await core.reviewQrPayment(1_250);
+          core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+          const pending = await core.confirmTransfer(review.id, pinAuth);
+          expect(pending).toMatchObject({ state: 'PENDING', balance: START.balance - 1_250 });
+          core.setNetworkSimulation(NETWORK_NORMAL);
+          await expectCoreError(core.startQrPayment('m-01', 'pr-0001'), 'QR_ALREADY_PAID');
+          advanceServerClock(PENDING_RESOLVE_MAX_MS);
+          expect((await core.getTransferStatus(review.id)).state).toBe('SUCCESS');
+          expect(await balance()).toBe(START.balance - 1_250);
+        });
+
+        it('logout forgets every attempt and the draft', async () => {
+          await core.startQrPayment('m-03');
+          const review = await core.reviewQrPayment(500);
+          await core.logout();
+          await expectCoreError(core.confirmTransfer(review.id, pinAuth), 'NOT_FOUND');
+          await expectCoreError(core.reviewQrPayment(500), 'NOT_FOUND');
+        });
+      });
+
+      describe('My QR (FR-QR-05)', () => {
+        const mine = qrFixture.myQr.cases.find((c) => c.phone === TEST_PHONE)!;
+
+        it('is this account\'s user id, IDs only; scanning it is refused as yourself', async () => {
+          const payload = await core.getMyQr();
+          expect(payload).toBe(mine.payload);
+          expect(core.parseQr(payload)).toEqual({ ok: true, kind: 'USER', userId: mine.userId });
+          await expectCoreError(core.startTransfer(mine.userId), 'INVALID_ARGUMENT');
+          await expect(core.startTransfer('u-01')).resolves.toBeDefined(); // another user's code: the Send flow
+        });
+
+        it('once fetched it works offline; resetAuth forgets it', async () => {
+          await core.getMyQr();
+          core.setNetworkSimulation(OFFLINE);
+          expect(await core.getMyQr()).toBe(mine.payload);
+          core.setNetworkSimulation(NETWORK_NORMAL);
+          await core.resetAuth();
+          await expectCoreError(core.getMyQr(), 'NOT_FOUND');
+        });
       });
     });
 

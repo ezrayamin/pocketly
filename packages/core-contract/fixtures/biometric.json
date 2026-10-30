@@ -1,5 +1,5 @@
 {
-  "_comment": "ADR-0012. Generated with Node's crypto and checked with the openssl CLI. Both cores must build these messages byte for byte and accept/reject exactly these signatures (ECDSA P-256, SHA-256, DER; public key = X.509 SubjectPublicKeyInfo, DER).",
+  "_comment": "ADR-0012. Generated with Node's crypto and checked with the openssl CLI. Signatures regenerated with a fresh key for ADR-0016's qrpay messages (the original key wasn't kept). Both cores must build these messages byte for byte and accept/reject exactly these signatures (ECDSA P-256, SHA-256, DER; public key = X.509 SubjectPublicKeyInfo, DER).",
   "params": {
     "curve": "P-256",
     "hash": "SHA-256",
@@ -8,34 +8,64 @@
     "nonceBytes": 32,
     "challengeTtlMs": 60000
   },
-  "publicKeyHex": "3059301306072a8648ce3d020106082a8648ce3d0301070342000441b8e6f52b29cb81f604ec54d7966b3e2fb3f2a1f8d1245462441af70436432a18e803aa186ae270686ed6cbbad8fc17422a2526f059466e8318f74c8bea63bf",
+  "publicKeyHex": "3059301306072a8648ce3d020106082a8648ce3d03010703420004b9b3bde6be4d2b482ff0288a0f4b793f93f084d6bd456eaa61db3934e90c7a8516bb5df4e14f3086f4153af7d6d8482f7032434112cbb2fcc98cfa7c25566d4e",
   "unlock": {
     "nonceHex": "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
     "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
-    "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064c"
+    "signatureHex": "3046022100d86fe62dd84886889d3ac408cb7698c222260cbf85e670fc9209f72723f785a6022100e0b16ff384b16828c86981deff51aed74ff565c5a1a1f5bbec75a794e5a3e707"
   },
   "transfer": {
     "amount": 12500,
     "recipientId": "u_0042",
     "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
     "message": "pocketly:transfer:v1\namount:12500\nrecipient:u_0042\nidempotencyKey:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-    "signatureHex": "3044022064859ecd6b3b92ea9c5fd04cc12626a8cdd912999a16ba233ff8a67b970b00f40220415be76fe124e0df8442478c7368c2f612c67e91588fdebaca5ff11bec511f22"
+    "signatureHex": "3046022100ec473c4a4afdcc6c1a4ade50d5858bd26bf9781e077cc774ccca54915675674f022100f8ad88b4fa9f6f8ecf4108debecaac2f952c0daa8c3e62ce4ae548b616e05401"
+  },
+  "qrpay": {
+    "amount": 1250,
+    "merchantId": "m-01",
+    "requestId": "pr-0001",
+    "idempotencyKey": "3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76",
+    "message": "pocketly:qrpay:v1\namount:1250\nmerchant:m-01\nrequest:pr-0001\nidempotencyKey:3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76",
+    "signatureHex": "3045022100dfd5c5c0a76f1e00bb4c6ad68b5355953552e17c29164642c3e965f69e7bfaaa02204cc8209c64065f3349e1f884a9cdf6f62c64dfbdd9d6caa2cbaa787609741d0c"
+  },
+  "qrpayStatic": {
+    "amount": 4000,
+    "merchantId": "m-02",
+    "idempotencyKey": "9a1c7e52-0b3d-4f8e-b6a4-5d2c1e0f9b83",
+    "message": "pocketly:qrpay:v1\namount:4000\nmerchant:m-02\nrequest:-\nidempotencyKey:9a1c7e52-0b3d-4f8e-b6a4-5d2c1e0f9b83",
+    "signatureHex": "3045022100a6f762eda8b7453d0aac0ec8faa58e95e185bdd809057863ecd8a2ffd8a2ddc702203d48ed315e2a0a3d46c95c359e6b3dc750a26924d6be6c4776ece56ffad24816"
   },
   "rejected": [
     {
       "why": "tampered signature",
       "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
-      "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064d"
+      "signatureHex": "3046022100d86fe62dd84886889d3ac408cb7698c222260cbf85e670fc9209f72723f785a6022100e0b16ff384b16828c86981deff51aed74ff565c5a1a1f5bbec75a794e5a3e706"
     },
     {
       "why": "signed by another key",
       "message": "pocketly:unlock:v1\nnonce:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
-      "signatureHex": "30440220077fd0f4987af32102182f45c253780f9a0e3c6ea76970c71648e9bff79b42c602204eea5dc73c0ad242cb88e4d11e5b92133d317c9e05481ffc66590aa791d825f6"
+      "signatureHex": "30450220079ff581879c69f4bcd09ded754d97b718934fa85d27b952e2a3b6fccdac3d0c022100a0c1df739b14beb77d2719ef65fe1b5eea7cb69229b8d1a47cc3412d28cd87f2"
     },
     {
       "why": "an unlock signature is not a transfer approval",
       "message": "pocketly:transfer:v1\namount:12500\nrecipient:u_0042\nidempotencyKey:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "signatureHex": "3045022100e0455aa099ae79a15b0c8c5c9f7fc33957870eb65dc6301f0a3fe87d6025f25e022023109c4821446d69b113d6997778cc720bad96ba1add32e60268b6244d18064c"
+      "signatureHex": "3046022100d86fe62dd84886889d3ac408cb7698c222260cbf85e670fc9209f72723f785a6022100e0b16ff384b16828c86981deff51aed74ff565c5a1a1f5bbec75a794e5a3e707"
+    },
+    {
+      "why": "a transfer signature is not a QR payment approval",
+      "message": "pocketly:qrpay:v1\namount:1250\nmerchant:m-01\nrequest:pr-0001\nidempotencyKey:3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76",
+      "signatureHex": "3046022100ec473c4a4afdcc6c1a4ade50d5858bd26bf9781e077cc774ccca54915675674f022100f8ad88b4fa9f6f8ecf4108debecaac2f952c0daa8c3e62ce4ae548b616e05401"
+    },
+    {
+      "why": "a QR payment signature is not a transfer approval",
+      "message": "pocketly:transfer:v1\namount:12500\nrecipient:u_0042\nidempotencyKey:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "signatureHex": "3045022100dfd5c5c0a76f1e00bb4c6ad68b5355953552e17c29164642c3e965f69e7bfaaa02204cc8209c64065f3349e1f884a9cdf6f62c64dfbdd9d6caa2cbaa787609741d0c"
+    },
+    {
+      "why": "a QR payment signature is for its own request only",
+      "message": "pocketly:qrpay:v1\namount:4000\nmerchant:m-02\nrequest:-\nidempotencyKey:9a1c7e52-0b3d-4f8e-b6a4-5d2c1e0f9b83",
+      "signatureHex": "3045022100dfd5c5c0a76f1e00bb4c6ad68b5355953552e17c29164642c3e965f69e7bfaaa02204cc8209c64065f3349e1f884a9cdf6f62c64dfbdd9d6caa2cbaa787609741d0c"
     },
     {
       "why": "not a DER signature",
@@ -61,6 +91,36 @@
       "amount": 100,
       "recipientId": "",
       "idempotencyKey": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    }
+  ],
+  "invalidQrPayments": [
+    {
+      "why": "amount not a positive whole number",
+      "amount": 0,
+      "merchantId": "m-01",
+      "requestId": null,
+      "idempotencyKey": "3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76"
+    },
+    {
+      "why": "field contains a line break",
+      "amount": 100,
+      "merchantId": "m-01\namount:1",
+      "requestId": null,
+      "idempotencyKey": "3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76"
+    },
+    {
+      "why": "empty merchant",
+      "amount": 100,
+      "merchantId": "",
+      "requestId": null,
+      "idempotencyKey": "3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76"
+    },
+    {
+      "why": "request id \"-\" would read as a static code",
+      "amount": 100,
+      "merchantId": "m-01",
+      "requestId": "-",
+      "idempotencyKey": "3f2b8c1e-5d4a-4e6f-9a7b-2c1d0e9f8a76"
     }
   ]
 }

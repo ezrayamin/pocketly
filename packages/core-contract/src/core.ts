@@ -16,6 +16,9 @@ import type {
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   Subscription,
   TopUpMethod,
@@ -170,7 +173,10 @@ export interface Core {
    * Replaces any draft; attempts already sent keep going.
    */
   startTransfer(recipientId: string): Promise<TransferDraft>;
-  /** FR-TRF-02, synchronous, against the current draft. NOT_FOUND without one. */
+  /**
+   * FR-TRF-02, synchronous, against the current draft: a transfer's (startTransfer) or a QR
+   * payment's (startQrPayment), whichever was started last. NOT_FOUND without one.
+   */
   checkTransferAmount(text: string): AmountCheck;
   /**
    * FR-TRF-03/05: creates the attempt and its idempotency key (UUID v4). The amount must pass
@@ -180,15 +186,16 @@ export interface Core {
    */
   reviewTransfer(amount: MinorUnits, note?: string): Promise<TransferReview>;
   /**
-   * FR-TRF-04..09, FR-TOP-03. Takes either kind of attempt: a transfer's (reviewTransfer) or a
-   * top-up's (reviewTopUp). A DRAFT transfer needs `auth`: biometrics sign the transfer message
-   * (ADR-0012), or the PIN is checked like verifyPin. A DRAFT top-up takes no `auth` and answers
-   * `auth: NOT_REQUIRED` (ADR-0015 §2). Then it's sent with the attempt's key and
+   * FR-TRF-04..09, FR-TOP-03, FR-QR-04. Takes any kind of attempt: a transfer's (reviewTransfer),
+   * a top-up's (reviewTopUp) or a QR payment's (reviewQrPayment). A DRAFT transfer or QR payment
+   * needs `auth`: biometrics sign its kind's message (ADR-0012, ADR-0016 §2), or the PIN is
+   * checked like verifyPin. A DRAFT top-up takes no `auth` and answers `auth: NOT_REQUIRED`
+   * (ADR-0015 §2). Then it's sent with the attempt's key and
    * waits up to writeTimeoutMs. A FAILED attempt whose `retryable` is true is sent again with the
    * same key and no new `auth`. A call while one is running gets that call's result (double
    * tap). SUCCESS / PENDING / non-retryable FAILED attempts just return their result.
-   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT transfer without `auth`, or a
-   * top-up with one.
+   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT transfer or QR payment without
+   * `auth`, or a top-up with one.
    */
   confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult>;
   /**
@@ -217,6 +224,34 @@ export interface Core {
    * (nothing was sent); a transfer's draft is left alone.
    */
   reviewTopUp(amount: MinorUnits, method: TopUpMethod): Promise<TopUpReview>;
+
+  // ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────
+  // parseQr (the scanned text) → MERCHANT: startQrPayment → (static code) checkTransferAmount per
+  // keystroke → reviewQrPayment → confirmTransfer(id, auth) → (if PENDING) getTransferStatus.
+  // USER: startTransfer(userId) and the Send flow.
+  /**
+   * FR-QR-02, synchronous, no server, never throws: strict parsing of ADR-0016 §3's payload
+   * (fixtures/qr.json). The code carries IDs only.
+   */
+  parseQr(text: string): QrCode;
+  /**
+   * The merchant (and, for a dynamic code, its payment request) and a fresh wallet from the
+   * server; becomes the current draft (replacing a transfer's). INVALID_QR for an unknown merchant
+   * or a request of another merchant, QR_EXPIRED, QR_ALREADY_PAID, NETWORK_* offline.
+   */
+  startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft>;
+  /**
+   * Creates the attempt and its idempotency key (UUID v4). The amount must pass
+   * checkTransferAmount's limits (INVALID_ARGUMENT, INSUFFICIENT_FUNDS, DAILY_LIMIT_EXCEEDED) and,
+   * for a dynamic code, equal the request's (INVALID_ARGUMENT). NOT_FOUND without a QR draft.
+   */
+  reviewQrPayment(amount: MinorUnits): Promise<QrPaymentReview>;
+  /**
+   * F8: this account's code, `pocketly://user/v1?u=<userId>`. The user ID comes from the server
+   * once and is kept with the verified phone (ADR-0016 §6). NOT_FOUND before a phone is verified;
+   * NETWORK_* the first time if offline.
+   */
+  getMyQr(): Promise<string>;
 
   // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;

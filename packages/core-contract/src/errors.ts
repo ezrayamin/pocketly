@@ -13,6 +13,8 @@ const ERROR_CODES: readonly ErrorCode[] = [
   'INVALID_ARGUMENT',
   'SECURE_STORAGE_UNAVAILABLE',
   'PAYMENT_DECLINED',
+  'QR_EXPIRED',
+  'QR_ALREADY_PAID',
 ];
 
 export class CoreError extends Error {

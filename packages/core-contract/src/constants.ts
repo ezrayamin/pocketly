@@ -113,3 +113,8 @@ export const TOP_UP_FEE_MINOR = 0;
 /** FR-TOP-02: the server processes a top-up for 2–5 s (a seeded draw; NetworkSimulation.topUpProcessingMs). */
 export const TOP_UP_PROCESSING_MIN_MS = 2_000;
 export const TOP_UP_PROCESSING_MAX_MS = 5_000;
+
+// ── QR Pay & My QR (F7, F8; ADR-0016). Kotlin: shared/.../domain/QrPolicy.kt ──
+
+/** Longest code parseQr reads, in UTF-16 code units; longer is TOO_LONG. */
+export const QR_MAX_LENGTH = 256;
