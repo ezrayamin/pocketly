@@ -12,7 +12,7 @@ import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { testCore } from '../testing/testCore';
 
 /**
- * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING): the parts the
+ * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING, transfers and top-ups): the parts the
  * contract suite can't script. Same cases as shared/src/jvmTest/.../contract/TransferFlowTest.kt.
  */
 const PIN = '482915';
@@ -123,6 +123,23 @@ describe('restart while PENDING (NFR-REL-03)', () => {
     (second as unknown as { backend: { advanceClock(ms: number): void } }).backend.advanceClock(20_000);
     const settled = await second.getTransferStatus(r.id);
     expect(settled).toMatchObject({ state: 'SUCCESS', transaction: { id: 'trf-1' } });
+  });
+
+  it('a pending top-up is rebuilt from the replica too, and adds to the balance only once settled (ADR-0015)', async () => {
+    const first = testCore({ ...files, dataset: DEFAULT_DATASET, pinIterations: 1000 });
+    await first.resetData(DEFAULT_DATASET);
+    const start = (await first.getWallet()).balance;
+    const r = await first.reviewTopUp(5_000, 'CARD');
+    first.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+    expect(await first.confirmTransfer(r.id)).toMatchObject({ state: 'PENDING', balance: start });
+
+    const second = testCore({ ...files, dataset: DEFAULT_DATASET, pinIterations: 1000 });
+    second.setNetworkSimulation(NETWORK_NORMAL);
+    expect(await second.getTransferStatus(r.id)).toMatchObject({ state: 'PENDING', transaction: { id: 'tup-1', type: 'TOP_UP' } });
+    expect((await second.getWallet()).balance).toBe(start);
+    (second as unknown as { backend: { advanceClock(ms: number): void } }).backend.advanceClock(20_000);
+    expect(await second.getTransferStatus(r.id)).toMatchObject({ state: 'SUCCESS', balance: start + 5_000 });
+    expect((await second.getWallet()).balance).toBe(start + 5_000);
   });
 });
 

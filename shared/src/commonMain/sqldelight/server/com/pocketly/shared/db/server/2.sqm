@@ -1,0 +1,5 @@
+-- Schema version 2 → 3 (slice 7, ADR-0015 §4): a held settlement carries its failure reason, so a
+-- top-up still processing when the app dies settles declined if it was going to be. Rows from
+-- version 2 have none and settle as before (SERVER_ERROR). The JS generator reads this file too.
+
+ALTER TABLE server_pending_settlement ADD COLUMN failure_reason TEXT;

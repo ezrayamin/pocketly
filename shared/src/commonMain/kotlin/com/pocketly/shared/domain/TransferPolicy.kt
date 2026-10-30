@@ -1,6 +1,6 @@
 package com.pocketly.shared.domain
 
-/** checkTransferAmount's refusals: the money parse errors, then the transfer limits. Mirrors AmountRejectReason. */
+/** checkTransferAmount's / checkTopUpAmount's refusals: the money parse errors, then the limits. Mirrors AmountRejectReason. */
 enum class AmountRejectReason {
     EMPTY,
     NEGATIVE,
@@ -8,6 +8,7 @@ enum class AmountRejectReason {
     INVALID_FORMAT,
     OUT_OF_RANGE,
     BELOW_MINIMUM,
+    ABOVE_MAXIMUM,
     INSUFFICIENT_FUNDS,
     DAILY_LIMIT_EXCEEDED,
 }
@@ -52,6 +53,19 @@ object TransferPolicy {
 
     /** FR-TRF-02, on every keystroke. A trailing "." is accepted while typing. */
     fun checkAmount(text: String, limits: AmountLimits): AmountCheck {
+        val parsed = parseKeypad(text)
+        val minor = parsed.minor?.minor ?: return parsed
+
+        val remaining = Money(limits.balance.minor - minor)
+        val reason = if (minor < MIN_AMOUNT) AmountRejectReason.BELOW_MINIMUM else exceededLimit(minor, limits)
+        return AmountCheck(Money(minor), reason, acceptInput = true, remainingBalance = remaining)
+    }
+
+    /**
+     * The keypad rules shared by transfers and top-ups: a check with only [AmountCheck.minor] set
+     * when the text parses, else the refusal (EMPTY keeps the text; the others drop the keystroke).
+     */
+    internal fun parseKeypad(text: String): AmountCheck {
         if (text.isEmpty()) return refuse(AmountRejectReason.EMPTY, accept = true)
         if (text.startsWith("-")) return refuse(AmountRejectReason.NEGATIVE)
         if (TOO_MANY_DECIMALS.matches(text)) return refuse(AmountRejectReason.TOO_MANY_DECIMALS)
@@ -61,10 +75,7 @@ object TransferPolicy {
         val fraction = match.groupValues[2].removePrefix(".").padEnd(2, '0')
         val minor = whole.toLong() * 100 + fraction.toLong()
         if (minor > Money.MAX_AMOUNT_MINOR) return refuse(AmountRejectReason.OUT_OF_RANGE)
-
-        val remaining = Money(limits.balance.minor - minor)
-        val reason = if (minor < MIN_AMOUNT) AmountRejectReason.BELOW_MINIMUM else exceededLimit(minor, limits)
-        return AmountCheck(Money(minor), reason, acceptInput = true, remainingBalance = remaining)
+        return AmountCheck(Money(minor), reason = null, acceptInput = true, remainingBalance = null)
     }
 
     /** min(balance, dailyRemaining). */

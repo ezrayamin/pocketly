@@ -1,4 +1,12 @@
-import type { Contact, DatasetConfig, OtpSendResult, OtpVerifyResult, Transaction, Wallet } from '@pocketly/core-contract';
+import type {
+  Contact,
+  DatasetConfig,
+  OtpSendResult,
+  OtpVerifyResult,
+  TopUpMethod,
+  Transaction,
+  Wallet,
+} from '@pocketly/core-contract';
 
 /** What the server answers on an OTP check: the result, plus a session token when verified. */
 export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string };
@@ -9,6 +17,12 @@ export interface TransferRequest {
   amount: number;
   /** Normalized (normalizeNote): absent, or one trimmed line. */
   note?: string;
+}
+
+/** ADR-0015: what a top-up's idempotency key protects. */
+export interface TopUpRequest {
+  method: TopUpMethod;
+  amount: number;
 }
 
 /** One page of server changes, ordered by (updatedAt, id). */
@@ -22,7 +36,7 @@ export interface ChangesPage {
 /**
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping the fake for a real backend
  * only changes the wiring in `jsCore.ts`. History reads the local replica (ADR-0009), so the
- * backend exposes a change feed instead of paged history. Top-up/QR/events arrive with M4.
+ * backend exposes a change feed instead of paged history. QR/events arrive with M4.
  * Mirrors shared/.../data/WalletApi.kt.
  */
 export interface WalletApi {
@@ -44,7 +58,13 @@ export interface WalletApi {
    * request is IDEMPOTENCY_CONFLICT. Business refusals come back as FAILED transactions.
    */
   transfer(request: TransferRequest, idempotencyKey: string): Promise<Transaction>;
-  /** FR-TRF-09 status check: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+  /**
+   * FR-TOP-02/03 (ADR-0015 §4): adds money once per key, from a mocked payment method. Recorded
+   * PENDING on arrival, answered once processed: SUCCESS, or FAILED with PAYMENT_DECLINED. Keys
+   * share transfer()'s table, so a key used for either kind conflicts with the other.
+   */
+  topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction>;
+  /** FR-TRF-09 status check, either kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
   getTransferByKey(idempotencyKey: string): Promise<Transaction>;
 }
 

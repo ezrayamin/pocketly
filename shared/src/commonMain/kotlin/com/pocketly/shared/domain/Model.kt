@@ -148,6 +148,10 @@ data class NetworkSimulation(
     val seed: Int = 1,
     /** Client-side transfer timeout (FR-TRF-09, ADR-0014). Same default as TRANSFER_TIMEOUT_MS. */
     val writeTimeoutMs: Int = TransferPolicy.TIMEOUT_MS.toInt(),
+    /** FR-DEV, ADR-0015 §4: the payment method declines every top-up (FAILED, PAYMENT_DECLINED). */
+    val declineTopUps: Boolean = false,
+    /** ADR-0015 §4: a fixed top-up processing time, 0–60000, instead of the seeded draw (null). */
+    val topUpProcessingMs: Int? = null,
 ) {
     companion object {
         val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
@@ -261,3 +265,19 @@ data class TransferResult(
     /** [balance] unwrapped for Swift: a nullable value class is exported as an opaque `id`. */
     val balanceMinor: Long? get() = balance?.minor
 }
+
+// ── Top-up (F6, FR-TOP-01..03; ADR-0015) ────────────────────────────────
+
+/** FR-TOP-02: the mocked payment methods. Mirrors core-contract's TopUpMethod. */
+enum class TopUpMethod { BANK_TRANSFER, CARD }
+
+/** reviewTopUp: what the user confirms. confirmTransfer(id) sends it, with no auth. Mirrors TopUpReview. */
+data class TopUpReview(
+    /** The attempt's id: its idempotency key. */
+    val id: String,
+    val idempotencyKey: String,
+    val method: TopUpMethod,
+    val amount: Money,
+    val fee: Money,
+    val balanceAfter: Money,
+)

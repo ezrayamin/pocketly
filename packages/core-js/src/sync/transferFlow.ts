@@ -1,9 +1,18 @@
-import { CoreError, RECENT_CONTACTS_LIMIT, TRANSFER_FEE_MINOR, TRANSFER_MIN_MINOR, toCoreError } from '@pocketly/core-contract';
+import {
+  CoreError,
+  RECENT_CONTACTS_LIMIT,
+  TOP_UP_FEE_MINOR,
+  TRANSFER_FEE_MINOR,
+  TRANSFER_MIN_MINOR,
+  toCoreError,
+} from '@pocketly/core-contract';
 import type {
   AmountCheck,
   Contact,
   ContactSearch,
   ErrorCode,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransferAuth,
   TransferAuthOutcome,
@@ -17,17 +26,16 @@ import type {
 import { PLACEHOLDER_PREFIX, type CacheStore } from '../data/cacheStore';
 import { searchDirectory } from '../data/contactSearch';
 import type { WalletApi } from '../data/walletApi';
+import { isTopUpMethod, isValidTopUpAmount, topUpCounterparty, topUpMethodOf } from '../domain/topUpPolicy';
 import { checkTransferAmount, exceededLimit, isRetryable, isValidTransferAmount, normalizeNote } from '../domain/transferPolicy';
 import { transition } from '../domain/transferStateMachine';
 import type { BiometricAuth } from '../security/biometricAuth';
 import type { PinAuth } from '../security/pinAuth';
 
-/** One transfer attempt (FR-TRF-05): one key, one approval. Its id is its idempotency key. */
-interface Attempt {
+/** One attempt (FR-TRF-05): one key, one approval. Its id is its idempotency key. */
+interface AttemptBase {
   readonly key: string;
-  readonly recipient: Contact;
   readonly amount: number;
-  readonly note?: string;
   state: TransferState;
   failureReason?: ErrorCode;
   retryable?: boolean;
@@ -35,6 +43,23 @@ interface Attempt {
   /** The confirm or status check running now: a second call joins it (double tap). */
   running?: Promise<TransferResult>;
 }
+
+interface TransferAttempt extends AttemptBase {
+  readonly kind: 'TRANSFER';
+  readonly recipient: Contact;
+  readonly note?: string;
+}
+
+/** ADR-0015: money in from a payment method; no approval in Pocketly (§2). */
+interface TopUpAttempt extends AttemptBase {
+  readonly kind: 'TOP_UP';
+  readonly method: TopUpMethod;
+}
+
+type Attempt = TransferAttempt | TopUpAttempt;
+
+/** A change to the replica's wallet: balance, and today's outgoing total. */
+type WalletDelta = readonly [balance: number, usedToday: number];
 
 interface Draft {
   recipient: Contact;
@@ -57,7 +82,8 @@ export interface TransferFlowDeps {
 
 /**
  * F5, the client side of a transfer (ADR-0014): draft → review (the key) → confirm (approval,
- * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. Every state change goes
+ * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. F6's top-ups (ADR-0015) are
+ * attempts too: review → confirm (no approval) → the same outcomes. Every state change goes
  * through the §3.2 state machine. Mirrors shared/.../sync/TransferFlow.kt.
  */
 export class TransferFlow {
@@ -123,10 +149,15 @@ export class TransferFlow {
     const over = exceededLimit(amount, draft);
     if (over !== undefined) throw new CoreError(over, 'Amount is over the limit');
     const normalized = normalizeNote(note);
-    // Attempts never sent go: a new review is a new attempt (ADR-0014 §2).
-    for (const [id, a] of this.attempts) if (a.state === 'DRAFT' && a.running === undefined) this.attempts.delete(id);
-    const key = uuidV4(this.deps.randomBytes(16));
-    this.attempts.set(key, { key, recipient: draft.recipient, amount, note: normalized, state: 'DRAFT' });
+    const key = this.newAttemptKey();
+    this.attempts.set(key, {
+      kind: 'TRANSFER',
+      key,
+      recipient: draft.recipient,
+      amount,
+      note: normalized,
+      state: 'DRAFT',
+    });
     return {
       id: key,
       idempotencyKey: key,
@@ -138,16 +169,33 @@ export class TransferFlow {
     };
   }
 
+  /** FR-TOP-01/02: a fresh wallet (FR-TRF-11: no top-up from cached data), then the attempt and its key. */
+  async reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
+    if (!isTopUpMethod(method)) throw new CoreError('INVALID_ARGUMENT', 'Unknown top-up method');
+    if (!isValidTopUpAmount(amount)) throw new CoreError('INVALID_ARGUMENT', 'Invalid top-up amount');
+    const wallet = await this.deps.fetchWallet();
+    const key = this.newAttemptKey();
+    this.attempts.set(key, { kind: 'TOP_UP', key, method, amount, state: 'DRAFT' });
+    const balanceAfter = wallet.balance + amount;
+    return { id: key, idempotencyKey: key, method, amount, fee: TOP_UP_FEE_MINOR, balanceAfter };
+  }
+
   async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
     const attempt = await this.attempt(id);
     if (attempt.running) return attempt.running;
-    if (attempt.state === 'DRAFT' && auth === undefined) {
+    if (attempt.state === 'DRAFT' && attempt.kind === 'TRANSFER' && auth === undefined) {
       throw new CoreError('INVALID_ARGUMENT', 'A new transfer needs biometrics or the PIN');
+    }
+    if (attempt.state === 'DRAFT' && attempt.kind === 'TOP_UP' && auth !== undefined) {
+      throw new CoreError('INVALID_ARGUMENT', 'A top-up takes no authorization');
     }
     if (attempt.state !== 'DRAFT' && !(attempt.state === 'FAILED' && attempt.retryable)) {
       return this.result(attempt, 'NOT_REQUIRED');
     }
-    return this.run(attempt, () => (attempt.state === 'DRAFT' ? this.authorizeAndSend(attempt, auth!) : this.retry(attempt)));
+    return this.run(attempt, () => {
+      if (attempt.state !== 'DRAFT') return this.retry(attempt);
+      return attempt.kind === 'TRANSFER' ? this.authorizeAndSend(attempt, auth!) : this.sendTopUp(attempt);
+    });
   }
 
   async getTransferStatus(id: string): Promise<TransferResult> {
@@ -159,7 +207,7 @@ export class TransferFlow {
 
   // ── steps ────────────────────────────────────────────────────────────
 
-  private async authorizeAndSend(attempt: Attempt, auth: TransferAuth): Promise<TransferResult> {
+  private async authorizeAndSend(attempt: TransferAttempt, auth: TransferAuth): Promise<TransferResult> {
     this.move(attempt, 'CONFIRM');
     let outcome: TransferAuthOutcome;
     let extra: Pick<TransferResult, 'attemptsLeft' | 'lockedUntil'> = {};
@@ -177,8 +225,15 @@ export class TransferFlow {
     return this.submit(attempt, 'OK');
   }
 
+  /** ADR-0015 §2: AUTHORIZING passes at once; the payment method authorizes the charge itself. */
+  private sendTopUp(attempt: TopUpAttempt): Promise<TransferResult> {
+    this.move(attempt, 'CONFIRM');
+    this.move(attempt, 'AUTH_OK');
+    return this.submit(attempt, 'NOT_REQUIRED');
+  }
+
   private async authorize(
-    attempt: Attempt,
+    attempt: TransferAttempt,
     auth: TransferAuth,
   ): Promise<{ outcome: TransferAuthOutcome; extra: Pick<TransferResult, 'attemptsLeft' | 'lockedUntil'> }> {
     if (auth.method === 'BIOMETRIC') {
@@ -205,10 +260,9 @@ export class TransferFlow {
 
   /** SUBMITTING → SUCCESS / FAILED / PENDING (ADR-0014 §2, §4). */
   private async submit(attempt: Attempt, auth: TransferAuthOutcome): Promise<TransferResult> {
-    const request = { recipientId: attempt.recipient.userId, amount: attempt.amount, ...(attempt.note !== undefined ? { note: attempt.note } : {}) };
     let tx: Transaction;
     try {
-      tx = await this.deps.api.transfer(request, attempt.key);
+      tx = await this.send(attempt);
     } catch (e) {
       const error = toCoreError(e);
       if (error.code === 'NETWORK_TIMEOUT') return this.timedOut(attempt, auth);
@@ -224,22 +278,10 @@ export class TransferFlow {
   /** FR-TRF-09: no answer in time. The app shows its own pending row until the server's arrives. */
   private async timedOut(attempt: Attempt, auth: TransferAuthOutcome): Promise<TransferResult> {
     this.move(attempt, 'TIMEOUT');
-    const now = this.deps.clock();
-    const placeholder: Transaction = {
-      id: `${PLACEHOLDER_PREFIX}${attempt.key}`,
-      idempotencyKey: attempt.key,
-      type: 'TRANSFER_OUT',
-      category: 'TRANSFER',
-      amount: attempt.amount,
-      counterparty: { kind: 'USER', id: attempt.recipient.userId, name: attempt.recipient.name, phone: attempt.recipient.phone },
-      ...(attempt.note !== undefined ? { note: attempt.note } : {}),
-      status: 'PENDING',
-      createdAt: now,
-      updatedAt: now,
-    };
+    const placeholder = this.placeholder(attempt);
     if ((await this.deps.cache.getByIdempotencyKey(attempt.key)) === undefined) {
       await this.deps.cache.upsert(placeholder);
-      await this.deps.cache.adjustWallet(-attempt.amount, attempt.amount); // the server holds it too
+      await this.adjustWallet(heldDelta(attempt)); // as the server counts it while pending
     }
     attempt.transaction = (await this.deps.cache.getByIdempotencyKey(attempt.key)) ?? placeholder;
     return { ...this.result(attempt, auth), balance: await this.cachedBalance() };
@@ -280,14 +322,17 @@ export class TransferFlow {
     if (tx.status === 'PENDING') return this.timedOut(attempt, auth); // a replay of a held transfer
     await this.deps.cache.upsert(tx); // history row (and the placeholder goes)
     attempt.transaction = tx;
+    // ADR-0014 §5, ADR-0015 §3: the replica moves at once, by what this answer adds to what's held.
+    const held = wasHeld ? heldDelta(attempt) : NO_CHANGE;
     if (tx.status === 'SUCCESS') {
       this.move(attempt, ok);
-      if (!wasHeld) await this.deps.cache.adjustWallet(-attempt.amount, attempt.amount);
+      const settled = settledDelta(attempt);
+      await this.adjustWallet([settled[0] - held[0], settled[1] - held[1]]);
     } else {
       this.move(attempt, failed);
       attempt.failureReason = tx.failureReason ?? 'SERVER_ERROR';
       attempt.retryable = false; // the server recorded it: the same key returns this again
-      if (wasHeld) await this.deps.cache.adjustWallet(attempt.amount, -attempt.amount); // released
+      await this.adjustWallet([-held[0], -held[1]]); // released
     }
     return { ...this.result(attempt, auth), balance: await this.cachedBalance() };
   }
@@ -299,23 +344,70 @@ export class TransferFlow {
     return this.draft;
   }
 
+  /** Attempts never sent go: a new review is a new attempt (ADR-0014 §2). */
+  private newAttemptKey(): string {
+    for (const [id, a] of this.attempts) if (a.state === 'DRAFT' && a.running === undefined) this.attempts.delete(id);
+    return uuidV4(this.deps.randomBytes(16));
+  }
+
+  private send(attempt: Attempt): Promise<Transaction> {
+    const { key, amount } = attempt;
+    if (attempt.kind === 'TOP_UP') return this.deps.api.topUp({ method: attempt.method, amount }, key);
+    const { recipient, note } = attempt;
+    const request = { recipientId: recipient.userId, amount, ...(note !== undefined ? { note } : {}) };
+    return this.deps.api.transfer(request, key);
+  }
+
+  /** FR-TRF-09: the app's own pending row, until the server's arrives. */
+  private placeholder(attempt: Attempt): Transaction {
+    const now = this.deps.clock();
+    const common = {
+      id: `${PLACEHOLDER_PREFIX}${attempt.key}`,
+      idempotencyKey: attempt.key,
+      amount: attempt.amount,
+      status: 'PENDING' as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+    if (attempt.kind === 'TOP_UP') {
+      return { ...common, type: 'TOP_UP', category: 'TOP_UP', counterparty: topUpCounterparty(attempt.method) };
+    }
+    const { recipient, note } = attempt;
+    return {
+      ...common,
+      type: 'TRANSFER_OUT',
+      category: 'TRANSFER',
+      counterparty: { kind: 'USER', id: recipient.userId, name: recipient.name, phone: recipient.phone },
+      ...(note !== undefined ? { note } : {}),
+    };
+  }
+
   /** In memory, or a pending one rebuilt from the replica after a restart (NFR-REL-03). */
   private async attempt(id: string): Promise<Attempt> {
     const known = this.attempts.get(id);
     if (known) return known;
     const row = await this.deps.cache.getByIdempotencyKey(id);
-    if (row === undefined || row.type !== 'TRANSFER_OUT' || row.counterparty === undefined) {
+    const method = row?.type === 'TOP_UP' ? topUpMethodOf(row.counterparty) : undefined;
+    if (row === undefined || row.counterparty === undefined || (row.type !== 'TRANSFER_OUT' && method === undefined)) {
       throw new CoreError('NOT_FOUND', `No transfer ${id}`);
     }
-    const restored: Attempt = {
+    const common = {
       key: id,
-      recipient: { userId: row.counterparty.id, name: row.counterparty.name, phone: row.counterparty.phone ?? '' },
       amount: row.amount,
-      ...(row.note !== undefined ? { note: row.note } : {}),
-      state: row.status === 'PENDING' ? 'PENDING' : row.status === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+      state: row.status === 'PENDING' ? 'PENDING' : row.status === 'SUCCESS' ? 'SUCCESS' : ('FAILED' as TransferState),
       transaction: row,
       ...(row.status === 'FAILED' ? { failureReason: row.failureReason ?? 'SERVER_ERROR', retryable: false } : {}),
     };
+    const cp = row.counterparty;
+    const restored: Attempt =
+      method !== undefined
+        ? { ...common, kind: 'TOP_UP', method }
+        : {
+            ...common,
+            kind: 'TRANSFER',
+            recipient: { userId: cp.id, name: cp.name, phone: cp.phone ?? '' },
+            ...(row.note !== undefined ? { note: row.note } : {}),
+          };
     this.attempts.set(id, restored);
     return restored;
   }
@@ -336,8 +428,13 @@ export class TransferFlow {
     const row = await this.deps.cache.getByIdempotencyKey(attempt.key);
     if (row?.id.startsWith(PLACEHOLDER_PREFIX)) {
       await this.deps.cache.delete(row.id);
-      await this.deps.cache.adjustWallet(attempt.amount, -attempt.amount);
+      const held = heldDelta(attempt);
+      await this.adjustWallet([-held[0], -held[1]]);
     }
+  }
+
+  private async adjustWallet([balance, usedToday]: WalletDelta): Promise<void> {
+    if (balance !== 0 || usedToday !== 0) await this.deps.cache.adjustWallet(balance, usedToday);
   }
 
   private async cachedBalance(): Promise<number | undefined> {
@@ -353,6 +450,21 @@ export class TransferFlow {
       ...(attempt.state === 'FAILED' ? { failureReason: attempt.failureReason, retryable: attempt.retryable ?? false } : {}),
     };
   }
+}
+
+const NO_CHANGE: WalletDelta = [0, 0];
+
+/**
+ * What the server counts while the attempt is PENDING: a held transfer is already out of the
+ * balance and in today's total; a pending top-up isn't in the balance yet (ADR-0015 §3).
+ */
+function heldDelta(attempt: Attempt): WalletDelta {
+  return attempt.kind === 'TRANSFER' ? [-attempt.amount, attempt.amount] : NO_CHANGE;
+}
+
+/** What a SUCCESS changes in all. A top-up never counts toward the daily limit. */
+function settledDelta(attempt: Attempt): WalletDelta {
+  return attempt.kind === 'TRANSFER' ? [-attempt.amount, attempt.amount] : [attempt.amount, 0];
 }
 
 /** RFC 4122 version 4 from 16 random bytes, lowercase. */

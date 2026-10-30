@@ -6,6 +6,8 @@ import {
   READ_TIMEOUT_MS,
   SLOW_LATENCY_MAX_MS,
   SLOW_LATENCY_MIN_MS,
+  TOP_UP_PROCESSING_MAX_MS,
+  TOP_UP_PROCESSING_MIN_MS,
   TRANSFER_TIMEOUT_MS,
 } from '@pocketly/core-contract';
 import type { NetworkMode, NetworkSimulation } from '@pocketly/core-contract';
@@ -13,15 +15,28 @@ import { SeededRandom } from '../random';
 
 const MODES: readonly NetworkMode[] = ['NORMAL', 'SLOW', 'ALWAYS_FAIL', 'TIMEOUT', 'OFFLINE'];
 
+/** Every field set, except topUpProcessingMs: absent means the seeded draw. */
+type Normalized = Required<Omit<NetworkSimulation, 'topUpProcessingMs'>> & Pick<NetworkSimulation, 'topUpProcessingMs'>;
+
+/**
+ * How the server handles a top-up that reached it (ADR-0015 §4). HOLD: TIMEOUT mode, held as
+ * PENDING and never answered, like a transfer. PROCESS: answered after processingMs. `declined`
+ * is the developer menu's switch as it was when the top-up arrived.
+ */
+export type TopUpHandling =
+  | { kind: 'HOLD'; holdMs: number; fails: boolean; declined: boolean }
+  | { kind: 'PROCESS'; processingMs: number; declined: boolean };
+
 /**
  * FR-FAKE-04: latency, failures and offline mode for the fake backend (developer menu).
  * Draw order is fixed (latency roll, then failure roll, for every NORMAL/SLOW/ALWAYS_FAIL
- * call; a delay roll, then an outcome roll, for a transfer in TIMEOUT mode) so both cores
+ * call; a delay roll, then an outcome roll, for a transfer or top-up in TIMEOUT mode; then a
+ * processing roll for a top-up in the other modes, unless topUpProcessingMs is set) so both cores
  * produce the same sequence for the same seed.
  * Mirrors shared/.../data/fake/NetworkSimulator.kt.
  */
 export class NetworkSimulator {
-  private simulation: Required<NetworkSimulation> = normalize(NETWORK_NORMAL);
+  private simulation: Normalized = normalize(NETWORK_NORMAL);
   private rng = new SeededRandom(1);
 
   set(simulation: NetworkSimulation): void {
@@ -39,13 +54,27 @@ export class NetworkSimulator {
    * fails. Otherwise as beforeCall, and returns undefined.
    */
   async beforeTransfer(): Promise<{ holdMs: number; fails: boolean } | undefined> {
-    const { mode, failureRatePercent } = this.simulation;
-    if (mode !== 'TIMEOUT') {
+    if (this.simulation.mode !== 'TIMEOUT') {
       await this.beforeCall();
       return undefined;
     }
+    return this.drawHold();
+  }
+
+  /** Runs before a top-up reaches the server: as beforeTransfer, then the processing time. */
+  async beforeTopUp(): Promise<TopUpHandling> {
+    const { mode, declineTopUps } = this.simulation;
+    if (mode === 'TIMEOUT') return { kind: 'HOLD', ...this.drawHold(), declined: declineTopUps };
+    await this.beforeCall();
+    const fixed = this.simulation.topUpProcessingMs;
+    const processingMs =
+      fixed ?? TOP_UP_PROCESSING_MIN_MS + this.rng.nextInt(TOP_UP_PROCESSING_MAX_MS - TOP_UP_PROCESSING_MIN_MS + 1);
+    return { kind: 'PROCESS', processingMs, declined: declineTopUps };
+  }
+
+  private drawHold(): { holdMs: number; fails: boolean } {
     const holdMs = PENDING_RESOLVE_MIN_MS + this.rng.nextInt(PENDING_RESOLVE_MAX_MS - PENDING_RESOLVE_MIN_MS + 1);
-    const fails = this.rng.nextInt(100) < failureRatePercent;
+    const fails = this.rng.nextInt(100) < this.simulation.failureRatePercent;
     return { holdMs, fails };
   }
 
@@ -70,7 +99,7 @@ export class NetworkSimulator {
   }
 }
 
-function normalize(s: NetworkSimulation): Required<NetworkSimulation> {
+function normalize(s: NetworkSimulation): Normalized {
   if (!(MODES as readonly string[]).includes(s.mode)) {
     throw new CoreError('INVALID_ARGUMENT', `Unknown network mode "${s.mode}"`);
   }
@@ -93,5 +122,25 @@ function normalize(s: NetworkSimulation): Required<NetworkSimulation> {
   if (!Number.isInteger(seed)) {
     throw new CoreError('INVALID_ARGUMENT', 'seed must be an integer');
   }
-  return { mode: s.mode, failureRatePercent: s.failureRatePercent, normalLatencyMs, readTimeoutMs, writeTimeoutMs, seed };
+  const declineTopUps = s.declineTopUps ?? false;
+  if (typeof declineTopUps !== 'boolean') {
+    throw new CoreError('INVALID_ARGUMENT', 'declineTopUps must be a boolean');
+  }
+  const { topUpProcessingMs } = s;
+  if (
+    topUpProcessingMs !== undefined &&
+    (!Number.isInteger(topUpProcessingMs) || topUpProcessingMs < 0 || topUpProcessingMs > 60_000)
+  ) {
+    throw new CoreError('INVALID_ARGUMENT', 'topUpProcessingMs must be an integer 0..60000');
+  }
+  return {
+    mode: s.mode,
+    failureRatePercent: s.failureRatePercent,
+    normalLatencyMs,
+    readTimeoutMs,
+    writeTimeoutMs,
+    seed,
+    declineTopUps,
+    ...(topUpProcessingMs !== undefined ? { topUpProcessingMs } : {}),
+  };
 }

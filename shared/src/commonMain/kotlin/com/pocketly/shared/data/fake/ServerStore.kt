@@ -11,7 +11,14 @@ import com.pocketly.shared.domain.TransactionStatus
 /** server_transfer_key: the request a key was first used for (FR-FAKE-02/03). */
 internal data class TransferKeyRow(val recipientId: String, val amount: Money, val note: String?, val transactionId: String)
 
-internal data class Settlement(val transactionId: String, val resolveAt: Long, val fails: Boolean)
+/** server_pending_settlement: a held transfer or a top-up being processed, and how it ends. */
+internal data class Settlement(
+    val transactionId: String,
+    val resolveAt: Long,
+    val fails: Boolean,
+    /** The code a failing row settles with; null means SERVER_ERROR (rows from schema 2). */
+    val failureReason: ErrorCode? = null,
+)
 
 /**
  * The fake backend's database (pocketly-server.db, FR-FAKE-07). Only FakeWalletApi uses it.
@@ -45,18 +52,23 @@ internal class ServerStore(driver: SqlDriver) {
         TransferKeyRow(it.recipient_id, Money(it.amount), it.note, it.transaction_id)
     }
 
-    /** A new transfer, its key, the meta that counts it, and its settlement: all or nothing. */
+    /** A new transfer or top-up, its key, the meta that counts it, and its settlement: all or nothing. */
     fun recordTransfer(tx: Transaction, key: TransferKeyRow, meta: Map<String, String>, settlement: Settlement?) = db.transaction {
         insertRow(tx)
         q.insertTransferKey(tx.idempotencyKey, key.recipientId, key.amount.minor, key.note, key.transactionId)
         meta.forEach { (k, v) -> q.setMeta(k, v) }
-        settlement?.let { q.insertSettlement(it.transactionId, it.resolveAt, if (it.fails) 1 else 0) }
+        settlement?.let { q.insertSettlement(it.transactionId, it.resolveAt, if (it.fails) 1 else 0, it.failureReason?.name) }
     }
 
-    fun dueSettlements(now: Long): List<Settlement> =
-        q.dueSettlements(now).executeAsList().map { Settlement(it.transaction_id, it.resolve_at, it.fails != 0L) }
+    fun dueSettlements(now: Long): List<Settlement> = q.dueSettlements(now).executeAsList().map {
+        settlement(it.transaction_id, it.resolve_at, it.fails, it.failure_reason)
+    }
 
-    /** Settles a held transfer: its new status, and the settlement row removed, together. */
+    fun getSettlement(transactionId: String): Settlement? = q.getSettlement(transactionId).executeAsOneOrNull()?.let {
+        settlement(it.transaction_id, it.resolve_at, it.fails, it.failure_reason)
+    }
+
+    /** Settles a held transfer or a processed top-up: its new status, and the settlement row removed, together. */
     fun settle(id: String, status: TransactionStatus, failureReason: ErrorCode?, updatedAt: Long) = db.transaction {
         q.updateTransactionStatus(status.name, failureReason?.name, updatedAt, id)
         q.deleteSettlement(id)
@@ -67,6 +79,9 @@ internal class ServerStore(driver: SqlDriver) {
     fun setMeta(key: String, value: String) {
         q.setMeta(key, value)
     }
+
+    private fun settlement(id: String, resolveAt: Long, fails: Long, failureReason: String?) =
+        Settlement(id, resolveAt, fails != 0L, failureReason?.let { ErrorCode.valueOf(it) })
 
     private fun insertRow(tx: Transaction) {
         val cp = tx.counterparty

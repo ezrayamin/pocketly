@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeout
  * regardless (M3 transfers) runs in the backend's own scope, not inside this call.
  * Retries with backoff come with the real backend. Mirrors packages/core-js/src/data/timeoutWalletApi.ts.
  */
-/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+/** Reads give up after readTimeoutMs; a transfer or top-up submission after writeTimeoutMs (FR-TRF-09). */
 internal enum class CallKind { READ, WRITE }
 
 internal class TimeoutWalletApi(
@@ -41,6 +41,10 @@ internal class TimeoutWalletApi(
     /** A timeout here doesn't mean "not applied": the caller treats it as PENDING (ADR-0014 §4). */
     override suspend fun transfer(request: TransferRequest, idempotencyKey: String): Transaction =
         withTimeoutOf(CallKind.WRITE) { inner.transfer(request, idempotencyKey) }
+
+    /** As [transfer]: a timeout leaves the top-up PENDING (ADR-0015 §4). */
+    override suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction =
+        withTimeoutOf(CallKind.WRITE) { inner.topUp(request, idempotencyKey) }
 
     override suspend fun getTransferByKey(idempotencyKey: String): Transaction =
         withTimeoutOf { inner.getTransferByKey(idempotencyKey) }

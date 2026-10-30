@@ -36,6 +36,9 @@ import com.pocketly.shared.domain.SpendingSummary
 import com.pocketly.shared.domain.StaleInfo
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
+import com.pocketly.shared.domain.TopUpMethod
+import com.pocketly.shared.domain.TopUpPolicy
+import com.pocketly.shared.domain.TopUpReview
 import com.pocketly.shared.domain.TransferAuth
 import com.pocketly.shared.domain.TransferDraft
 import com.pocketly.shared.domain.TransferResult
@@ -307,7 +310,18 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun getTransferStatus(id: String): TransferResult = onDb { transfers.getTransferStatus(id) }
 
-    /** Tests only: moves the fake server's frozen clock forward (held transfers settle by it). */
+    // ── Top-up (F6, FR-TOP-01..03; ADR-0015) ───────────────────────────────
+    // checkTopUpAmount → reviewTopUp → confirmTransfer(id, auth = null) → getTransferStatus(id).
+
+    /** FR-TOP-01, synchronous, needs no draft and no server. */
+    @Throws(CoreException::class)
+    fun checkTopUpAmount(text: String): AmountCheck = TopUpPolicy.checkAmount(text)
+
+    /** FR-TOP-01/02: fresh wallet (offline: NETWORK_*), then the attempt and its key. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun reviewTopUp(amount: Money, method: TopUpMethod): TopUpReview = onDb { transfers.reviewTopUp(amount, method) }
+
+    /** Tests only: moves the fake server's frozen clock forward (held transfers and top-ups settle by it). */
     internal fun advanceServerClock(ms: Long) = backend.advanceClock(ms)
 
     /** FR-TRF-10, developer menu. */

@@ -1,16 +1,23 @@
 import { CoreError, MAX_AMOUNT_MINOR } from '@pocketly/core-contract';
 import type { Contact, DatasetConfig, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
+import { isTopUpMethod, isValidTopUpAmount, topUpCounterparty } from '../../domain/topUpPolicy';
 import { exceededLimit, isValidTransferAmount, normalizeNote } from '../../domain/transferPolicy';
 import { localEpochDay, localMidnight } from '../../domain/zonedCalendar';
 import { matchDirectory } from '../contactSearch';
 import { validateTransaction } from '../transactionDtoValidator';
 import { CONTACTS, DAILY_LIMIT, WALLET_ID, generateTransactions, simulatedIncomingTransfer } from '../seedData';
 import type { UserTimeZone } from '../timeZone';
-import type { ChangesPage, FakeBackendControls, ServerOtpVerify, TransferRequest, WalletApi } from '../walletApi';
-import { NetworkSimulator } from './networkSimulator';
+import type {
+  ChangesPage,
+  FakeBackendControls,
+  ServerOtpVerify,
+  TopUpRequest,
+  TransferRequest,
+  WalletApi,
+} from '../walletApi';
+import { NetworkSimulator, type TopUpHandling } from './networkSimulator';
 import { OtpServer } from './otpServer';
-import type { ServerStore } from './serverStore';
-
+import type { ServerStore, SettlementRow } from './serverStore';
 
 /** A dataset plus extra seed rows: tests and benchmarks only (BenchCore.resetDataWithExtras). */
 export type ServerDataset = DatasetConfig & { extraTransactions?: readonly Transaction[] };
@@ -23,6 +30,7 @@ const META_FROZEN_NOW = 'frozenNowMillis';
 const META_SIMULATED_INCOMING = 'simulatedIncoming';
 const META_DAILY_LIMIT = 'dailyLimit';
 const META_TRANSFERS = 'transfers';
+const META_TOP_UPS = 'topUps';
 /** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
 const META_ACCOUNT_PHONE = 'accountPhone';
 
@@ -41,6 +49,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   private simulatedIncoming = 0;
   private dailyLimit = DAILY_LIMIT;
   private transfers = 0;
+  private topUps = 0;
   private accountPhone: string | undefined;
   /**
    * Kotlin runs backend calls in parallel; here they interleave at every await. Anything that
@@ -90,6 +99,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     this.simulatedIncoming = Number((await this.store.getMeta(META_SIMULATED_INCOMING)) ?? 0);
     this.dailyLimit = Number((await this.store.getMeta(META_DAILY_LIMIT)) ?? DAILY_LIMIT);
     this.transfers = Number((await this.store.getMeta(META_TRANSFERS)) ?? 0);
+    this.topUps = Number((await this.store.getMeta(META_TOP_UPS)) ?? 0);
     this.accountPhone = await this.store.getMeta(META_ACCOUNT_PHONE);
   }
 
@@ -112,12 +122,14 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       this.simulatedIncoming = 0;
       this.dailyLimit = DAILY_LIMIT;
       this.transfers = 0;
+      this.topUps = 0;
       await this.store.replaceAll([...generateTransactions(config, this.now()), ...extra], {
         [META_SEEDED]: '1',
         [META_FROZEN_NOW]: config.nowMillis === undefined ? '' : String(config.nowMillis),
         [META_SIMULATED_INCOMING]: '0',
         [META_DAILY_LIMIT]: String(DAILY_LIMIT),
         [META_TRANSFERS]: '0',
+        [META_TOP_UPS]: '0',
         // The account outlives a dataset reset.
         ...(this.accountPhone !== undefined ? { [META_ACCOUNT_PHONE]: this.accountPhone } : {}),
       });
@@ -134,7 +146,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     });
   }
 
-  /** Tests only: moves a frozen clock forward (pending transfers settle by it). */
+  /** Tests only: moves a frozen clock forward (pending transfers and top-ups settle by it). */
   advanceClock(ms: number): void {
     if (this.frozenNow === undefined) throw new CoreError('INVALID_ARGUMENT', 'the clock is not frozen');
     this.frozenNow += ms;
@@ -158,6 +170,17 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     const tx = await this.exclusive(() => this.applyTransfer(request, idempotencyKey, hold));
     if (hold !== undefined) return new Promise<Transaction>(() => {}); // TIMEOUT: the answer never comes
     return tx;
+  }
+
+  async topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction> {
+    const handling = await this.network.beforeTopUp();
+    // From here the server has the request: it finishes even if the client stops waiting (ADR-0007 §2).
+    const { tx, recorded } = await this.exclusive(() => this.applyTopUp(request, idempotencyKey, handling));
+    if (handling.kind === 'HOLD') return new Promise<Transaction>(() => {}); // TIMEOUT: the answer never comes
+    if (!recorded) return tx; // a replay: the transaction as it is now
+    // Processing runs outside the lock: a retry or status check meanwhile finds it PENDING.
+    if (handling.processingMs > 0) await new Promise((resolve) => setTimeout(resolve, handling.processingMs));
+    return this.exclusive(() => this.settleProcessed(tx));
   }
 
   async getTransferByKey(idempotencyKey: string): Promise<Transaction> {
@@ -224,22 +247,81 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   /**
-   * FR-FAKE-05: settles held transfers whose time has come, lazily, at the start of each call
-   * that reads server state. updatedAt moves forward so the replica's delta sync sees the change
-   * even with a frozen clock.
+   * ADR-0015 §4. Runs inside `exclusive`. A new top-up is recorded PENDING with a settlement row
+   * saying how it ends, so one still processing when the app dies settles on the next start.
+   */
+  private async applyTopUp(
+    request: TopUpRequest,
+    idempotencyKey: string,
+    handling: TopUpHandling,
+  ): Promise<{ tx: Transaction; recorded: boolean }> {
+    await this.settleDue();
+    if (!isTopUpMethod(request.method)) throw new CoreError('INVALID_ARGUMENT', 'Unknown top-up method');
+    const counterparty = topUpCounterparty(request.method);
+    const known = await this.store.getTransferKey(idempotencyKey);
+    if (known !== undefined) {
+      const same = known.recipientId === counterparty.id && known.amount === request.amount && known.note === undefined;
+      if (!same) throw new CoreError('IDEMPOTENCY_CONFLICT', 'This key was used for a different request');
+      const original = await this.store.get(known.transactionId);
+      if (!original) throw new CoreError('SERVER_ERROR', 'Recorded top-up is missing');
+      return { tx: original, recorded: false };
+    }
+    if (idempotencyKey.length === 0) throw new CoreError('INVALID_ARGUMENT', 'idempotencyKey is required');
+    if (!isValidTopUpAmount(request.amount)) throw new CoreError('INVALID_ARGUMENT', 'Invalid top-up amount');
+
+    const now = this.now();
+    const n = this.topUps + 1;
+    const tx: Transaction = {
+      id: `tup-${n}`,
+      idempotencyKey,
+      type: 'TOP_UP',
+      category: 'TOP_UP',
+      amount: request.amount,
+      counterparty,
+      status: 'PENDING',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const waitMs = handling.kind === 'HOLD' ? handling.holdMs : handling.processingMs;
+    const fails = handling.declined || (handling.kind === 'HOLD' && handling.fails);
+    await this.store.recordTransfer(
+      tx,
+      { recipientId: counterparty.id, amount: request.amount, transactionId: tx.id },
+      { [META_TOP_UPS]: String(n) },
+      { resolveAt: now + waitMs, fails, ...(handling.declined ? { failureReason: 'PAYMENT_DECLINED' as const } : {}) },
+    );
+    this.topUps = n;
+    return { tx, recorded: true };
+  }
+
+  /** After processing: settles this top-up by its row, unless something settled it already. Inside `exclusive`. */
+  private async settleProcessed(tx: Transaction): Promise<Transaction> {
+    const current = await this.store.get(tx.id);
+    if (current === undefined || current.idempotencyKey !== tx.idempotencyKey) return tx; // reset meanwhile
+    const due = await this.store.getSettlement(tx.id);
+    if (due === undefined) return current;
+    return this.settleRow(due, current, this.now());
+  }
+
+  /**
+   * FR-FAKE-05: settles held transfers and top-ups whose time has come, lazily, at the start of
+   * each call that reads server state.
    */
   private async settleDue(): Promise<void> {
     const now = this.now();
     for (const due of await this.store.dueSettlements(now)) {
       const tx = await this.store.get(due.transactionId);
-      if (!tx) continue;
-      await this.store.settle(
-        tx.id,
-        due.fails ? 'FAILED' : 'SUCCESS',
-        due.fails ? 'SERVER_ERROR' : undefined,
-        Math.max(now, tx.updatedAt + 1),
-      );
+      if (tx) await this.settleRow(due, tx, now);
     }
+  }
+
+  /** updatedAt moves forward so the replica's delta sync sees the change even with a frozen clock. */
+  private async settleRow(due: SettlementRow, tx: Transaction, now: number): Promise<Transaction> {
+    const status = due.fails ? 'FAILED' : 'SUCCESS';
+    const failureReason = due.fails ? (due.failureReason ?? 'SERVER_ERROR') : undefined;
+    const updatedAt = Math.max(now, tx.updatedAt + 1);
+    await this.store.settle(tx.id, status, failureReason, updatedAt);
+    return { ...tx, status, ...(failureReason !== undefined ? { failureReason } : {}), updatedAt };
   }
 
   private async usedToday(now: number): Promise<number> {

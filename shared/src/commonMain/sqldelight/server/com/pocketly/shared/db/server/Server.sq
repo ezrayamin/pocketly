@@ -37,11 +37,14 @@ CREATE TABLE server_transfer_key (
   transaction_id TEXT NOT NULL
 );
 
--- FR-FAKE-05: transfers held as PENDING (TIMEOUT mode) and when they settle. Version 2.
+-- FR-FAKE-05: transfers held as PENDING (TIMEOUT mode) and top-ups being processed (ADR-0015),
+-- and when they settle. Version 2; failure_reason since version 3 (2.sqm): the code a failing
+-- row settles with, NULL meaning SERVER_ERROR.
 CREATE TABLE server_pending_settlement (
   transaction_id TEXT NOT NULL PRIMARY KEY,
   resolve_at INTEGER NOT NULL,
-  fails INTEGER NOT NULL
+  fails INTEGER NOT NULL,
+  failure_reason TEXT
 );
 
 insertTransaction:
@@ -85,11 +88,14 @@ deleteAllTransferKeys:
 DELETE FROM server_transfer_key;
 
 insertSettlement:
-INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails) VALUES (?, ?, ?);
+INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails, failure_reason) VALUES (?, ?, ?, ?);
 
 -- Oldest first, so settling several at once keeps their order.
 dueSettlements:
 SELECT * FROM server_pending_settlement WHERE resolve_at <= ? ORDER BY resolve_at, transaction_id;
+
+getSettlement:
+SELECT * FROM server_pending_settlement WHERE transaction_id = ?;
 
 deleteSettlement:
 DELETE FROM server_pending_settlement WHERE transaction_id = ?;

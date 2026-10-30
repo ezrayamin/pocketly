@@ -1,8 +1,8 @@
 import { CoreError } from '@pocketly/core-contract';
 import type { Contact, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
-import type { ChangesPage, ServerOtpVerify, TransferRequest, WalletApi } from './walletApi';
+import type { ChangesPage, ServerOtpVerify, TopUpRequest, TransferRequest, WalletApi } from './walletApi';
 
-/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+/** Reads give up after readTimeoutMs; a transfer or top-up submission after writeTimeoutMs (FR-TRF-09). */
 export type CallKind = 'read' | 'write';
 
 /**
@@ -51,6 +51,11 @@ export class TimeoutWalletApi implements WalletApi {
   /** A timeout here doesn't mean "not applied": the caller treats it as PENDING (ADR-0014 §4). */
   transfer(request: TransferRequest, idempotencyKey: string): Promise<Transaction> {
     return this.withTimeout(() => this.inner.transfer(request, idempotencyKey), 'write');
+  }
+
+  /** As transfer: a timeout leaves the top-up PENDING (ADR-0015 §4). */
+  topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction> {
+    return this.withTimeout(() => this.inner.topUp(request, idempotencyKey), 'write');
   }
 
   getTransferByKey(idempotencyKey: string): Promise<Transaction> {

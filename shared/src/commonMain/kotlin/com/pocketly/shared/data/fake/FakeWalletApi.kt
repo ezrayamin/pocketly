@@ -5,6 +5,7 @@ import com.pocketly.shared.data.ContactSearch
 import com.pocketly.shared.data.FakeBackendControls
 import com.pocketly.shared.data.ServerOtpVerify
 import com.pocketly.shared.data.TimeZoneHolder
+import com.pocketly.shared.data.TopUpRequest
 import com.pocketly.shared.data.TransactionDtoValidator
 import com.pocketly.shared.data.TransferRequest
 import com.pocketly.shared.data.WalletApi
@@ -22,6 +23,7 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyOutcome
+import com.pocketly.shared.domain.TopUpPolicy
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 import com.pocketly.shared.domain.TransactionType
@@ -34,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -76,6 +79,7 @@ internal class FakeWalletApi(
     @Volatile
     private var dailyLimit = SeedData.DAILY_LIMIT
     private var transfers = 0
+    private var topUps = 0
     @Volatile
     private var accountPhone: String? = null
 
@@ -101,6 +105,7 @@ internal class FakeWalletApi(
         simulatedIncoming = store.getMeta(META_SIMULATED_INCOMING)?.toInt() ?: 0
         dailyLimit = store.getMeta(META_DAILY_LIMIT)?.toLong()?.let(::Money) ?: SeedData.DAILY_LIMIT
         transfers = store.getMeta(META_TRANSFERS)?.toInt() ?: 0
+        topUps = store.getMeta(META_TOP_UPS)?.toInt() ?: 0
         accountPhone = store.getMeta(META_ACCOUNT_PHONE)
     }
 
@@ -117,6 +122,7 @@ internal class FakeWalletApi(
         simulatedIncoming = 0
         dailyLimit = SeedData.DAILY_LIMIT
         transfers = 0
+        topUps = 0
         store.replaceAll(
             SeedData.generate(config, now()) + config.extraTransactions,
             mapOf(
@@ -125,6 +131,7 @@ internal class FakeWalletApi(
                 META_SIMULATED_INCOMING to "0",
                 META_DAILY_LIMIT to SeedData.DAILY_LIMIT.minor.toString(),
                 META_TRANSFERS to "0",
+                META_TOP_UPS to "0",
             ) + listOfNotNull(accountPhone?.let { META_ACCOUNT_PHONE to it }), // the account outlives a dataset reset
         )
     }
@@ -140,7 +147,7 @@ internal class FakeWalletApi(
     /** Tests only: the simulator, to skip seeded draws. */
     internal fun simulatorForTests(): NetworkSimulator = network
 
-    /** Tests only: moves a frozen clock forward (pending transfers settle by it). */
+    /** Tests only: moves a frozen clock forward (pending transfers and top-ups settle by it). */
     fun advanceClock(ms: Long) {
         val frozen = frozenNow ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "the clock is not frozen")
         frozenNow = frozen + ms
@@ -165,6 +172,21 @@ internal class FakeWalletApi(
         }
         val (hold, tx) = work.await()
         if (hold != null) awaitCancellation() // TIMEOUT: the answer never comes
+        return tx
+    }
+
+    override suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction {
+        // As transfer: the server's work runs in serverScope, which the client's timeout doesn't stop.
+        val work = serverScope.async {
+            val handling = network.beforeTopUp()
+            val (tx, recorded) = serial.withLock { applyTopUp(request, idempotencyKey, handling) }
+            if (handling !is NetworkSimulator.TopUpHandling.Processed || !recorded) return@async handling to tx
+            // Processing runs outside the lock: a retry or status check meanwhile finds it PENDING.
+            if (handling.processingMs > 0) delay(handling.processingMs)
+            handling to serial.withLock { settleProcessed(tx) }
+        }
+        val (handling, tx) = work.await()
+        if (handling is NetworkSimulator.TopUpHandling.Held) awaitCancellation() // TIMEOUT: the answer never comes
         return tx
     }
 
@@ -224,21 +246,86 @@ internal class FakeWalletApi(
     }
 
     /**
-     * FR-FAKE-05: settles held transfers whose time has come, lazily, at the start of each call
-     * that reads server state. updatedAt moves forward so the replica's delta sync sees the change
-     * even with a frozen clock.
+     * ADR-0015 §4. Runs under [serial]. A new top-up is recorded PENDING with a settlement row
+     * saying how it ends, so one still processing when the app dies settles on the next start.
+     * Returns the transaction and whether this call recorded it (false: a replay).
+     */
+    private fun applyTopUp(
+        request: TopUpRequest,
+        idempotencyKey: String,
+        handling: NetworkSimulator.TopUpHandling,
+    ): Pair<Transaction, Boolean> {
+        settleDue()
+        val counterparty = TopUpPolicy.counterparty(request.method)
+        store.getTransferKey(idempotencyKey)?.let { known ->
+            val same = known.recipientId == counterparty.id && known.amount == request.amount && known.note == null
+            if (!same) throw CoreException(ErrorCode.IDEMPOTENCY_CONFLICT, "This key was used for a different request")
+            val original = store.get(known.transactionId)
+                ?: throw CoreException(ErrorCode.SERVER_ERROR, "Recorded top-up is missing")
+            return original to false
+        }
+        if (idempotencyKey.isEmpty()) throw CoreException(ErrorCode.INVALID_ARGUMENT, "idempotencyKey is required")
+        if (!TopUpPolicy.isValidAmount(request.amount.minor)) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid top-up amount")
+        }
+
+        val now = now()
+        val n = topUps + 1
+        val tx = Transaction(
+            id = "tup-$n",
+            idempotencyKey = idempotencyKey,
+            type = TransactionType.TOP_UP,
+            category = Category.TOP_UP,
+            amount = request.amount,
+            counterparty = counterparty,
+            note = null,
+            status = TransactionStatus.PENDING,
+            failureReason = null,
+            createdAt = now,
+            updatedAt = now,
+        )
+        val (waitMs, fails) = when (handling) {
+            is NetworkSimulator.TopUpHandling.Held -> handling.hold.holdMs to (handling.declined || handling.hold.fails)
+            is NetworkSimulator.TopUpHandling.Processed -> handling.processingMs to handling.declined
+        }
+        val reason = if (handling.declined) ErrorCode.PAYMENT_DECLINED else null
+        store.recordTransfer(
+            tx,
+            TransferKeyRow(counterparty.id, request.amount, null, tx.id),
+            mapOf(META_TOP_UPS to n.toString()),
+            Settlement(tx.id, now + waitMs, fails, reason),
+        )
+        topUps = n
+        return tx to true
+    }
+
+    /** After processing: settles this top-up by its row, unless something settled it already. Under [serial]. */
+    private fun settleProcessed(tx: Transaction): Transaction {
+        val current = store.get(tx.id)
+        if (current == null || current.idempotencyKey != tx.idempotencyKey) return tx // reset meanwhile
+        val due = store.getSettlement(tx.id) ?: return current
+        return settleRow(due, current, now())
+    }
+
+    /**
+     * FR-FAKE-05: settles held transfers and top-ups whose time has come, lazily, at the start of
+     * each call that reads server state.
      */
     private fun settleDue() {
         val now = now()
         for (due in store.dueSettlements(now)) {
             val tx = store.get(due.transactionId) ?: continue
-            store.settle(
-                tx.id,
-                if (due.fails) TransactionStatus.FAILED else TransactionStatus.SUCCESS,
-                if (due.fails) ErrorCode.SERVER_ERROR else null,
-                maxOf(now, tx.updatedAt + 1),
-            )
+            settleRow(due, tx, now)
         }
+    }
+
+    /** updatedAt moves forward so the replica's delta sync sees the change even with a frozen clock. */
+    private fun settleRow(due: Settlement, tx: Transaction, now: Long): Transaction {
+        val status = if (due.fails) TransactionStatus.FAILED else TransactionStatus.SUCCESS
+        val failureReason = if (due.fails) due.failureReason ?: ErrorCode.SERVER_ERROR else null
+        val updatedAt = maxOf(now, tx.updatedAt + 1)
+        store.settle(tx.id, status, failureReason, updatedAt)
+        return tx.copy(status = status, failureReason = failureReason, updatedAt = updatedAt)
     }
 
     private fun usedToday(now: Long): Long {
@@ -303,6 +390,7 @@ internal class FakeWalletApi(
         private const val META_SIMULATED_INCOMING = "simulatedIncoming"
         private const val META_DAILY_LIMIT = "dailyLimit"
         private const val META_TRANSFERS = "transfers"
+        private const val META_TOP_UPS = "topUps"
 
         /** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
         private const val META_ACCOUNT_PHONE = "accountPhone"

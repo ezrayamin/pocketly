@@ -36,6 +36,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -210,6 +211,10 @@ class ContractFixturesTest {
         readTimeoutMs = o["readTimeoutMs"]?.jsonPrimitive?.int ?: 10_000,
         seed = o["seed"]?.jsonPrimitive?.int ?: 1,
         writeTimeoutMs = o["writeTimeoutMs"]?.jsonPrimitive?.int ?: 15_000,
+        declineTopUps = o["declineTopUps"]?.jsonPrimitive?.boolean ?: false,
+        topUpProcessingMs = o["topUpProcessingMs"]?.jsonPrimitive?.double?.let {
+            if (it != kotlin.math.floor(it)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "not an integer") else it.toInt()
+        },
     )
 
     @Test

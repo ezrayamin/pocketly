@@ -6,11 +6,15 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyResult
+import com.pocketly.shared.domain.TopUpMethod
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.Wallet
 
 /** requirements §4.1 `TransferRequest`: what the idempotency key protects (ADR-0014). [note] is normalized. */
 data class TransferRequest(val recipientId: String, val amount: Money, val note: String? = null)
+
+/** ADR-0015: what a top-up's idempotency key protects. */
+data class TopUpRequest(val method: TopUpMethod, val amount: Money)
 
 /** One page of server changes, ordered by (updatedAt, id). */
 data class ChangesPage(val items: List<Transaction>, val nextToken: String?, val hasMore: Boolean)
@@ -19,7 +23,7 @@ data class ChangesPage(val items: List<Transaction>, val nextToken: String?, val
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping FakeWalletApi for a real
  * implementation only changes `bridge/di/CoreModule.kt`. History reads the local replica
  * (ADR-0009), so the backend exposes a change feed instead of paged history.
- * topUp / payMerchant / incomingEvents() arrive with M4.
+ * payMerchant / incomingEvents() arrive with M4.
  * Mirrors packages/core-js/src/data/walletApi.ts.
  */
 interface WalletApi {
@@ -48,7 +52,14 @@ interface WalletApi {
      */
     suspend fun transfer(request: TransferRequest, idempotencyKey: String): Transaction
 
-    /** FR-TRF-09 status check: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+    /**
+     * FR-TOP-02/03 (ADR-0015 §4): adds money once per key, from a mocked payment method. Recorded
+     * PENDING on arrival, answered once processed: SUCCESS, or FAILED with PAYMENT_DECLINED. Keys
+     * share [transfer]'s table, so a key used for either kind conflicts with the other.
+     */
+    suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction
+
+    /** FR-TRF-09 status check, either kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
     suspend fun getTransferByKey(idempotencyKey: String): Transaction
 }
 

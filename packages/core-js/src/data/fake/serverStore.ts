@@ -1,5 +1,5 @@
 import type { ErrorCode, Transaction, TransactionStatus } from '@pocketly/core-contract';
-import { bind, migrate, type SqlCommand, type SqlDriver } from '../db/sqlDriver';
+import { bind, migrate, type SqlCommand, type SqlDriver, type SqlRow } from '../db/sqlDriver';
 import { SERVER_MIGRATIONS, SERVER_SCHEMA, SERVER_SQL, SERVER_VERSION } from '../db/sql.generated';
 import { rowToTransaction, transactionValues } from '../db/rows';
 
@@ -9,6 +9,15 @@ export interface TransferKeyRow {
   amount: number;
   note?: string;
   transactionId: string;
+}
+
+/** server_pending_settlement: a held transfer or a top-up being processed, and how it ends. */
+export interface SettlementRow {
+  transactionId: string;
+  resolveAt: number;
+  fails: boolean;
+  /** The code a failing row settles with; absent means SERVER_ERROR (rows from schema 2). */
+  failureReason?: ErrorCode;
 }
 
 /**
@@ -66,12 +75,12 @@ export class ServerStore {
     };
   }
 
-  /** A new transfer, its key, the meta that counts it, and its settlement: all or nothing. */
+  /** A new transfer or top-up, its key, the meta that counts it, and its settlement: all or nothing. */
   async recordTransfer(
     tx: Transaction,
     key: TransferKeyRow,
     meta: Record<string, string>,
-    settlement?: { resolveAt: number; fails: boolean },
+    settlement?: Omit<SettlementRow, 'transactionId'>,
   ): Promise<void> {
     const commands: SqlCommand[] = [
       { sql: SERVER_SQL.insertTransaction.sql, values: transactionValues(tx) },
@@ -84,21 +93,22 @@ export class ServerStore {
     if (settlement) {
       commands.push({
         sql: SERVER_SQL.insertSettlement.sql,
-        values: [tx.id, settlement.resolveAt, settlement.fails ? 1 : 0],
+        values: [tx.id, settlement.resolveAt, settlement.fails ? 1 : 0, settlement.failureReason ?? null],
       });
     }
     await this.db.batch(commands);
   }
 
-  async dueSettlements(now: number): Promise<{ transactionId: string; resolveAt: number; fails: boolean }[]> {
-    return (await this.db.query(SERVER_SQL.dueSettlements.sql, [now])).map((r) => ({
-      transactionId: r.transaction_id as string,
-      resolveAt: Number(r.resolve_at),
-      fails: Number(r.fails) !== 0,
-    }));
+  async dueSettlements(now: number): Promise<SettlementRow[]> {
+    return (await this.db.query(SERVER_SQL.dueSettlements.sql, [now])).map(rowToSettlement);
   }
 
-  /** Settles a held transfer: its new status, and the settlement row removed, together. */
+  async getSettlement(transactionId: string): Promise<SettlementRow | undefined> {
+    const [row] = await this.db.query(SERVER_SQL.getSettlement.sql, [transactionId]);
+    return row ? rowToSettlement(row) : undefined;
+  }
+
+  /** Settles a held transfer or a processed top-up: its new status, and the settlement row removed, together. */
   async settle(id: string, status: TransactionStatus, failureReason: ErrorCode | undefined, updatedAt: number): Promise<void> {
     await this.db.batch([
       { sql: SERVER_SQL.updateTransactionStatus.sql, values: [status, failureReason ?? null, updatedAt, id] },
@@ -114,4 +124,13 @@ export class ServerStore {
   async setMeta(key: string, value: string): Promise<void> {
     await this.db.run(SERVER_SQL.setMeta.sql, [key, value]);
   }
+}
+
+function rowToSettlement(r: SqlRow): SettlementRow {
+  return {
+    transactionId: r.transaction_id as string,
+    resolveAt: Number(r.resolve_at),
+    fails: Number(r.fails) !== 0,
+    ...(r.failure_reason != null ? { failureReason: r.failure_reason as ErrorCode } : {}),
+  };
 }

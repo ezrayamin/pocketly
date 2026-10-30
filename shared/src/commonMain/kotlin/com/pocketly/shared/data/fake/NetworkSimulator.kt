@@ -4,6 +4,7 @@ import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.NetworkMode
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.TopUpPolicy
 import com.pocketly.shared.domain.TransferPolicy
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
@@ -14,7 +15,8 @@ import kotlin.concurrent.Volatile
 /**
  * FR-FAKE-04: latency, failures and offline mode for the fake backend (developer menu).
  * Draw order is fixed (latency roll, then failure roll, for every NORMAL/SLOW/ALWAYS_FAIL
- * call; a delay roll, then an outcome roll, for a transfer in TIMEOUT mode) so both cores
+ * call; a delay roll, then an outcome roll, for a transfer or top-up in TIMEOUT mode; then a
+ * processing roll for a top-up in the other modes, unless topUpProcessingMs is set) so both cores
  * produce the same sequence for the same seed.
  * Mirrors packages/core-js/src/data/fake/networkSimulator.ts.
  */
@@ -45,11 +47,39 @@ internal class NetworkSimulator {
             beforeCall()
             return null
         }
-        return rngLock.withLock {
-            val span = (TransferPolicy.PENDING_RESOLVE_MAX_MS - TransferPolicy.PENDING_RESOLVE_MIN_MS + 1).toInt()
-            val holdMs = TransferPolicy.PENDING_RESOLVE_MIN_MS + rng.nextInt(span)
-            Hold(holdMs, fails = rng.nextInt(100) < sim.failureRatePercent)
+        return rngLock.withLock { drawHold(sim) }
+    }
+
+    /**
+     * How the server handles a top-up that reached it (ADR-0015 §4). [declined] is the developer
+     * menu's switch as it was when the top-up arrived.
+     */
+    sealed class TopUpHandling {
+        abstract val declined: Boolean
+
+        /** TIMEOUT mode: held as PENDING and never answered, like a transfer. */
+        data class Held(val hold: Hold, override val declined: Boolean) : TopUpHandling()
+
+        /** Answered after [processingMs]. */
+        data class Processed(val processingMs: Long, override val declined: Boolean) : TopUpHandling()
+    }
+
+    /** Runs before a top-up reaches the server: as [beforeTransfer], then the processing time. */
+    suspend fun beforeTopUp(): TopUpHandling {
+        val sim = simulation
+        if (sim.mode == NetworkMode.TIMEOUT) return TopUpHandling.Held(rngLock.withLock { drawHold(sim) }, sim.declineTopUps)
+        beforeCall()
+        val processingMs = sim.topUpProcessingMs?.toLong() ?: rngLock.withLock {
+            val span = (TopUpPolicy.PROCESSING_MAX_MS - TopUpPolicy.PROCESSING_MIN_MS + 1).toInt()
+            TopUpPolicy.PROCESSING_MIN_MS + rng.nextInt(span)
         }
+        return TopUpHandling.Processed(processingMs, sim.declineTopUps)
+    }
+
+    private fun drawHold(sim: NetworkSimulation): Hold {
+        val span = (TransferPolicy.PENDING_RESOLVE_MAX_MS - TransferPolicy.PENDING_RESOLVE_MIN_MS + 1).toInt()
+        val holdMs = TransferPolicy.PENDING_RESOLVE_MIN_MS + rng.nextInt(span)
+        return Hold(holdMs, fails = rng.nextInt(100) < sim.failureRatePercent)
     }
 
     /** Runs before every backend call: waits, then maybe fails. Never returns in TIMEOUT. */
@@ -87,6 +117,9 @@ internal class NetworkSimulator {
         }
         if (s.writeTimeoutMs !in 100..60_000) {
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "writeTimeoutMs must be an integer 100..60000")
+        }
+        if (s.topUpProcessingMs != null && s.topUpProcessingMs !in 0..60_000) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "topUpProcessingMs must be an integer 0..60000")
         }
     }
 

@@ -31,6 +31,8 @@ import type {
   Subscription,
   Transaction,
   TransactionPage,
+  TopUpMethod,
+  TopUpReview,
   TransferAuth,
   TransferDraft,
   TransferResult,
@@ -46,6 +48,7 @@ import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { checkTopUpAmount } from './domain/topUpPolicy';
 import { BiometricAuth } from './security/biometricAuth';
 import type { BiometricSigner } from './security/biometricSigner';
 import { PinAuth } from './security/pinAuth';
@@ -344,6 +347,15 @@ export class JsCore implements Core {
   async getTransferStatus(id: string): Promise<TransferResult> {
     await this.ready;
     return this.transfers.getTransferStatus(id);
+  }
+
+  checkTopUpAmount(text: string): AmountCheck {
+    return checkTopUpAmount(text);
+  }
+
+  async reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
+    await this.ready;
+    return this.transfers.reviewTopUp(amount, method);
   }
 
   async setDailyLimit(minor: number): Promise<void> {

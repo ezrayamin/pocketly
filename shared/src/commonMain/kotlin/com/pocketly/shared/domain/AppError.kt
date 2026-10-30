@@ -14,6 +14,8 @@ enum class ErrorCode(val retryable: Boolean) {
     INVALID_ARGUMENT(false),
     /** ADR-0010: secure storage can't be used right now (device locked, Keystore busy). Nothing was wiped. */
     SECURE_STORAGE_UNAVAILABLE(true),
+    /** ADR-0015: the payment method refused a top-up. A recorded FAILED transaction. */
+    PAYMENT_DECLINED(false),
 }
 
 /**

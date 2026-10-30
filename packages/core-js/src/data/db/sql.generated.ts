@@ -13,17 +13,20 @@ export const SERVER_SCHEMA: readonly string[] = [
   "CREATE INDEX server_transaction_changes ON server_transaction(updated_at, id)",
   "CREATE TABLE server_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )",
   "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL )",
-  "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL )"
+  "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL, failure_reason TEXT )"
 ];
 
 /** Schema version (SQLDelight's: highest .sqm + 1). */
-export const SERVER_VERSION = 2;
+export const SERVER_VERSION = 3;
 
 /** <n>.sqm: from version n to n + 1. */
 export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
   "1": [
     "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL )",
     "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL )"
+  ],
+  "2": [
+    "ALTER TABLE server_pending_settlement ADD COLUMN failure_reason TEXT"
   ]
 };
 
@@ -74,11 +77,15 @@ export const SERVER_SQL = {
     "params": 0
   },
   "insertSettlement": {
-    "sql": "INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails) VALUES (?, ?, ?)",
-    "params": 3
+    "sql": "INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails, failure_reason) VALUES (?, ?, ?, ?)",
+    "params": 4
   },
   "dueSettlements": {
     "sql": "SELECT * FROM server_pending_settlement WHERE resolve_at <= ? ORDER BY resolve_at, transaction_id",
+    "params": 1
+  },
+  "getSettlement": {
+    "sql": "SELECT * FROM server_pending_settlement WHERE transaction_id = ?",
     "params": 1
   },
   "deleteSettlement": {

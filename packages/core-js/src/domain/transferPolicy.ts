@@ -23,6 +23,24 @@ const MAX_WHOLE_DIGITS = 11;
  * AmountCheck.acceptInput for which refusals the keypad drops.
  */
 export function checkTransferAmount(text: string, limits: AmountLimits): AmountCheck {
+  const parsed = parseKeypadAmount(text);
+  if (typeof parsed !== 'number') return parsed;
+  const minor = parsed;
+
+  const remainingBalance = limits.balance - minor;
+  if (minor < TRANSFER_MIN_MINOR) {
+    return { ok: false, minor, reason: 'BELOW_MINIMUM', acceptInput: true, remainingBalance };
+  }
+  const reason = exceededLimit(minor, limits);
+  if (reason !== undefined) return { ok: false, minor, reason, acceptInput: true, remainingBalance };
+  return { ok: true, minor, acceptInput: true, remainingBalance };
+}
+
+/**
+ * The keypad rules shared by transfers and top-ups: the amount in minor units, or the refusal
+ * (EMPTY keeps the text; the others drop the keystroke).
+ */
+export function parseKeypadAmount(text: string): MinorUnits | AmountCheck {
   if (text.length === 0) return { ok: false, reason: 'EMPTY', acceptInput: true };
   if (text.startsWith('-')) return { ok: false, reason: 'NEGATIVE', acceptInput: false };
   if (TOO_MANY_DECIMALS.test(text)) return { ok: false, reason: 'TOO_MANY_DECIMALS', acceptInput: false };
@@ -33,14 +51,7 @@ export function checkTransferAmount(text: string, limits: AmountLimits): AmountC
   const fraction = (match[2] ?? '.').slice(1).padEnd(2, '0');
   const minor = Number(whole) * 100 + Number(fraction);
   if (minor > MAX_AMOUNT_MINOR) return { ok: false, reason: 'OUT_OF_RANGE', acceptInput: false };
-
-  const remainingBalance = limits.balance - minor;
-  if (minor < TRANSFER_MIN_MINOR) {
-    return { ok: false, minor, reason: 'BELOW_MINIMUM', acceptInput: true, remainingBalance };
-  }
-  const reason = exceededLimit(minor, limits);
-  if (reason !== undefined) return { ok: false, minor, reason, acceptInput: true, remainingBalance };
-  return { ok: true, minor, acceptInput: true, remainingBalance };
+  return minor;
 }
 
 /** min(balance, dailyRemaining). */
