@@ -11,6 +11,7 @@ import { core } from '../../core';
  *   pocketly://dev/reset
  *   pocketly://dev/incoming
  *   pocketly://dev/limit?minor=100000           (FR-TRF-10: the server's daily transfer limit)
+ *   pocketly://dev/scan?code=<url-encoded code>  (ADR-0016 §7: as if the scanner read it)
  *
  * Network params not given keep their current value. Only active when DEV_TOOLS_ENABLED.
  */
@@ -71,6 +72,10 @@ export async function applyDevLink(url: string): Promise<DevLinkResult | null> {
       const minor = Number(parseQuery(query).minor);
       await core.setDailyLimit(minor); // validates
       return { action, detail: `daily limit ${core.formatMoney(minor)}` };
+    }
+    case 'scan': {
+      // The app opens the scanner screen with it; nothing changes in the core here.
+      return { action, detail: parseQuery(query).code ?? '' };
     }
     case 'incoming': {
       const tx = await core.simulateIncomingTransfer();

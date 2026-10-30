@@ -7,15 +7,13 @@ import type { RootStackParamList } from '../../../navigation';
 import { ArrowUpRight, CreditCard, QrCode, ScanLine, type LucideIcon } from '../../../components/icons';
 import { colors } from '../../../theme/tokens';
 
-/**
- * FR-HOME-03. Send (F5) and Top-Up (F6) open their flows. Pay (F7) and Receive (F8) are still
- * placeholders until those features exist.
- */
-const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: 'SendRecipient' | 'TopUpAmount' }[] = [
+/** FR-HOME-03: Send (F5), Top-Up (F6), Pay by QR (F7) and Receive, My QR (F8). */
+type Route = 'SendRecipient' | 'TopUpAmount' | 'QrScan' | 'MyQr';
+const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: Route }[] = [
   { label: 'Send', Icon: ArrowUpRight, primary: true, route: 'SendRecipient' },
   { label: 'Top-Up', Icon: CreditCard, route: 'TopUpAmount' },
-  { label: 'Pay (QR)', Icon: ScanLine },
-  { label: 'Receive', Icon: QrCode },
+  { label: 'Pay (QR)', Icon: ScanLine, route: 'QrScan' },
+  { label: 'Receive', Icon: QrCode, route: 'MyQr' },
 ];
 
 export function QuickActions() {

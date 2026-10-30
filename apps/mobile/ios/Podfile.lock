@@ -13,12 +13,56 @@ PODS:
   - hermes-engine (250829098.0.17):
     - hermes-engine/Pre-built (= 250829098.0.17)
   - hermes-engine/Pre-built (250829098.0.17)
+  - NitroDataScanner (0.1.2):
+    - hermes-engine
+    - NitroModules
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
+    - React-callinvoker
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - NitroModules (0.37.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
     - React-bridging
     - React-callinvoker
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - PocketlyBrightness (0.1.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-bridging
     - React-Core
     - React-debug
     - React-Fabric
@@ -2042,7 +2086,9 @@ DEPENDENCIES:
   - fmt (from `build/rndeps-facades/fmt`)
   - glog (from `build/rndeps-facades/glog`)
   - hermes-engine (from `../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - NitroDataScanner (from `../../../node_modules/react-native-data-scanner`)
   - NitroModules (from `../../../node_modules/react-native-nitro-modules`)
+  - "PocketlyBrightness (from `../../../node_modules/@pocketly/native-screen-brightness`)"
   - "PocketlyBuildInfo (from `../../../node_modules/@pocketly/native-build-info`)"
   - "PocketlyCoreKmp (from `../../../node_modules/@pocketly/core-kmp`)"
   - "PocketlyPreferences (from `../../../node_modules/@pocketly/native-preferences`)"
@@ -2145,8 +2191,12 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v250829098.0.17
+  NitroDataScanner:
+    :path: "../../../node_modules/react-native-data-scanner"
   NitroModules:
     :path: "../../../node_modules/react-native-nitro-modules"
+  PocketlyBrightness:
+    :path: "../../../node_modules/@pocketly/native-screen-brightness"
   PocketlyBuildInfo:
     :path: "../../../node_modules/@pocketly/native-build-info"
   PocketlyCoreKmp:
@@ -2324,7 +2374,9 @@ SPEC CHECKSUMS:
   fmt: ba0886e864ebb21d14c98b2e12e164b8002f5b93
   glog: 3cf7cb46f743c4bc758ae3e6d9c15bd1b4cfd6d4
   hermes-engine: 8930e5f68b09f76e00ab617da3f7587e7262efd0
+  NitroDataScanner: 2ca57af8c70b06c351ff4945f97b02d65effa4a5
   NitroModules: 5e0af7712c8e46b30ce7f314b913ec3f75122f56
+  PocketlyBrightness: 28efce4a6b39be258eb60348fc7e9b140fdef3fd
   PocketlyBuildInfo: 90cc192e47b3e85a0ca3778be56dbd7078060644
   PocketlyCoreKmp: 55cd399ea211ec03cb010ac4da6adb8f77a50274
   PocketlyPreferences: ebf9f81ada6190d6d5ce332a078b21230395badd

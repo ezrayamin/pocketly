@@ -1,0 +1,12 @@
+{
+  "name": "@pocketly/native-screen-brightness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Raises the screen's brightness while My QR is shown (FR-QR-05). Same in both builds.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "peerDependencies": {
+    "react-native": "*"
+  }
+}

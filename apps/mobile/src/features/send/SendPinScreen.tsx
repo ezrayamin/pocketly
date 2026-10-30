@@ -11,24 +11,25 @@ import { PinScreen, type PinMessage } from '../auth/PinScreen';
 import { usePinEntry } from '../auth/usePinEntry';
 import { toUserError } from '../errors';
 import { ProcessingView } from './components';
-import { biometricFallbackNotice, transferPrompt } from './sendCopy';
+import { payee, paymentPrompt, pinSubtitle, processingTitle } from './payment';
+import { biometricFallbackNotice } from './sendCopy';
 import { useConfirmTransfer } from './useConfirmTransfer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SendPin'>;
 
 /**
- * Send, PIN fallback (FR-TRF-04): the PIN approves this transfer, checked and counted like the
- * lock screen's (FR-LOCK-04). Cancel goes back to review with nothing sent. If biometrics are
- * still on, "Use fingerprint" tries the prompt again. Blocks screenshots (PinScreen).
+ * PIN fallback (FR-TRF-04, FR-QR-04): the PIN approves this transfer or QR payment, checked and
+ * counted like the lock screen's (FR-LOCK-04). Cancel goes back to review with nothing sent. If
+ * biometrics are still on, "Use fingerprint" tries the prompt again. Blocks screenshots (PinScreen).
  */
 export function SendPinScreen({ navigation, route }: Props) {
-  const { review, notice } = route.params;
-  const amount = core.formatMoney(review.amount);
+  const { payment, notice } = route.params;
+  const amount = core.formatMoney(payment.review.amount);
   const [biometrics, setBiometrics] = useState<BiometricStatus | null>(null);
   const [message, setMessage] = useState<PinMessage | null>(notice ? { tone: 'warning', text: notice } : null);
   const [locked, setLocked] = useState(false);
   const [shakeToken, setShakeToken] = useState(0);
-  const { sending, confirm } = useConfirmTransfer(review, navigation);
+  const { sending, confirm } = useConfirmTransfer(payment, navigation);
   const clearRef = useRef<() => void>(() => {});
 
   useEffect(() => flowMark('pin-shown'), []); // BM-07
@@ -66,10 +67,7 @@ export function SendPinScreen({ navigation, route }: Props) {
     if (!biometrics) return;
     setMessage(null);
     try {
-      const result = await confirm({
-        method: 'BIOMETRIC',
-        prompt: transferPrompt(biometrics.kind, amount, review.recipient.name),
-      });
+      const result = await confirm({ method: 'BIOMETRIC', prompt: paymentPrompt(payment, biometrics.kind, amount) });
       if (result?.state === 'DRAFT') {
         const text = biometricFallbackNotice(result.auth, biometrics.kind);
         if (text) setMessage({ tone: 'warning', text });
@@ -86,7 +84,7 @@ export function SendPinScreen({ navigation, route }: Props) {
       <PinScreen
         testID="send-pin"
         title="Enter your PIN"
-        subtitle={`To send ${amount} to ${review.recipient.name}.`}
+        subtitle={pinSubtitle(payment, amount)}
         message={message}
         count={entry.count}
         busy={sending}
@@ -104,7 +102,7 @@ export function SendPinScreen({ navigation, route }: Props) {
             : undefined
         }
       />
-      {sending && <ProcessingView title={`Sending ${amount}`} subtitle={`to ${review.recipient.name}`} />}
+      {sending && <ProcessingView title={processingTitle(payment, amount)} subtitle={`to ${payee(payment)}`} />}
     </View>
   );
 }

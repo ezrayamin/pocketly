@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { DarkTheme, NavigationContainer, useNavigationContainerRef, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { BenchScreen } from '@pocketly/bench-app';
 import { TabBar, type TabKey } from './src/components/TabBar';
@@ -14,6 +14,11 @@ import { HistoryScreen } from './src/features/history/HistoryScreen';
 import { TransactionDetailScreen } from './src/features/history/TransactionDetailScreen';
 import { HomeScreen } from './src/features/home/HomeScreen';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
+import { MyQrScreen } from './src/features/qr/MyQrScreen';
+import { QrAmountScreen } from './src/features/qr/QrAmountScreen';
+import { QrResultScreen } from './src/features/qr/QrResultScreen';
+import { QrReviewScreen } from './src/features/qr/QrReviewScreen';
+import { QrScanScreen } from './src/features/qr/QrScanScreen';
 import { SendAmountScreen } from './src/features/send/SendAmountScreen';
 import { onTransferFinished } from './src/features/send/sendEvents';
 import { SendPinScreen } from './src/features/send/SendPinScreen';
@@ -54,7 +59,14 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
   // History reload from it.
   const [homeRefresh, setHomeRefresh] = useState(0);
 
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+
   const selectTab = (next: TabKey) => {
+    // Pay opens the scanner over the current tab, not a tab of its own (product §7.3 rule 1).
+    if (next === 'pay') {
+      if (navigationRef.isReady()) navigationRef.navigate('QrScan');
+      return;
+    }
     if (next === tab) {
       // product.md §7.3 rule 5: tapping the active tab again scrolls its list to the top.
       if (next === 'history') setHistoryScrollToTop((n) => n + 1);
@@ -76,6 +88,9 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
         (result) => {
           if (!result) return;
           console.info(`[Pocketly] dev link ${result.action}: ${result.detail}`);
+          if (result.action === 'scan' && navigationRef.isReady()) {
+            navigationRef.navigate('QrScan', { code: result.detail });
+          }
           setHomeRefresh((n) => n + 1);
         },
         (e: unknown) => console.warn(`[Pocketly] dev link rejected: ${url}`, e),
@@ -108,7 +123,7 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer theme={NAV_THEME}>
+      <NavigationContainer theme={NAV_THEME} ref={navigationRef}>
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
           <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
@@ -123,6 +138,12 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
           <Stack.Screen name="TopUpMethod" component={TopUpMethodScreen} />
           <Stack.Screen name="TopUpReview" component={TopUpReviewScreen} />
           <Stack.Screen name="TopUpResult" component={TopUpResultScreen} options={{ gestureEnabled: false }} />
+          {/* Pay is a full-screen modal over the tab it was opened from (product §7.3 rule 1). */}
+          <Stack.Screen name="QrScan" component={QrScanScreen} options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="QrAmount" component={QrAmountScreen} />
+          <Stack.Screen name="QrReview" component={QrReviewScreen} />
+          <Stack.Screen name="QrResult" component={QrResultScreen} options={{ gestureEnabled: false }} />
+          <Stack.Screen name="MyQr" component={MyQrScreen} options={{ presentation: 'modal' }} />
         </Stack.Navigator>
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (

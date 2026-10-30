@@ -44,6 +44,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Pocketly uses the camera to scan payment codes.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Pocketly uses Face ID to unlock your wallet instead of your PIN.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

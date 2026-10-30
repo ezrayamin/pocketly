@@ -123,8 +123,8 @@ each that is roughly +160 KB of kmpCore bridge (BM-08 will say).
   `verifyOtp` returns it and the core keeps it in the secure session with the phone (cleared with
   it by `resetAuth` / `logout`); a session from before this asks the server once (`getMyQr`). Scanning your own code: `parseQr`
   gives USER, `startTransfer` refuses it, and the scanner says "That's your own code".
-- **Rendering** is UI: `react-native-qrcode-svg` on the `react-native-svg` the app already ships,
-  so no new native code. Both builds use it.
+- **Rendering** is UI: `qrcode-generator` (pure JS) computes the modules and the app draws them
+  with the `react-native-svg` it already ships, so no new native code. Both builds use it.
 - **Brightness** (FR-QR-05) needs a native API: a small in-repo module next to
   `native-secure-screen`. Android raises the activity window's `screenBrightness` (no permission,
   only this window, gone when the screen closes); iOS sets `UIScreen.main.brightness` and
@@ -133,21 +133,26 @@ each that is roughly +160 KB of kmpCore bridge (BM-08 will say).
 
 ### 7. The scanner (FR-QR-01)
 
-- **One library for both builds** (it's UI): react-native-vision-camera's code scanner,
-  QR only. Version and RN 0.87 / New Architecture support to be confirmed before it's added.
-- **Size:** on Android it uses ML Kit. The Play-services ("unbundled") model adds little to the
-  APK but downloads on first use; the bundled model adds a few MB per ABI. Default to unbundled,
-  and BM-08 records which one shipped and what it cost, in both builds equally (it doesn't
-  change the architecture comparison). iOS uses AVFoundation, nothing extra.
-- **Camera only while scanning** (product §7.3 rule 1): Pay (tab button and Home quick action)
-  opens a full-screen modal; the camera stops when it closes, loses focus or the app goes to the
-  background.
-- **Permission in context:** asked when the scanner first opens, with a line saying why; denied
-  → a screen with "Open Settings" (FR-QR-01). Offline: scanning and parsing work, and the flow
+- **The platform's own scanner, one shot**: `react-native-data-scanner` (Nitro-based, as the
+  bridge). Pay opens it at once; it returns one code or an error. Both builds use it (it's UI).
+  Chosen over VisionCamera 5, which now needs three packages (camera, barcode scanner,
+  nitro-image) for the same job.
+- **Android:** Google's code scanner from Play services (`play-services-code-scanner`). Its UI
+  and model come with Play services, so the APK grows by little and **no camera permission** is
+  needed: the app never sees the camera. BM-08 records what it added, in both builds equally.
+- **iOS:** VisionKit's DataScannerViewController (iOS 16+), which asks for camera access the
+  first time (`NSCameraUsageDescription`). Without access, or on a device that can't scan, the
+  library reports an error; the scanner screen says so, with **Open Settings** when access is
+  the fix (FR-QR-01). The simulator has no camera, so it always takes that path.
+- **Camera only while scanning** (product §7.3 rule 1) holds by construction: the system UI owns
+  the camera and closes when it returns.
+- **One code per scan:** an invalid or refused code is explained on the scanner screen with
+  **Scan again**, instead of over a live camera. Offline, scanning and parsing work, and the flow
   stops at `startQrPayment` with the offline message (as FR-TRF-11).
 - **Testing without a camera:** `pocketly://dev/scan?code=<url-encoded payload>` (dev builds
-  only, ADR-0008) hands a payload to the scanner screen as if scanned, for Maestro, Jest and the
-  device check. The device check also scans real codes printed from `fixtures/qr.json`.
+  only, ADR-0008) opens the scanner screen with that code instead of the camera, for Maestro and
+  the device check; Jest mocks the library. The device check also scans real codes shown on
+  another screen.
 
 ### 8. The flow in the app
 
@@ -155,15 +160,15 @@ Pay → scanner → `parseQr` → merchant: `startQrPayment` → amount (static:
 `checkTransferAmount`; dynamic: shown, locked) → review (merchant name from the server, "Pay
 <amount> to <merchant>") → PIN or biometrics → processing → result, reusing the Send flow's
 components. User code → the Send flow's amount step. Invalid code → "This isn't a valid payment
-code" over the live camera, which keeps scanning.
+code" with Scan again. The PIN screen is the Send flow's, shared by both kinds of payment.
 
 ## Consequences
 
 - `fixtures/qr.json` (payloads and parse results, server steps for payment requests) and new
   cases in `fixtures/biometric.json`; both cores test against them.
 - Server schema 4; ADR-0015's key table gains `request_id`.
-- New dependencies to approve and download: react-native-vision-camera, react-native-qrcode-svg
-  (and its `qrcode`), and the in-repo brightness module.
+- New dependencies: `react-native-data-scanner` 0.1.2, `qrcode-generator` 2.0.4, and the in-repo
+  `@pocketly/native-screen-brightness` module.
 - BM-08 measures the bridge growth and the scanner library separately.
 
 ## Limits
