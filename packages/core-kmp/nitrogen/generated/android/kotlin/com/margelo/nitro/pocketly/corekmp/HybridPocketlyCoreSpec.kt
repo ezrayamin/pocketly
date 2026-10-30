@@ -164,6 +164,22 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun parseQr(text: String): QrCode
+  
+  @DoNotStrip
+  @Keep
+  abstract fun startQrPayment(merchantId: String, requestId: String?): Promise<QrPaymentDraft>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun reviewQrPayment(amount: Double): Promise<QrPaymentReview>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getMyQr(): Promise<String>
+  
+  @DoNotStrip
+  @Keep
   abstract fun formatMoney(minor: Double): String
   
   @DoNotStrip

@@ -78,6 +78,16 @@ namespace margelo::nitro::pocketly { struct PinCheck; }
 namespace margelo::nitro::pocketly { enum class PinRejectReason; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `StaleInfo` to properly resolve imports.
@@ -159,6 +169,11 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
 #include "PriceTick.hpp"
+#include "QrCode.hpp"
+#include "QrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
+#include "QrRejectReason.hpp"
 #include "SpendingSummary.hpp"
 #include "StaleInfo.hpp"
 #include "TopUpMethod.hpp"
@@ -1185,6 +1200,138 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Func_void_TopUpReview_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::optional<QrRejectReason>
+  /**
+   * Specialized version of `std::optional<QrRejectReason>`.
+   */
+  using std__optional_QrRejectReason_ = std::optional<QrRejectReason>;
+  inline std::optional<QrRejectReason> create_std__optional_QrRejectReason_(const QrRejectReason& value) noexcept {
+    return std::optional<QrRejectReason>(value);
+  }
+  inline bool has_value_std__optional_QrRejectReason_(const std::optional<QrRejectReason>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline QrRejectReason get_std__optional_QrRejectReason_(const std::optional<QrRejectReason>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<QrKind>
+  /**
+   * Specialized version of `std::optional<QrKind>`.
+   */
+  using std__optional_QrKind_ = std::optional<QrKind>;
+  inline std::optional<QrKind> create_std__optional_QrKind_(const QrKind& value) noexcept {
+    return std::optional<QrKind>(value);
+  }
+  inline bool has_value_std__optional_QrKind_(const std::optional<QrKind>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline QrKind get_std__optional_QrKind_(const std::optional<QrKind>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<QrPaymentDraft>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<QrPaymentDraft>>`.
+   */
+  using std__shared_ptr_Promise_QrPaymentDraft__ = std::shared_ptr<Promise<QrPaymentDraft>>;
+  inline std::shared_ptr<Promise<QrPaymentDraft>> create_std__shared_ptr_Promise_QrPaymentDraft__() noexcept {
+    return Promise<QrPaymentDraft>::create();
+  }
+  inline PromiseHolder<QrPaymentDraft> wrap_std__shared_ptr_Promise_QrPaymentDraft__(std::shared_ptr<Promise<QrPaymentDraft>> promise) noexcept {
+    return PromiseHolder<QrPaymentDraft>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const QrPaymentDraft& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const QrPaymentDraft&)>`.
+   */
+  using Func_void_QrPaymentDraft = std::function<void(const QrPaymentDraft& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const QrPaymentDraft& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_QrPaymentDraft_Wrapper final {
+  public:
+    explicit Func_void_QrPaymentDraft_Wrapper(std::function<void(const QrPaymentDraft& /* result */)>&& func): _function(std::make_unique<std::function<void(const QrPaymentDraft& /* result */)>>(std::move(func))) {}
+    inline void call(QrPaymentDraft result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const QrPaymentDraft& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_QrPaymentDraft create_Func_void_QrPaymentDraft(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_QrPaymentDraft_Wrapper wrap_Func_void_QrPaymentDraft(Func_void_QrPaymentDraft value) noexcept {
+    return Func_void_QrPaymentDraft_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<QrPaymentReview>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<QrPaymentReview>>`.
+   */
+  using std__shared_ptr_Promise_QrPaymentReview__ = std::shared_ptr<Promise<QrPaymentReview>>;
+  inline std::shared_ptr<Promise<QrPaymentReview>> create_std__shared_ptr_Promise_QrPaymentReview__() noexcept {
+    return Promise<QrPaymentReview>::create();
+  }
+  inline PromiseHolder<QrPaymentReview> wrap_std__shared_ptr_Promise_QrPaymentReview__(std::shared_ptr<Promise<QrPaymentReview>> promise) noexcept {
+    return PromiseHolder<QrPaymentReview>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const QrPaymentReview& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const QrPaymentReview&)>`.
+   */
+  using Func_void_QrPaymentReview = std::function<void(const QrPaymentReview& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const QrPaymentReview& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_QrPaymentReview_Wrapper final {
+  public:
+    explicit Func_void_QrPaymentReview_Wrapper(std::function<void(const QrPaymentReview& /* result */)>&& func): _function(std::make_unique<std::function<void(const QrPaymentReview& /* result */)>>(std::move(func))) {}
+    inline void call(QrPaymentReview result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const QrPaymentReview& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_QrPaymentReview create_Func_void_QrPaymentReview(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_QrPaymentReview_Wrapper wrap_Func_void_QrPaymentReview(Func_void_QrPaymentReview value) noexcept {
+    return Func_void_QrPaymentReview_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<std::string>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<std::string>>`.
+   */
+  using std__shared_ptr_Promise_std__string__ = std::shared_ptr<Promise<std::string>>;
+  inline std::shared_ptr<Promise<std::string>> create_std__shared_ptr_Promise_std__string__() noexcept {
+    return Promise<std::string>::create();
+  }
+  inline PromiseHolder<std::string> wrap_std__shared_ptr_Promise_std__string__(std::shared_ptr<Promise<std::string>> promise) noexcept {
+    return PromiseHolder<std::string>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* result */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* result */)>>(std::move(func))) {}
+    inline void call(std::string result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::optional<MoneyParseError>
   /**
    * Specialized version of `std::optional<MoneyParseError>`.
@@ -1452,6 +1599,42 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_TopUpReview___ create_Result_std__shared_ptr_Promise_TopUpReview___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<TopUpReview>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<QrCode>
+  using Result_QrCode_ = Result<QrCode>;
+  inline Result_QrCode_ create_Result_QrCode_(const QrCode& value) noexcept {
+    return Result<QrCode>::withValue(value);
+  }
+  inline Result_QrCode_ create_Result_QrCode_(const std::exception_ptr& error) noexcept {
+    return Result<QrCode>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<QrPaymentDraft>>>
+  using Result_std__shared_ptr_Promise_QrPaymentDraft___ = Result<std::shared_ptr<Promise<QrPaymentDraft>>>;
+  inline Result_std__shared_ptr_Promise_QrPaymentDraft___ create_Result_std__shared_ptr_Promise_QrPaymentDraft___(const std::shared_ptr<Promise<QrPaymentDraft>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentDraft>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_QrPaymentDraft___ create_Result_std__shared_ptr_Promise_QrPaymentDraft___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentDraft>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<QrPaymentReview>>>
+  using Result_std__shared_ptr_Promise_QrPaymentReview___ = Result<std::shared_ptr<Promise<QrPaymentReview>>>;
+  inline Result_std__shared_ptr_Promise_QrPaymentReview___ create_Result_std__shared_ptr_Promise_QrPaymentReview___(const std::shared_ptr<Promise<QrPaymentReview>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentReview>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_QrPaymentReview___ create_Result_std__shared_ptr_Promise_QrPaymentReview___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentReview>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<std::string>>>
+  using Result_std__shared_ptr_Promise_std__string___ = Result<std::shared_ptr<Promise<std::string>>>;
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::shared_ptr<Promise<std::string>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withError(error);
   }
   
   // pragma MARK: Result<std::string>

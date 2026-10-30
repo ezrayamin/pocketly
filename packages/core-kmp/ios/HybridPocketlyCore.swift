@@ -314,6 +314,54 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     }
   }
 
+  func parseQr(text: String) throws -> QrCode {
+    let c = core.parseQr(text: text)
+    return QrCode(
+      ok: c.ok,
+      reason: c.reason.map { QrRejectReason(fromString: $0.name)! },
+      kind: c.kind.map { QrKind(fromString: $0.name)! },
+      merchantId: c.merchantId,
+      requestId: c.requestId,
+      userId: c.userId
+    )
+  }
+
+  func startQrPayment(merchantId: String, requestId: String?) throws -> Promise<QrPaymentDraft> {
+    return Promise.async { [core] in
+      let d = try await core.startQrPayment(merchantId: merchantId, requestId: requestId)
+      return QrPaymentDraft(
+        merchant: d.merchant.toNitro(),
+        requestId: d.requestId,
+        amount: d.amountMinor.map { Double($0.int64Value) },
+        expiresAt: d.expiresAt.map { Double($0.int64Value) },
+        balance: Double(d.balance),
+        dailyRemaining: Double(d.dailyRemaining),
+        minAmount: Double(d.minAmount),
+        maxAmount: Double(d.maxAmount)
+      )
+    }
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func reviewQrPayment(amount: Double) throws -> Promise<QrPaymentReview> {
+    return Promise.async { [core, convert] in
+      let r = try await core.reviewQrPayment(amount: try convert.toLongExact(value: amount, field: "amount"))
+      return QrPaymentReview(
+        id: r.id,
+        idempotencyKey: r.idempotencyKey,
+        merchant: r.merchant.toNitro(),
+        requestId: r.requestId,
+        amount: Double(r.amount),
+        fee: Double(r.fee),
+        balanceAfter: Double(r.balanceAfter)
+      )
+    }
+  }
+
+  func getMyQr() throws -> Promise<String> {
+    return Promise.async { [core] in try await core.getMyQr() }
+  }
+
   func parseMoney(input: String) throws -> MoneyParseResult {
     let r = core.parseMoney(input: input)
     return MoneyParseResult(
@@ -381,15 +429,19 @@ private extension PocketlyShared.Transaction {
       type: TransactionType(fromString: type.name)!,
       category: Category(fromString: category.name)!,
       amount: Double(amount),
-      counterparty: counterparty.map { c in
-        Counterparty(kind: CounterpartyKind(fromString: c.kind.name)!, id: c.id, name: c.name, phone: c.phone)
-      },
+      counterparty: counterparty.map { $0.toNitro() },
       note: note,
       status: TransactionStatus(fromString: status.name)!,
       failureReason: failureReason.map { ErrorCode(fromString: $0.name)! },
       createdAt: Double(createdAt),
       updatedAt: Double(updatedAt)
     )
+  }
+}
+
+private extension PocketlyShared.Counterparty {
+  func toNitro() -> Counterparty {
+    Counterparty(kind: CounterpartyKind(fromString: kind.name)!, id: id, name: name, phone: phone)
   }
 }
 

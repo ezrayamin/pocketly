@@ -23,6 +23,9 @@ import type {
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   Subscription,
   TopUpMethod,
@@ -194,6 +197,30 @@ export class KmpCore implements Core {
 
   setDailyLimit(minor: number): Promise<void> {
     return this.native.setDailyLimit(minor).catch(rethrow);
+  }
+
+  parseQr(text: string): QrCode {
+    const c = this.native.parseQr(text);
+    return withoutUndefined({
+      ok: c.ok,
+      reason: c.reason,
+      kind: c.kind,
+      merchantId: c.merchantId,
+      requestId: c.requestId,
+      userId: c.userId,
+    });
+  }
+
+  async startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft> {
+    return withoutUndefined(await this.native.startQrPayment(merchantId, requestId).catch(rethrow));
+  }
+
+  async reviewQrPayment(amount: number): Promise<QrPaymentReview> {
+    return withoutUndefined(await this.native.reviewQrPayment(amount).catch(rethrow));
+  }
+
+  getMyQr(): Promise<string> {
+    return this.native.getMyQr().catch(rethrow);
   }
 
   checkTopUpAmount(text: string): AmountCheck {

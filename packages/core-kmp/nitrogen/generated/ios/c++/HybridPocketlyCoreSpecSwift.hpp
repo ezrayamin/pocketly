@@ -114,6 +114,16 @@ namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
 namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TopUpMethod` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -178,6 +188,11 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransferAuthMethod.hpp"
 #include "TopUpReview.hpp"
 #include "TopUpMethod.hpp"
+#include "QrCode.hpp"
+#include "QrRejectReason.hpp"
+#include "QrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -489,6 +504,38 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) override {
       auto __result = _swiftPart.reviewTopUp(std::forward<decltype(amount)>(amount), static_cast<int>(paymentMethod));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline QrCode parseQr(const std::string& text) override {
+      auto __result = _swiftPart.parseQr(text);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<QrPaymentDraft>> startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) override {
+      auto __result = _swiftPart.startQrPayment(merchantId, requestId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<QrPaymentReview>> reviewQrPayment(double amount) override {
+      auto __result = _swiftPart.reviewQrPayment(std::forward<decltype(amount)>(amount));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<std::string>> getMyQr() override {
+      auto __result = _swiftPart.getMyQr();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

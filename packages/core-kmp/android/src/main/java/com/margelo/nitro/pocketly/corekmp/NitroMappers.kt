@@ -28,6 +28,9 @@ import com.pocketly.shared.domain.UnlockResult as KUnlockResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
 import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
+import com.pocketly.shared.domain.QrCode as KQrCode
+import com.pocketly.shared.domain.QrPaymentDraft as KQrPaymentDraft
+import com.pocketly.shared.domain.QrPaymentReview as KQrPaymentReview
 import com.pocketly.shared.domain.SpendingSummary as KSpendingSummary
 import com.pocketly.shared.domain.StaleInfo as KStaleInfo
 import com.pocketly.shared.domain.TopUpMethod as KTopUpMethod
@@ -213,6 +216,30 @@ internal fun KTransferReview.toNitro() = TransferReview(
 
 internal fun KTopUpReview.toNitro() = TopUpReview(
     id, idempotencyKey, TopUpMethod.valueOf(method.name), amount.minor.toDouble(), fee.minor.toDouble(), balanceAfter.minor.toDouble(),
+)
+
+internal fun KQrCode.toNitro() = QrCode(
+    ok = ok,
+    reason = reason?.let { QrRejectReason.valueOf(it.name) },
+    kind = kind?.let { QrKind.valueOf(it.name) },
+    merchantId = merchantId,
+    requestId = requestId,
+    userId = userId,
+)
+
+internal fun KQrPaymentDraft.toNitro() = QrPaymentDraft(
+    merchant = merchant.toNitro(),
+    requestId = requestId,
+    amount = amount?.minor?.toDouble(),
+    expiresAt = expiresAt?.toDouble(),
+    balance = balance.minor.toDouble(),
+    dailyRemaining = dailyRemaining.minor.toDouble(),
+    minAmount = minAmount.minor.toDouble(),
+    maxAmount = maxAmount.minor.toDouble(),
+)
+
+internal fun KQrPaymentReview.toNitro() = QrPaymentReview(
+    id, idempotencyKey, merchant.toNitro(), requestId, amount.minor.toDouble(), fee.minor.toDouble(), balanceAfter.minor.toDouble(),
 )
 
 internal fun KTransferResult.toNitro() = TransferResult(

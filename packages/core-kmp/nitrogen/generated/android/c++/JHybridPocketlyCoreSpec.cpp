@@ -99,6 +99,16 @@ namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
 namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TopUpMethod` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -216,6 +226,16 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JTopUpReview.hpp"
 #include "TopUpMethod.hpp"
 #include "JTopUpMethod.hpp"
+#include "QrCode.hpp"
+#include "JQrCode.hpp"
+#include "QrRejectReason.hpp"
+#include "JQrRejectReason.hpp"
+#include "QrKind.hpp"
+#include "JQrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "JQrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
+#include "JQrPaymentReview.hpp"
 #include "MoneyParseResult.hpp"
 #include "JMoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
@@ -706,6 +726,59 @@ namespace margelo::nitro::pocketly {
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
         auto __result = jni::static_ref_cast<JTopUpReview>(__boxedResult);
         __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  QrCode JHybridPocketlyCoreSpec::parseQr(const std::string& text) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JQrCode>(jni::alias_ref<jni::JString> /* text */)>("parseQr");
+    auto __result = method(_javaPart, jni::make_jstring(text));
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<QrPaymentDraft>> JHybridPocketlyCoreSpec::startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* merchantId */, jni::alias_ref<jni::JString> /* requestId */)>("startQrPayment");
+    auto __result = method(_javaPart, jni::make_jstring(merchantId), requestId.has_value() ? jni::make_jstring(requestId.value()) : nullptr);
+    return [&]() {
+      auto __promise = Promise<QrPaymentDraft>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JQrPaymentDraft>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<QrPaymentReview>> JHybridPocketlyCoreSpec::reviewQrPayment(double amount) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(double /* amount */)>("reviewQrPayment");
+    auto __result = method(_javaPart, amount);
+    return [&]() {
+      auto __promise = Promise<QrPaymentReview>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JQrPaymentReview>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<std::string>> JHybridPocketlyCoreSpec::getMyQr() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getMyQr");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<std::string>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<jni::JString>(__boxedResult);
+        __promise->resolve(__result->toStdString());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
         jni::JniException __jniError(__throwable);

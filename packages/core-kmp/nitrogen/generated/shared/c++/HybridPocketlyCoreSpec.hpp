@@ -63,6 +63,12 @@ namespace margelo::nitro::pocketly { struct TransferAuth; }
 namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TopUpMethod` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -98,6 +104,9 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransferAuth.hpp"
 #include "TopUpReview.hpp"
 #include "TopUpMethod.hpp"
+#include "QrCode.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -169,6 +178,10 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<void>> setDailyLimit(double minor) = 0;
       virtual AmountCheck checkTopUpAmount(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) = 0;
+      virtual QrCode parseQr(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<QrPaymentDraft>> startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) = 0;
+      virtual std::shared_ptr<Promise<QrPaymentReview>> reviewQrPayment(double amount) = 0;
+      virtual std::shared_ptr<Promise<std::string>> getMyQr() = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;

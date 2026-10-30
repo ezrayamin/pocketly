@@ -121,6 +121,16 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun reviewTopUp(amount: Double, paymentMethod: TopUpMethod): Promise<TopUpReview> =
         Promise.async { core.reviewTopUp(Money(BridgeConversions.toLongExact(amount)), paymentMethod.toDomain()).toNitro() }
 
+    override fun parseQr(text: String): QrCode = core.parseQr(text).toNitro()
+
+    override fun startQrPayment(merchantId: String, requestId: String?): Promise<QrPaymentDraft> =
+        Promise.async { core.startQrPayment(merchantId, requestId).toNitro() }
+
+    override fun reviewQrPayment(amount: Double): Promise<QrPaymentReview> =
+        Promise.async { core.reviewQrPayment(Money(BridgeConversions.toLongExact(amount))).toNitro() }
+
+    override fun getMyQr(): Promise<String> = Promise.async { core.getMyQr() }
+
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
 
     override fun parseMoney(input: String): MoneyParseResult = core.parseMoney(input).toNitro()

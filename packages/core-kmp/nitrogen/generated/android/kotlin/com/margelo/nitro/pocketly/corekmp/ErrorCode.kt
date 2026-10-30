@@ -27,7 +27,9 @@ enum class ErrorCode(@DoNotStrip @Keep val value: Int) {
   NOT_FOUND(8),
   INVALID_ARGUMENT(9),
   SECURE_STORAGE_UNAVAILABLE(10),
-  PAYMENT_DECLINED(11);
+  PAYMENT_DECLINED(11),
+  QR_EXPIRED(12),
+  QR_ALREADY_PAID(13);
 
   companion object
 }

@@ -47,6 +47,10 @@ namespace margelo::nitro::pocketly {
       prototype.registerHybridMethod("setDailyLimit", &HybridPocketlyCoreSpec::setDailyLimit);
       prototype.registerHybridMethod("checkTopUpAmount", &HybridPocketlyCoreSpec::checkTopUpAmount);
       prototype.registerHybridMethod("reviewTopUp", &HybridPocketlyCoreSpec::reviewTopUp);
+      prototype.registerHybridMethod("parseQr", &HybridPocketlyCoreSpec::parseQr);
+      prototype.registerHybridMethod("startQrPayment", &HybridPocketlyCoreSpec::startQrPayment);
+      prototype.registerHybridMethod("reviewQrPayment", &HybridPocketlyCoreSpec::reviewQrPayment);
+      prototype.registerHybridMethod("getMyQr", &HybridPocketlyCoreSpec::getMyQr);
       prototype.registerHybridMethod("formatMoney", &HybridPocketlyCoreSpec::formatMoney);
       prototype.registerHybridMethod("parseMoney", &HybridPocketlyCoreSpec::parseMoney);
       prototype.registerHybridMethod("subscribePrices", &HybridPocketlyCoreSpec::subscribePrices);

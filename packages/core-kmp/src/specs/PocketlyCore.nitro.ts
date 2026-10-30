@@ -17,6 +17,9 @@ import type {
   PhoneCheck,
   PinCheck,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   TopUpMethod,
   TopUpReview,
@@ -88,6 +91,12 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   // Not `method`: Nitro's generated JNI code has a local of that name.
   checkTopUpAmount(text: string): AmountCheck;
   reviewTopUp(amount: number, paymentMethod: TopUpMethod): Promise<TopUpReview>;
+
+  // F7, F8 (ADR-0016). Four methods; confirming and checking reuse confirmTransfer / getTransferStatus.
+  parseQr(text: string): QrCode;
+  startQrPayment(merchantId: string, requestId: string | undefined): Promise<QrPaymentDraft>;
+  reviewQrPayment(amount: number): Promise<QrPaymentReview>;
+  getMyQr(): Promise<string>;
 
   formatMoney(minor: number): string;
   parseMoney(input: string): MoneyParseResult;
