@@ -13,6 +13,7 @@ import { MERCHANTS, seedPaymentRequests } from '../src/data/seedData';
 import { UserTimeZone } from '../src/data/timeZone';
 import { parseQr, userQrPayload } from '../src/domain/qrPolicy';
 import { nodeSqliteDriver } from '../testing/nodeSqliteDriver';
+import { testCore } from '../testing/testCore';
 
 /** ADR-0016: the QR rules and the fake server's merchant endpoints, against fixtures/qr.json. */
 
@@ -181,18 +182,37 @@ describe("fake server: the account's user id (ADR-0016 §6)", () => {
   it('is random per account, kept for the same phone and across resets, new for another phone', async () => {
     const otpNow = { ms: 0 };
     const api = await openServer(otpNow);
-    expect(await error(api.getAccountUserId())).toBe('NOT_FOUND');
     const first = await verify(api, '+6281234567890');
     expect(first.userId).toMatch(PATTERN);
-    expect(await api.getAccountUserId()).toBe(first.userId);
+    expect(await api.getAccountUserId('+6281234567890')).toBe(first.userId);
+    expect(await error(api.getAccountUserId('+6285712345678'))).toBe('NOT_FOUND'); // not this account
     await api.reset(DEFAULT_DATASET);
-    expect(await api.getAccountUserId()).toBe(first.userId);
+    expect(await api.getAccountUserId('+6281234567890')).toBe(first.userId);
     otpNow.ms += 60_000; // past the resend wait
     expect((await verify(api, '+6281234567890')).userId).toBe(first.userId);
     otpNow.ms += 60_000;
     const other = await verify(api, '+6285712345678');
     expect(other.userId).toMatch(PATTERN);
     expect(other.userId).not.toBe(first.userId);
+  });
+
+  it('adopts an account verified before the server recorded it (slice 5 installs)', async () => {
+    const api = await openServer();
+    const userId = await api.getAccountUserId('+6281234567890');
+    expect(userId).toMatch(PATTERN);
+    expect(await api.getAccountUserId('+6281234567890')).toBe(userId);
+    expect(await error(api.getAccountUserId('+6285712345678'))).toBe('NOT_FOUND');
+  });
+
+  it('My QR works for a session from before user ids, on a server without the account (device check 2026-10-30)', async () => {
+    const core = testCore({ pinIterations: 1000 });
+    await core.resetData(DEFAULT_DATASET);
+    // As slice 5 left it: a verified phone in the session, no user id, a server that never recorded the account.
+    const pin = (core as unknown as { pin: { rememberVerifiedPhone(p: string, t: string): Promise<void> } }).pin;
+    await pin.rememberVerifiedPhone('+6281234567890', 'old-token');
+    const payload = await core.getMyQr();
+    expect(payload).toMatch(/^pocketly:\/\/user\/v1\?u=u-[0-9a-f]{12}$/);
+    expect(await core.getMyQr()).toBe(payload); // kept in the session
   });
 
   it('looks the account up as itself, so the client can refuse paying yourself', async () => {

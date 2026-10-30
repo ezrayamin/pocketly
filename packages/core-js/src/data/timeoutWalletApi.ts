@@ -75,8 +75,8 @@ export class TimeoutWalletApi implements WalletApi {
     return this.withTimeout(() => this.inner.payMerchant(request, idempotencyKey), 'write');
   }
 
-  getAccountUserId(): Promise<string> {
-    return this.withTimeout(() => this.inner.getAccountUserId());
+  getAccountUserId(phone: string): Promise<string> {
+    return this.withTimeout(() => this.inner.getAccountUserId(phone));
   }
 
   getTransferByKey(idempotencyKey: string): Promise<Transaction> {

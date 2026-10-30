@@ -239,18 +239,27 @@ class QrServerTest {
         val pattern = Regex(fixture["myQr"]!!.jsonObject.str("userIdPattern")!!)
         var otpNow = 0L
         val api = openServer { otpNow }
-        assertEquals(ErrorCode.NOT_FOUND, error { api.getAccountUserId() })
         val first = verify(api, "+6281234567890")!!
         assertTrue(pattern.matches(first), first)
-        assertEquals(first, api.getAccountUserId())
+        assertEquals(first, api.getAccountUserId("+6281234567890"))
+        assertEquals(ErrorCode.NOT_FOUND, error { api.getAccountUserId("+6285712345678") }) // not this account
         api.reset(DatasetConfig.DEFAULT)
-        assertEquals(first, api.getAccountUserId())
+        assertEquals(first, api.getAccountUserId("+6281234567890"))
         otpNow += 60_000 // past the resend wait
         assertEquals(first, verify(api, "+6281234567890"))
         otpNow += 60_000
         val other = verify(api, "+6285712345678")!!
         assertTrue(pattern.matches(other), other)
         assertNotEquals(first, other)
+    }
+
+    @Test
+    fun adoptsAnAccountVerifiedBeforeTheServerRecordedIt() = runBlocking {
+        val api = openServer()
+        val userId = api.getAccountUserId("+6281234567890")
+        assertTrue(Regex(fixture["myQr"]!!.jsonObject.str("userIdPattern")!!).matches(userId), userId)
+        assertEquals(userId, api.getAccountUserId("+6281234567890"))
+        assertEquals(ErrorCode.NOT_FOUND, error { api.getAccountUserId("+6285712345678") })
     }
 
     @Test

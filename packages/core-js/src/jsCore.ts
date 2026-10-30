@@ -385,7 +385,7 @@ export class JsCore implements Core {
 
   async getMyQr(): Promise<string> {
     await this.ready;
-    return userQrPayload(await this.pin.myUserId(() => this.api.getAccountUserId()));
+    return userQrPayload(await this.pin.myUserId((phone) => this.api.getAccountUserId(phone)));
   }
 
   async setDailyLimit(minor: number): Promise<void> {

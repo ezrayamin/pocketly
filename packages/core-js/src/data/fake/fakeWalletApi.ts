@@ -105,10 +105,15 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     return { ...result, userId };
   }
 
-  async getAccountUserId(): Promise<string> {
+  async getAccountUserId(phone: string): Promise<string> {
     await this.network.beforeCall();
     return this.exclusive(async () => {
-      if (this.accountPhone === undefined) throw new CoreError('NOT_FOUND', 'No verified account');
+      if (this.accountPhone === undefined) {
+        // Verified before this server recorded the account (slice 5): the session's phone is it.
+        await this.store.setMeta(META_ACCOUNT_PHONE, phone);
+        this.accountPhone = phone;
+      }
+      if (phone !== this.accountPhone) throw new CoreError('NOT_FOUND', 'Not this account');
       if (this.accountUserId === undefined) {
         // Verified before user ids existed: the account gets one now.
         this.accountUserId = this.newUserId();

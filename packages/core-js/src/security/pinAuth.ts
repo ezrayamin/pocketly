@@ -208,17 +208,18 @@ export class PinAuth {
   }
 
   /**
-   * ADR-0016 §6: the verified account's user id. `fetch` runs (and its answer is kept) only for a
-   * session from before verifyOtp returned it. NOT_FOUND without a verified phone.
+   * ADR-0016 §6: the verified account's user id. `fetch` (given the verified phone) runs, and its
+   * answer is kept, only for a session from before verifyOtp returned it. NOT_FOUND without a
+   * verified phone.
    */
-  async myUserId(fetch: () => Promise<string>): Promise<string> {
+  async myUserId(fetch: (phone: string) => Promise<string>): Promise<string> {
     const session = await this.serial(async () => {
       await this.readRecord();
       return this.readSession();
     });
     if (session === undefined) throw new CoreError('NOT_FOUND', 'No verified phone');
     if (session.userId !== undefined) return session.userId;
-    const userId = await fetch(); // outside the queue: the lock screen doesn't wait for the network
+    const userId = await fetch(session.phone); // outside the queue: the lock screen doesn't wait for the network
     await this.serial(async () => {
       const current = await this.readSession();
       if (current?.phone === session.phone && current.userId === undefined) {

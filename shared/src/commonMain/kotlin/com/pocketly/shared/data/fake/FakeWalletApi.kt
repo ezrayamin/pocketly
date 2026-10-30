@@ -83,10 +83,15 @@ internal class FakeWalletApi(
         }
     }
 
-    override suspend fun getAccountUserId(): String {
+    override suspend fun getAccountUserId(phone: String): String {
         network.beforeCall()
         return serial.withLock {
-            if (accountPhone == null) throw CoreException(ErrorCode.NOT_FOUND, "No verified account")
+            if (accountPhone == null) {
+                // Verified before this server recorded the account (slice 5): the session's phone is it.
+                store.setMeta(META_ACCOUNT_PHONE, phone)
+                accountPhone = phone
+            }
+            if (phone != accountPhone) throw CoreException(ErrorCode.NOT_FOUND, "Not this account")
             accountUserId ?: newUserId().also {
                 // Verified before user ids existed: the account gets one now.
                 store.setMeta(META_ACCOUNT_USER_ID, it)

@@ -18,7 +18,9 @@ export async function scanQr(): Promise<ScanOutcome> {
     const barcode = await DataScanner.scanBarcode({ targetFormats: ['qr'], enableAutoZoom: true });
     return { kind: 'SCANNED', value: barcode.value };
   } catch (e) {
-    return classify(e instanceof Error ? e.message : String(e));
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn(`[Pocketly] scanner: ${message}`); // the library's own words, no user data
+    return classify(message);
   }
 }
 

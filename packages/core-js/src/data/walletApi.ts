@@ -97,10 +97,11 @@ export interface WalletApi {
    */
   payMerchant(request: QrPaymentRequest, idempotencyKey: string): Promise<Transaction>;
   /**
-   * ADR-0016 §6: the verified account's user id, for sessions from before verifyOtp returned it.
-   * NOT_FOUND without one.
+   * ADR-0016 §6: the user id of the account verified with `phone`, for sessions from before
+   * verifyOtp returned it. A server that doesn't know the account yet (phone verified before it
+   * recorded one) takes this phone as it; another phone than the account's is NOT_FOUND.
    */
-  getAccountUserId(): Promise<string>;
+  getAccountUserId(phone: string): Promise<string>;
   /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
   getTransferByKey(idempotencyKey: string): Promise<Transaction>;
 }

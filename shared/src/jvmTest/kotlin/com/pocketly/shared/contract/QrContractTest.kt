@@ -223,6 +223,18 @@ class QrContractTest {
         assertEquals(ErrorCode.NOT_FOUND, code { core.getMyQr() })
     }
 
+    /** Device check 2026-10-30: a session from before user ids, on a server that never recorded the account. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun myQrWorksForASessionFromBeforeUserIds() = runBlocking {
+        val old = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), MemorySecureStore(), pinIterations = 1000)
+        old.resetData(DatasetConfig.DEFAULT)
+        old.pinForTests().rememberVerifiedPhone("+6281234567890", "old-token")
+        val payload = old.getMyQr()
+        assertTrue(payload.startsWith(prefix) && userIdPattern.matches(payload.removePrefix(prefix)), payload)
+        assertEquals(payload, old.getMyQr()) // kept in the session
+    }
+
     private companion object {
         const val PIN = "482915"
     }

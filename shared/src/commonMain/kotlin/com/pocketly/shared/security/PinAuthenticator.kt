@@ -131,13 +131,13 @@ class PinAuthenticator(
      * verifyOtp returned it. NOT_FOUND without a verified phone.
      */
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
-    suspend fun myUserId(fetch: suspend () -> String): String {
+    suspend fun myUserId(fetch: suspend (phone: String) -> String): String {
         val session = serial {
             readRecord()
             readSession()
         } ?: throw CoreException(ErrorCode.NOT_FOUND, "No verified phone")
         session.userId?.let { return it }
-        val userId = fetch()
+        val userId = fetch(session.phone)
         serial {
             val current = readSession()
             if (current?.phone == session.phone && current.userId == null) store.put(KEY_SESSION, current.copy(userId = userId).encode())

@@ -81,8 +81,12 @@ interface WalletApi {
      */
     suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction
 
-    /** ADR-0016 §6: the verified account's user id (for sessions from before verifyOtp returned it). NOT_FOUND without one. */
-    suspend fun getAccountUserId(): String
+    /**
+     * ADR-0016 §6: the user id of the account verified with [phone], for sessions from before
+     * verifyOtp returned it. A server that doesn't know the account yet (phone verified before it
+     * recorded one) takes this phone as it; another phone than the account's is NOT_FOUND.
+     */
+    suspend fun getAccountUserId(phone: String): String
 
     /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
     suspend fun getTransferByKey(idempotencyKey: String): Transaction

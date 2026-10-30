@@ -53,7 +53,7 @@ internal class TimeoutWalletApi(
     override suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction =
         withTimeoutOf(CallKind.WRITE) { inner.payMerchant(request, idempotencyKey) }
 
-    override suspend fun getAccountUserId(): String = withTimeoutOf { inner.getAccountUserId() }
+    override suspend fun getAccountUserId(phone: String): String = withTimeoutOf { inner.getAccountUserId(phone) }
 
     override suspend fun getTransferByKey(idempotencyKey: String): Transaction =
         withTimeoutOf { inner.getTransferByKey(idempotencyKey) }

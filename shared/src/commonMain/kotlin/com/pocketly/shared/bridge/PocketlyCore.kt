@@ -340,7 +340,10 @@ class PocketlyCore internal constructor(
 
     /** F8: this account's code; the user id comes from the server once (ADR-0016 §6). */
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun getMyQr(): String = QrPolicy.userPayload(pin.myUserId { onDb { api.getAccountUserId() } })
+    suspend fun getMyQr(): String = QrPolicy.userPayload(pin.myUserId { phone -> onDb { api.getAccountUserId(phone) } })
+
+    /** Tests only: the PIN and session store (an old install's session, ADR-0016 §6). */
+    internal fun pinForTests(): PinAuthenticator = pin
 
     /** Tests only: moves the fake server's frozen clock forward (held transfers and top-ups settle by it). */
     internal fun advanceServerClock(ms: Long) = backend.advanceClock(ms)
