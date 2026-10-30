@@ -1,0 +1,47 @@
+# NFR-TEST-04: a declined top-up (FR-TOP-03, ADR-0015 §4), then another method goes through.
+# The launch argument turns on the developer menu's "Decline top-ups"; the dev link turns it off.
+#   maestro test -e APP_ID=com.pocketly.js apps/mobile/e2e/topup-declined.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks are run with adb input. This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+      pocketly.network.declineTopUps: true
+- tapOn:
+    id: "quick-topup"
+- tapOn:
+    id: "amount-key-2"
+- tapOn:
+    id: "amount-key-0"
+- tapOn:
+    id: "topup-amount-continue"
+- tapOn:
+    id: "topup-method-continue"
+- tapOn:
+    id: "topup-review-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "topup-result-failed"
+    timeout: 15000
+- assertVisible: "Top-up declined"
+- openLink: "pocketly://dev/network?declineTopUps=false"
+- tapOn:
+    id: "topup-result-other-method"
+- tapOn:
+    id: "topup-method-BANK_TRANSFER"
+- tapOn:
+    id: "topup-method-continue"
+- tapOn:
+    id: "topup-review-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "topup-result-success"
+    timeout: 15000

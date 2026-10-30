@@ -104,7 +104,7 @@ export function SendPinScreen({ navigation, route }: Props) {
             : undefined
         }
       />
-      {sending && <ProcessingView amount={amount} recipient={review.recipient.name} />}
+      {sending && <ProcessingView title={`Sending ${amount}`} subtitle={`to ${review.recipient.name}`} />}
     </View>
   );
 }

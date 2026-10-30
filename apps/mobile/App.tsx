@@ -20,6 +20,10 @@ import { SendPinScreen } from './src/features/send/SendPinScreen';
 import { SendRecipientScreen } from './src/features/send/SendRecipientScreen';
 import { SendResultScreen } from './src/features/send/SendResultScreen';
 import { SendReviewScreen } from './src/features/send/SendReviewScreen';
+import { TopUpAmountScreen } from './src/features/topup/TopUpAmountScreen';
+import { TopUpMethodScreen } from './src/features/topup/TopUpMethodScreen';
+import { TopUpResultScreen } from './src/features/topup/TopUpResultScreen';
+import { TopUpReviewScreen } from './src/features/topup/TopUpReviewScreen';
 import { applyLaunchArgs, needsSetup, parseLaunchArgs, type LaunchArgs } from './src/launchArgs';
 import type { RootStackParamList } from './src/navigation';
 import { colors } from './src/theme/tokens';
@@ -115,6 +119,10 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
           <Stack.Screen name="SendPin" component={SendPinScreen} />
           {/* A result can't be swiped back into the flow: Back goes Home (product §7.3 rule 3). */}
           <Stack.Screen name="SendResult" component={SendResultScreen} options={{ gestureEnabled: false }} />
+          <Stack.Screen name="TopUpAmount" component={TopUpAmountScreen} />
+          <Stack.Screen name="TopUpMethod" component={TopUpMethodScreen} />
+          <Stack.Screen name="TopUpReview" component={TopUpReviewScreen} />
+          <Stack.Screen name="TopUpResult" component={TopUpResultScreen} options={{ gestureEnabled: false }} />
         </Stack.Navigator>
       </NavigationContainer>
       {DEV_TOOLS_ENABLED && (

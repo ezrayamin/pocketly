@@ -92,7 +92,7 @@ export function SendReviewScreen({ navigation, route }: Props) {
         <PrimaryButton label="Confirm and send" onPress={onConfirm} busy={sending} testID="review-confirm" />
         <TextButton label="Edit amount" onPress={() => navigation.goBack()} testID="review-edit" accent />
       </View>
-      {sending && <ProcessingView amount={amount} recipient={review.recipient.name} />}
+      {sending && <ProcessingView title={`Sending ${amount}`} subtitle={`to ${review.recipient.name}`} />}
     </SafeAreaView>
   );
 }

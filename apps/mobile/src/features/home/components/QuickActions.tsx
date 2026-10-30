@@ -8,12 +8,12 @@ import { ArrowUpRight, CreditCard, QrCode, ScanLine, type LucideIcon } from '../
 import { colors } from '../../../theme/tokens';
 
 /**
- * FR-HOME-03. Send opens its flow (F5). Top-Up (F6), Pay (F7) and Receive (F8) are still
+ * FR-HOME-03. Send (F5) and Top-Up (F6) open their flows. Pay (F7) and Receive (F8) are still
  * placeholders until those features exist.
  */
-const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: 'SendRecipient' }[] = [
+const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: 'SendRecipient' | 'TopUpAmount' }[] = [
   { label: 'Send', Icon: ArrowUpRight, primary: true, route: 'SendRecipient' },
-  { label: 'Top-Up', Icon: CreditCard },
+  { label: 'Top-Up', Icon: CreditCard, route: 'TopUpAmount' },
   { label: 'Pay (QR)', Icon: ScanLine },
   { label: 'Receive', Icon: QrCode },
 ];
@@ -29,7 +29,7 @@ export function QuickActions() {
           onPress={
             route
               ? () => {
-                  flowMark('send-tap');
+                  if (route === 'SendRecipient') flowMark('send-tap'); // BM-07 times the Send flow only
                   navigation.navigate(route);
                 }
               : undefined

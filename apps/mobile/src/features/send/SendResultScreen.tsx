@@ -1,17 +1,25 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, Share, StatusBar, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, Share, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { FlowMarksProbe, flowMark } from '@pocketly/bench-app';
 import type { TransferResult } from '@pocketly/core-contract';
-import { Check, CircleAlert, CircleX, Clock, Copy, Share2 } from '../../components/icons';
+import { Clock, Copy, Share2 } from '../../components/icons';
 import { core } from '../../core';
 import type { RootStackParamList } from '../../navigation';
 import { colors, spacing } from '../../theme/tokens';
 import { toUserError } from '../errors';
 import { receiptText } from '../history/receipt';
 import { formatDateTime } from '../home/presentation';
-import { PrimaryButton, ProcessingView, SecondaryButton, Summary, TextButton, sendStyles } from './components';
+import {
+  PrimaryButton,
+  ProcessingView,
+  ResultIcon,
+  SecondaryButton,
+  Summary,
+  TextButton,
+  sendStyles,
+} from './components';
 import { resultCopy } from './sendCopy';
 import { transferFinished } from './sendEvents';
 
@@ -199,41 +207,13 @@ export function SendResultScreen({ navigation, route }: Props) {
         {result.state === 'FAILED' && <TextButton label="Cancel" onPress={done} testID="result-cancel" />}
       </View>
       {FlowMarksProbe && <FlowMarksProbe key={result.state} />}
-      {retrying && <ProcessingView amount={amount} recipient={review.recipient.name} />}
+      {retrying && <ProcessingView title={`Sending ${amount}`} subtitle={`to ${review.recipient.name}`} />}
     </SafeAreaView>
-  );
-}
-
-/** FR-TRF-07 "animated success": the check pops in. Status is never color alone (NFR-A11Y-03). */
-function ResultIcon({ state, retryable }: { state: TransferResult['state']; retryable: boolean }) {
-  const scale = useRef(new Animated.Value(state === 'SUCCESS' ? 0.4 : 1)).current;
-  useEffect(() => {
-    if (state !== 'SUCCESS') return;
-    Animated.spring(scale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
-  }, [state, scale]);
-  const look =
-    state === 'SUCCESS'
-      ? { bg: colors.primary, Icon: Check, color: colors.onPrimary }
-      : state === 'PENDING'
-      ? { bg: colors.tertiaryDim, Icon: Clock, color: colors.tertiary }
-      : { bg: colors.dangerDim, Icon: retryable ? CircleAlert : CircleX, color: colors.danger };
-  return (
-    <Animated.View style={[styles.icon, { backgroundColor: look.bg, transform: [{ scale }] }]} testID="result-icon">
-      <look.Icon color={look.color} size={40} strokeWidth={2.4} />
-    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   top: { alignItems: 'center', gap: 10, paddingTop: 80, paddingHorizontal: 28 },
-  icon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
   title: { color: colors.textPrimary, fontSize: 22, fontWeight: '700', textAlign: 'center' },
   amount: {
     color: colors.textPrimary,

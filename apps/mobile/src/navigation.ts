@@ -1,4 +1,4 @@
-import type { Transaction, TransferDraft, TransferResult, TransferReview } from '@pocketly/core-contract';
+import type { TopUpReview, Transaction, TransferDraft, TransferResult, TransferReview } from '@pocketly/core-contract';
 
 /**
  * Root stack (product.md §7.4, the part built so far): the tab screens, with
@@ -20,4 +20,10 @@ export type RootStackParamList = {
   /** PIN fallback (FR-TRF-04). `notice`: why biometrics didn't do it. */
   SendPin: { review: TransferReview; notice?: string };
   SendResult: { review: TransferReview; result: TransferResult };
+  // Top-Up flow (F6, ADR-0015 §5): amount → method → review → result, root-stack screens too.
+  TopUpAmount: undefined;
+  /** `amount`: what the amount step accepted (checkTopUpAmount), in minor units. */
+  TopUpMethod: { amount: number };
+  TopUpReview: { review: TopUpReview };
+  TopUpResult: { review: TopUpReview; result: TransferResult };
 };
