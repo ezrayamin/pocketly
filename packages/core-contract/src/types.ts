@@ -634,3 +634,30 @@ export interface QrPaymentReview {
   fee: MinorUnits;
   balanceAfter: MinorUnits;
 }
+
+// ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ───────────────────────
+
+/**
+ * MONEY_RECEIVED: an incoming transfer (FR-NOTIF-01). TRANSACTION_SETTLED: a transfer, top-up or QR
+ * payment this install saw PENDING settled SUCCESS or FAILED (FR-NOTIF-02).
+ */
+export type NotificationKind = 'MONEY_RECEIVED' | 'TRANSACTION_SETTLED';
+
+/** One in-app notification. The words are the app's; this carries what they're about. */
+export interface AppNotification {
+  /** The server event's id (`evt-<n>`): unique, so an event delivered twice is one notification. */
+  id: string;
+  kind: NotificationKind;
+  /** The transaction as the event left it (TRANSACTION_SETTLED: SUCCESS or FAILED). */
+  transaction: Transaction;
+  /** When the server logged the event. */
+  createdAt: EpochMillis;
+  read: boolean;
+}
+
+/** getNotifications (FR-NOTIF-03): from the replica, so it works offline. */
+export interface NotificationList {
+  /** At most NOTIFICATIONS_KEPT, newest first. */
+  items: AppNotification[];
+  unreadCount: number;
+}

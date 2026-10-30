@@ -118,3 +118,8 @@ export const TOP_UP_PROCESSING_MAX_MS = 5_000;
 
 /** Longest code parseQr reads, in UTF-16 code units; longer is TOO_LONG. */
 export const QR_MAX_LENGTH = 256;
+
+// ── Notifications (F9; ADR-0017) ──
+
+/** FR-NOTIF-03: how many notifications the replica keeps; older ones are dropped. */
+export const NOTIFICATIONS_KEPT = 50;

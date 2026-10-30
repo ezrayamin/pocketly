@@ -34,6 +34,7 @@ import {
   PIN_PBKDF2_ITERATIONS,
   PIN_RECORD_VERSION,
   PIN_SALT_BYTES,
+  NOTIFICATIONS_KEPT,
   QR_MAX_LENGTH,
   TOP_UP_FEE_MINOR,
   TOP_UP_MAX_MINOR,
@@ -45,8 +46,18 @@ import {
 import type { BenchCore } from '../bench';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
-import type { Contact, DatasetConfig, NetworkSimulation, PriceTick, Transaction, TransferResult, Wallet } from '../types';
+import type {
+  AppNotification,
+  Contact,
+  DatasetConfig,
+  NetworkSimulation,
+  PriceTick,
+  Transaction,
+  TransferResult,
+  Wallet,
+} from '../types';
 import golden from '../../fixtures/golden.json';
+import eventsFixture from '../../fixtures/events.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
 import network from '../../fixtures/network.json';
@@ -1271,6 +1282,131 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
           await core.resetAuth();
           await expectCoreError(core.getMyQr(), 'NOT_FOUND'); // the same phone verified again keeps it: qrServer tests
         });
+      });
+    });
+
+    describe('Notifications (F9, FR-NOTIF-01..03, ADR-0017)', () => {
+      const PIN = '482915';
+      const START = golden.defaultDataset.wallet; // balance 1459085
+      const ID = new RegExp(eventsFixture.params.idPattern);
+      const pinAuth = { method: 'PIN' as const, pin: PIN };
+      const INSTANT: NetworkSimulation = { ...NETWORK_NORMAL, topUpProcessingMs: 0 };
+      const OFFLINE: NetworkSimulation = { mode: 'OFFLINE', failureRatePercent: 0 };
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      /** Delivery is asynchronous: polls until `check` holds (at most 3 s). */
+      async function until(check: () => boolean | Promise<boolean>) {
+        const end = Date.now() + 3_000;
+        while (!(await check())) {
+          if (Date.now() > end) throw new Error('timed out waiting for notifications');
+          await wait(10);
+        }
+      }
+
+      function subscribe() {
+        const got: AppNotification[] = [];
+        const sub = core.subscribeNotifications((n) => got.push(...n));
+        return { got, sub };
+      }
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+        core.setNetworkSimulation(INSTANT);
+      });
+
+      it('starts empty', async () => {
+        expect(NOTIFICATIONS_KEPT).toBe(eventsFixture.params.kept);
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
+      });
+
+      it('an incoming transfer notifies once, updates history, and reading clears the badge (FR-NOTIF-01/03)', async () => {
+        const { got, sub } = subscribe();
+        const tx = await core.simulateIncomingTransfer();
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({ kind: 'MONEY_RECEIVED', read: false, transaction: { id: tx.id, status: 'SUCCESS' } });
+        expect(got[0].id).toMatch(ID);
+        expect(await core.getNotifications()).toEqual({ items: [got[0]], unreadCount: 1 });
+        core.setNetworkSimulation(OFFLINE); // the replica has it already
+        expect((await core.getTransactions(undefined, 1)).items[0].id).toBe(tx.id);
+        core.setNetworkSimulation(INSTANT);
+
+        await core.markNotificationsRead();
+        expect(await core.getNotifications()).toEqual({ items: [{ ...got[0], read: true }], unreadCount: 0 });
+        await core.getTransactions(); // another catch-up: nothing new
+        await wait(50);
+        expect(got).toHaveLength(1);
+        sub.unsubscribe();
+      });
+
+      it('a held transfer that settles notifies, and its attempt agrees without asking (FR-NOTIF-02)', async () => {
+        await core.startTransfer('u-02');
+        const review = await core.reviewTransfer(1_000);
+        core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+        expect((await core.confirmTransfer(review.id, pinAuth)).state).toBe('PENDING');
+        core.setNetworkSimulation(INSTANT);
+        const { got, sub } = subscribe();
+        advanceServerClock(PENDING_RESOLVE_MAX_MS); // the server's timer settles it
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({
+          kind: 'TRANSACTION_SETTLED',
+          transaction: { id: 'trf-1', idempotencyKey: review.idempotencyKey, status: 'SUCCESS' },
+        });
+        core.setNetworkSimulation(OFFLINE); // no status check needed: the event moved the attempt
+        expect(await core.getTransferStatus(review.id)).toMatchObject({ state: 'SUCCESS' });
+        core.setNetworkSimulation(INSTANT);
+        expect((await core.getWallet()).balance).toBe(START.balance - 1_000);
+        sub.unsubscribe();
+      });
+
+      it('a top-up answered at once does not notify; one left pending does', async () => {
+        const { got, sub } = subscribe();
+        const quick = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+        expect((await core.confirmTransfer(quick.id)).state).toBe('SUCCESS');
+        await core.getTransactions(); // a catch-up that applies its settled event
+        await wait(100);
+        expect(got).toHaveLength(0);
+
+        const slow = await core.reviewTopUp(2_500, 'CARD');
+        core.setNetworkSimulation({ ...NETWORK_NORMAL, topUpProcessingMs: 300, writeTimeoutMs: 100 });
+        expect((await core.confirmTransfer(slow.id)).state).toBe('PENDING');
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({ kind: 'TRANSACTION_SETTLED', transaction: { id: 'tup-2', status: 'SUCCESS' } });
+        core.setNetworkSimulation(INSTANT);
+        expect((await core.getWallet()).balance).toBe(START.balance + 5_000 + 2_500);
+        sub.unsubscribe();
+      });
+
+      it('keeps the newest 50 (FR-NOTIF-03)', async () => {
+        for (let i = 0; i < NOTIFICATIONS_KEPT + 1; i++) await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).items[0]?.transaction.id === 'sim-000051');
+        const list = await core.getNotifications();
+        expect(list.items).toHaveLength(NOTIFICATIONS_KEPT);
+        expect(list.unreadCount).toBe(NOTIFICATIONS_KEPT);
+        expect(list.items[NOTIFICATIONS_KEPT - 1].transaction.id).toBe('sim-000002'); // sim-000001 dropped
+      });
+
+      it('unsubscribing stops delivery, not the catching up', async () => {
+        const { got, sub } = subscribe();
+        sub.unsubscribe();
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        expect(got).toHaveLength(0);
+      });
+
+      it('works offline; resetData and logout clear them', async () => {
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        core.setNetworkSimulation(OFFLINE);
+        expect((await core.getNotifications()).items).toHaveLength(1);
+        core.setNetworkSimulation(INSTANT);
+        await core.resetData(DEFAULT_DATASET);
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        await core.logout();
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
       });
     });
 
