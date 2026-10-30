@@ -48,6 +48,8 @@ Two measurements point the same way:
   its contract methods are plain JS. **Slice 6** (transfers, `2026-10-17_mid-06`): 7 methods with
   12 new structs and enums added 351 KB (1,318 → 1,668 KB), ~50 KB per method or ~18 KB per
   bridged method-or-type: new types cost about as much as new methods, so reuse structs too.
+  **Slice 7** (top-up, `2026-10-30_mid-01`): 2 methods and 2 new types added 74 KB (1,668 →
+  1,742 KB), the same ~18 KB each; reusing the transfer methods (ADR-0015 §1) kept it at that.
 - **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
   batched call (BM-06).
 
