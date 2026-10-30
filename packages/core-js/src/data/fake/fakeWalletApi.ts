@@ -17,6 +17,7 @@ import {
 import type { UserTimeZone } from '../timeZone';
 import type {
   ChangesPage,
+  EventsPage,
   FakeBackendControls,
   PaymentTarget,
   QrPaymentRequest,
@@ -24,6 +25,7 @@ import type {
   TopUpRequest,
   TransferRequest,
   WalletApi,
+  WalletEvent,
 } from '../walletApi';
 import { NetworkSimulator, type TopUpHandling } from './networkSimulator';
 import { OtpServer } from './otpServer';
@@ -34,6 +36,8 @@ export type ServerDataset = DatasetConfig & { extraTransactions?: readonly Trans
 
 /** Server-side page size cap for getChanges (sync). Same as Kotlin. */
 export const MAX_CHANGES_PAGE = 500;
+/** Server-side page size cap for getEvents. Same as Kotlin. */
+export const MAX_EVENTS_PAGE = 500;
 
 const META_SEEDED = 'seeded';
 const META_FROZEN_NOW = 'frozenNowMillis';
@@ -71,6 +75,10 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
    * reads and then writes server state runs one at a time through this chain.
    */
   private serial: Promise<unknown> = Promise.resolve();
+  /** incomingEvents listeners (ADR-0017 §1). */
+  private readonly eventListeners = new Set<() => void>();
+  /** App mode only: one timer per held or processing transaction, settling it on time (ADR-0017 §1). */
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>();
 
   private readonly otp: OtpServer;
 
@@ -148,6 +156,10 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     this.qrPayments = Number((await this.store.getMeta(META_QR_PAYMENTS)) ?? 0);
     this.accountUserId = await this.store.getMeta(META_ACCOUNT_USER_ID);
     this.accountPhone = await this.store.getMeta(META_ACCOUNT_PHONE);
+    // What was held when the process died settles now if it's due, else on time (ADR-0017 §1).
+    for (const due of await this.store.dueSettlements(Number.MAX_SAFE_INTEGER)) {
+      this.scheduleSettlement(due.transactionId, due.resolveAt);
+    }
   }
 
   async reset(config: ServerDataset): Promise<void> {
@@ -165,6 +177,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       return result.value;
     });
     await this.exclusive(async () => {
+      for (const timer of this.timers) clearTimeout(timer);
+      this.timers.clear();
       this.frozenNow = config.nowMillis;
       this.simulatedIncoming = 0;
       this.dailyLimit = DAILY_LIMIT;
@@ -197,10 +211,66 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     });
   }
 
-  /** Tests only: moves a frozen clock forward (pending transfers and top-ups settle by it). */
+  /**
+   * Tests only: moves a frozen clock forward, and settles what that makes due, as the app's timers
+   * would (ADR-0017 §1). The settling runs in the background: the next server call waits for it.
+   */
   advanceClock(ms: number): void {
     if (this.frozenNow === undefined) throw new CoreError('INVALID_ARGUMENT', 'the clock is not frozen');
     this.frozenNow += ms;
+    this.exclusive(() => this.settleDue()).catch(() => undefined);
+  }
+
+  incomingEvents(listener: () => void): () => void {
+    this.eventListeners.add(listener);
+    return () => this.eventListeners.delete(listener);
+  }
+
+  async getEvents(afterSeq: number, limit: number): Promise<EventsPage> {
+    await this.network.beforeEventRead();
+    if (!Number.isSafeInteger(afterSeq) || afterSeq < 0) {
+      throw new CoreError('INVALID_ARGUMENT', 'afterSeq must be >= 0');
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_EVENTS_PAGE) {
+      throw new CoreError('INVALID_ARGUMENT', `limit must be 1..${MAX_EVENTS_PAGE}`);
+    }
+    return this.exclusive(async () => {
+      await this.settleDue();
+      const rows = await this.store.eventsAfter(afterSeq, limit + 1);
+      const items: WalletEvent[] = [];
+      for (const row of rows.slice(0, limit)) {
+        const transaction = await this.store.get(row.transactionId);
+        if (!transaction) throw new CoreError('SERVER_ERROR', `Logged transaction ${row.transactionId} is missing`);
+        items.push({ seq: row.seq, kind: row.kind, transaction, createdAt: row.createdAt });
+      }
+      return { items, hasMore: rows.length > limit };
+    });
+  }
+
+  /** "The log grew", after the write that grew it: asynchronous, as from a socket. */
+  private signal(): void {
+    if (this.eventListeners.size === 0) return;
+    setTimeout(() => {
+      for (const listener of this.eventListeners) listener();
+    }, 0);
+  }
+
+  /**
+   * App mode: settles this transaction when its time comes (FR-FAKE-05), so its event appears while the
+   * app runs. A frozen clock (tests) has no timers: advanceClock settles instead.
+   */
+  private scheduleSettlement(transactionId: string, resolveAt: number): void {
+    if (this.frozenNow !== undefined) return;
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      this.exclusive(async () => {
+        await this.settleDue();
+        const left = await this.store.getSettlement(transactionId);
+        if (left) this.scheduleSettlement(transactionId, left.resolveAt); // woke a little early
+      }).catch(() => undefined);
+    }, Math.max(0, resolveAt - Date.now()));
+    (timer as { unref?: () => void }).unref?.(); // Node: never keeps a test process alive
+    this.timers.add(timer);
   }
 
   async searchContacts(query: string): Promise<Contact[]> {
@@ -317,6 +387,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       tx.status === 'PENDING' && hold ? { resolveAt: now + hold.holdMs, fails: hold.fails } : undefined,
     );
     this.transfers = n;
+    if (tx.status === 'PENDING' && hold) this.scheduleSettlement(tx.id, now + hold.holdMs);
     return tx;
   }
 
@@ -390,6 +461,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       refused === undefined ? request.requestId : undefined, // paid (or held): nobody pays it again
     );
     this.qrPayments = n;
+    if (tx.status === 'PENDING' && hold) this.scheduleSettlement(tx.id, now + hold.holdMs);
     return tx;
   }
 
@@ -442,6 +514,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       { resolveAt: now + waitMs, fails, ...(handling.declined ? { failureReason: 'PAYMENT_DECLINED' as const } : {}) },
     );
     this.topUps = n;
+    // A processing one settles when its answer goes out; the timer is for a process that died meanwhile.
+    this.scheduleSettlement(tx.id, now + waitMs);
     return { tx, recorded: true };
   }
 
@@ -472,6 +546,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     const failureReason = due.fails ? (due.failureReason ?? 'SERVER_ERROR') : undefined;
     const updatedAt = Math.max(now, tx.updatedAt + 1);
     await this.store.settle(tx.id, status, failureReason, updatedAt);
+    this.signal();
     return { ...tx, status, ...(failureReason !== undefined ? { failureReason } : {}), updatedAt };
   }
 
@@ -487,12 +562,16 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     return run;
   }
 
-  async simulateIncomingTransfer(): Promise<Transaction> {
-    const tx = simulatedIncomingTransfer(this.simulatedIncoming + 1, this.now());
-    await this.store.insert(tx);
-    this.simulatedIncoming += 1;
-    await this.store.setMeta(META_SIMULATED_INCOMING, String(this.simulatedIncoming));
-    return tx;
+  /** FR-DEV-04: the transfer and its MONEY_RECEIVED event, in one write (ADR-0017 §1). */
+  simulateIncomingTransfer(): Promise<Transaction> {
+    return this.exclusive(async () => {
+      const n = this.simulatedIncoming + 1;
+      const tx = simulatedIncomingTransfer(n, this.now());
+      await this.store.insertIncoming(tx, { [META_SIMULATED_INCOMING]: String(n) });
+      this.simulatedIncoming = n;
+      this.signal();
+      return tx;
+    });
   }
 
   async getWallet(): Promise<Wallet> {

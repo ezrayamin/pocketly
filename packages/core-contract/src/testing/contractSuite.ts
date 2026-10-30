@@ -322,8 +322,8 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
       it('the replica is separate from the server: offline shows what was synced, not live data', async () => {
         await core.getTransactions(); // synced
-        await core.simulateIncomingTransfer(); // server-side change
         core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+        await core.simulateIncomingTransfer(); // server-side change; its event can't reach the core offline
         expect((await core.getTransactions()).items.map((t) => t.id)).not.toContain('sim-000001');
         core.setNetworkSimulation(NETWORK_NORMAL);
         expect((await core.getTransactions()).items[0].id).toBe('sim-000001'); // the next refresh brings it

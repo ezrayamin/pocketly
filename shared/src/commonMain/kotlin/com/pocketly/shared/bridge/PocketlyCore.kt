@@ -11,6 +11,7 @@ import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
 import com.pocketly.shared.domain.AmountCheck
+import com.pocketly.shared.domain.AppNotification
 import com.pocketly.shared.domain.AuthState
 import com.pocketly.shared.domain.BiometricEnableResult
 import com.pocketly.shared.domain.BiometricPromptText
@@ -25,6 +26,7 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.NotificationList
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyOutcome
 import com.pocketly.shared.domain.OtpVerifyResult
@@ -60,18 +62,21 @@ import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.security.platformPinCrypto
+import com.pocketly.shared.sync.EventSync
 import com.pocketly.shared.sync.LedgerSync
 import com.pocketly.shared.sync.PriceFeed
 import com.pocketly.shared.sync.PaymentFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.dsl.koinApplication
 import kotlin.concurrent.Volatile
@@ -118,6 +123,15 @@ class PocketlyCore internal constructor(
     private val biometric = biometric(this.pin)
 
     private val payments = PaymentFlow(api, cache, this.pin, this.biometric, ::fetchWallet, randomBytes, clock)
+
+    private val events = EventSync(api, cache, payments::applySettled)
+
+    init {
+        // ADR-0017 §2: catch up on start and after each "new events" signal; failures wait for the next one.
+        // Undispatched, so the signal subscription exists before this constructor returns.
+        streamScope.launch(start = CoroutineStart.UNDISPATCHED) { api.incomingEvents().collect { catchUpQuietly() } }
+        streamScope.launch { catchUpQuietly() }
+    }
 
     @Volatile
     internal var computeMs = 0.0
@@ -167,7 +181,11 @@ class PocketlyCore internal constructor(
             var stale: StaleInfo? = null
             if (cursor == null) {
                 try {
-                    ledgerSync.sync() // the first page is a refresh
+                    // The first page is a refresh: the event log first, so a settlement there notifies before
+                    // the change feed brings its row (ADR-0017 §2).
+                    val generation = cache.generation
+                    events.catchUp()
+                    ledgerSync.sync(generation)
                 } catch (e: CoreException) {
                     val cachedAt = if (e.code in STALEABLE) cache.lastSyncedAt() else null
                     stale = StaleInfo(e.code, cachedAt ?: throw e)
@@ -352,6 +370,28 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun setDailyLimit(minor: Money) = onDb { controls.setDailyLimit(minor) }
 
+    // ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ──────────────────────
+
+    /**
+     * FR-NOTIF-01/02: [onNew] gets the notifications each catch-up added, newest first, while subscribed.
+     * Cancelling stops delivery, not the catching up.
+     */
+    fun subscribeNotifications(onNew: (List<AppNotification>) -> Unit): Cancellable {
+        // Undispatched: subscribed before this returns, so nothing added after it is missed.
+        val job = streamScope.launch(start = CoroutineStart.UNDISPATCHED) { events.added.collect { onNew(it) } }
+        return Cancellable { job.cancel() }
+    }
+
+    /** FR-NOTIF-03: from the replica, never the server. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getNotifications(): NotificationList = onDb {
+        NotificationList(cache.notifications(AppNotification.KEPT), cache.unreadCount())
+    }
+
+    /** FR-NOTIF-03: every notification read; the badge clears. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun markNotificationsRead() = onDb { cache.markNotificationsRead() }
+
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
     fun formatMoney(minor: Long): String = MoneyFormatter.format(Money(minor))
@@ -381,6 +421,16 @@ class PocketlyCore internal constructor(
     }
 
     // ── Internals ──────────────────────────────────────────────────────────
+
+    private suspend fun catchUpQuietly() {
+        try {
+            onDb { events.catchUp() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Offline or failing: the next signal, start or refresh catches up.
+        }
+    }
 
     private suspend fun <T> onDb(block: suspend () -> T): T = withContext(db) {
         ready.await()

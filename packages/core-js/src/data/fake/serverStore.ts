@@ -14,6 +14,14 @@ export interface TransferKeyRow {
   requestId?: string;
 }
 
+/** server_event: one entry of the event log the client catches up from (ADR-0017 §1). */
+export interface EventRow {
+  seq: number;
+  kind: 'MONEY_RECEIVED' | 'TRANSACTION_SETTLED';
+  transactionId: string;
+  createdAt: number;
+}
+
 /** server_payment_request: a dynamic QR code's request (ADR-0016 §4). */
 export interface PaymentRequestRow {
   id: string;
@@ -54,6 +62,7 @@ export class ServerStore {
     await this.db.run(SERVER_SQL.deleteAllTransferKeys.sql, []);
     await this.db.run(SERVER_SQL.deleteAllSettlements.sql, []);
     await this.db.run(SERVER_SQL.deleteAllPaymentRequests.sql, []);
+    await this.db.run(SERVER_SQL.deleteAllEvents.sql, []);
     await this.db.runMany(SERVER_SQL.insertTransaction.sql, transactions.map(transactionValues));
     await this.db.runMany(
       SERVER_SQL.insertPaymentRequest.sql,
@@ -62,8 +71,23 @@ export class ServerStore {
     for (const [key, value] of Object.entries(meta)) await this.setMeta(key, value);
   }
 
-  async insert(tx: Transaction): Promise<void> {
-    await this.db.run(SERVER_SQL.insertTransaction.sql, transactionValues(tx));
+  /** An incoming transfer, the meta that counts it, and its MONEY_RECEIVED event: all or nothing (ADR-0017 §1). */
+  async insertIncoming(tx: Transaction, meta: Record<string, string>): Promise<void> {
+    await this.db.batch([
+      { sql: SERVER_SQL.insertTransaction.sql, values: transactionValues(tx) },
+      ...Object.entries(meta).map(([k, v]) => ({ sql: SERVER_SQL.setMeta.sql, values: [k, v] })),
+      { sql: SERVER_SQL.insertEvent.sql, values: ['MONEY_RECEIVED', tx.id, tx.createdAt] },
+    ]);
+  }
+
+  /** The log after `seq`, oldest first. */
+  async eventsAfter(seq: number, limit: number): Promise<EventRow[]> {
+    return (await this.db.query(SERVER_SQL.eventsAfter.sql, [seq, limit])).map((r) => ({
+      seq: Number(r.seq),
+      kind: r.kind as EventRow['kind'],
+      transactionId: r.transaction_id as string,
+      createdAt: Number(r.created_at),
+    }));
   }
 
   async get(id: string): Promise<Transaction | undefined> {
@@ -146,13 +170,15 @@ export class ServerStore {
   }
 
   /**
-   * Settles a held transaction: its new status, and the settlement row removed, together. A failed
-   * QR payment gives its payment request back (ADR-0016 §4).
+   * Settles a held transaction: its new status, the settlement row removed, and the
+   * TRANSACTION_SETTLED event (ADR-0017 §1), together. A failed QR payment gives its payment request
+   * back (ADR-0016 §4).
    */
   async settle(id: string, status: TransactionStatus, failureReason: ErrorCode | undefined, updatedAt: number): Promise<void> {
     await this.db.batch([
       { sql: SERVER_SQL.updateTransactionStatus.sql, values: [status, failureReason ?? null, updatedAt, id] },
       { sql: SERVER_SQL.deleteSettlement.sql, values: [id] },
+      { sql: SERVER_SQL.insertEvent.sql, values: ['TRANSACTION_SETTLED', id, updatedAt] },
       ...(status === 'FAILED' ? [{ sql: SERVER_SQL.reopenPaymentRequest.sql, values: [id] }] : []),
     ]);
   }

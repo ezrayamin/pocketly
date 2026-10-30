@@ -2,6 +2,7 @@ package com.pocketly.shared.data.fake
 
 import com.pocketly.shared.data.ChangesPage
 import com.pocketly.shared.data.ContactSearch
+import com.pocketly.shared.data.EventsPage
 import com.pocketly.shared.data.FakeBackendControls
 import com.pocketly.shared.data.OpenPaymentRequest
 import com.pocketly.shared.data.PaymentTarget
@@ -12,6 +13,7 @@ import com.pocketly.shared.data.TopUpRequest
 import com.pocketly.shared.data.TransactionDtoValidator
 import com.pocketly.shared.data.TransferRequest
 import com.pocketly.shared.data.WalletApi
+import com.pocketly.shared.data.WalletEvent
 import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.domain.AmountLimits
 import com.pocketly.shared.domain.AmountRejectReason
@@ -36,10 +38,17 @@ import com.pocketly.shared.domain.ZonedCalendar
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.Volatile
@@ -122,6 +131,12 @@ internal class FakeWalletApi(
     /** ADR-0007 §2: the server's own work, which a client giving up doesn't cancel. */
     private val serverScope = CoroutineScope(SupervisorJob() + serverDispatcher)
 
+    /** "The log grew" (ADR-0017 §1). Conflated: one pending signal says it all. */
+    private val signals = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** App mode only: the parent of one timer per held or processing transaction (ADR-0017 §1). */
+    private val timers = SupervisorJob(serverScope.coroutineContext[Job])
+
     override var networkSimulation: NetworkSimulation
         get() = network.get()
         set(value) = network.set(value)
@@ -142,6 +157,8 @@ internal class FakeWalletApi(
         qrPayments = store.getMeta(META_QR_PAYMENTS)?.toInt() ?: 0
         accountUserId = store.getMeta(META_ACCOUNT_USER_ID)
         accountPhone = store.getMeta(META_ACCOUNT_PHONE)
+        // What was held when the process died settles now if it's due, else on time (ADR-0017 §1).
+        store.dueSettlements(Long.MAX_VALUE).forEach { scheduleSettlement(it.transactionId, it.resolveAt) }
     }
 
     override fun reset(config: DatasetConfig) {
@@ -153,6 +170,7 @@ internal class FakeWalletApi(
                 throw CoreException(ErrorCode.INVALID_ARGUMENT, "extraTransactions[$index]: $it")
             }
         }
+        timers.cancelChildren()
         frozenNow = config.nowMillis
         simulatedIncoming = 0
         dailyLimit = SeedData.DAILY_LIMIT
@@ -189,10 +207,52 @@ internal class FakeWalletApi(
     /** Tests only: the simulator, to skip seeded draws. */
     internal fun simulatorForTests(): NetworkSimulator = network
 
-    /** Tests only: moves a frozen clock forward (pending transfers and top-ups settle by it). */
+    /**
+     * Tests only: moves a frozen clock forward, and settles what that makes due, as the app's timers
+     * would (ADR-0017 §1). The settling runs in the background: the next server call waits for it.
+     */
     fun advanceClock(ms: Long) {
         val frozen = frozenNow ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "the clock is not frozen")
         frozenNow = frozen + ms
+        serverScope.launch { serial.withLock { settleDue() } }
+    }
+
+    override fun incomingEvents(): Flow<Unit> = signals.asSharedFlow()
+
+    override suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage {
+        network.beforeEventRead()
+        if (afterSeq < 0) throw CoreException(ErrorCode.INVALID_ARGUMENT, "afterSeq must be >= 0")
+        if (limit !in 1..MAX_EVENTS_PAGE) throw CoreException(ErrorCode.INVALID_ARGUMENT, "limit must be 1..$MAX_EVENTS_PAGE")
+        return serial.withLock {
+            settleDue()
+            val rows = store.eventsAfter(afterSeq, limit + 1L)
+            val items = rows.take(limit).map { row ->
+                val tx = store.get(row.transactionId)
+                    ?: throw CoreException(ErrorCode.SERVER_ERROR, "Logged transaction ${row.transactionId} is missing")
+                WalletEvent(row.seq, row.kind, tx, row.createdAt)
+            }
+            EventsPage(items, hasMore = rows.size > limit)
+        }
+    }
+
+    /** "The log grew", after the write that grew it. */
+    private fun signal() {
+        signals.tryEmit(Unit)
+    }
+
+    /**
+     * App mode: settles this transaction when its time comes (FR-FAKE-05), so its event appears while the
+     * app runs. A frozen clock (tests) has no timers: [advanceClock] settles instead.
+     */
+    private fun scheduleSettlement(transactionId: String, resolveAt: Long) {
+        if (frozenNow != null) return
+        serverScope.launch(timers) {
+            delay(maxOf(0L, resolveAt - currentTimeMillis()))
+            serial.withLock {
+                settleDue()
+                store.getSettlement(transactionId)?.let { scheduleSettlement(transactionId, it.resolveAt) } // woke a little early
+            }
+        }
     }
 
     override suspend fun searchContacts(query: String): List<Contact> {
@@ -307,6 +367,7 @@ internal class FakeWalletApi(
             if (tx.status == TransactionStatus.PENDING && hold != null) Settlement(tx.id, now + hold.holdMs, hold.fails) else null,
         )
         transfers = n
+        if (tx.status == TransactionStatus.PENDING && hold != null) scheduleSettlement(tx.id, now + hold.holdMs)
         return tx
     }
 
@@ -367,6 +428,7 @@ internal class FakeWalletApi(
             paysRequest = request.requestId.takeIf { refused == null }, // paid (or held): nobody pays it again
         )
         qrPayments = n
+        if (tx.status == TransactionStatus.PENDING && hold != null) scheduleSettlement(tx.id, now + hold.holdMs)
         return tx
     }
 
@@ -422,6 +484,8 @@ internal class FakeWalletApi(
             Settlement(tx.id, now + waitMs, fails, reason),
         )
         topUps = n
+        // A processing one settles when its answer goes out; the timer is for a process that died meanwhile.
+        scheduleSettlement(tx.id, now + waitMs)
         return tx to true
     }
 
@@ -451,6 +515,7 @@ internal class FakeWalletApi(
         val failureReason = if (due.fails) due.failureReason ?: ErrorCode.SERVER_ERROR else null
         val updatedAt = maxOf(now, tx.updatedAt + 1)
         store.settle(tx.id, status, failureReason, updatedAt)
+        signal()
         return tx.copy(status = status, failureReason = failureReason, updatedAt = updatedAt)
     }
 
@@ -460,11 +525,13 @@ internal class FakeWalletApi(
         return store.usedSince(ZonedCalendar.localMidnight(ZonedCalendar.localEpochDay(now, zone), zone))
     }
 
+    /** FR-DEV-04: the transfer and its MONEY_RECEIVED event, in one write (ADR-0017 §1). */
     override fun simulateIncomingTransfer(): Transaction {
-        val tx = SeedData.simulatedIncomingTransfer(simulatedIncoming + 1, now())
-        store.insert(tx)
-        simulatedIncoming += 1
-        store.setMeta(META_SIMULATED_INCOMING, simulatedIncoming.toString())
+        val n = simulatedIncoming + 1
+        val tx = SeedData.simulatedIncomingTransfer(n, now())
+        store.insertIncoming(tx, mapOf(META_SIMULATED_INCOMING to n.toString()))
+        simulatedIncoming = n
+        signal()
         return tx
     }
 
@@ -511,6 +578,9 @@ internal class FakeWalletApi(
     companion object {
         /** Server-side page size cap for getChanges (sync). Same as core-js. */
         const val MAX_CHANGES_PAGE = 500
+
+        /** Server-side page size cap for getEvents. Same as core-js. */
+        const val MAX_EVENTS_PAGE = 500
         private const val META_SEEDED = "seeded"
         private const val META_FROZEN_NOW = "frozenNowMillis"
         private const val META_SIMULATED_INCOMING = "simulatedIncoming"

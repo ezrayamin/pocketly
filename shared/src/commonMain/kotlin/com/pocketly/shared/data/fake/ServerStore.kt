@@ -5,6 +5,7 @@ import com.pocketly.shared.data.db.Rows.toDomain
 import com.pocketly.shared.db.server.ServerDatabase
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
+import com.pocketly.shared.domain.NotificationKind
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 
@@ -29,6 +30,9 @@ internal data class PaymentRequestRow(
     val paidBy: String? = null,
 )
 
+/** server_event: one entry of the event log the client catches up from (ADR-0017 §1). */
+internal data class EventRow(val seq: Long, val kind: NotificationKind, val transactionId: String, val createdAt: Long)
+
 /** server_pending_settlement: a held transfer or a top-up being processed, and how it ends. */
 internal data class Settlement(
     val transactionId: String,
@@ -52,12 +56,23 @@ internal class ServerStore(driver: SqlDriver) {
         q.deleteAllTransferKeys()
         q.deleteAllSettlements()
         q.deleteAllPaymentRequests()
+        q.deleteAllEvents()
         transactions.forEach(::insertRow)
         paymentRequests.forEach { q.insertPaymentRequest(it.id, it.merchantId, it.amount, it.expiresAt, it.paidBy) }
         meta.forEach { (k, v) -> q.setMeta(k, v) }
     }
 
-    fun insert(tx: Transaction) = insertRow(tx)
+    /** An incoming transfer, the meta that counts it, and its MONEY_RECEIVED event: all or nothing (ADR-0017 §1). */
+    fun insertIncoming(tx: Transaction, meta: Map<String, String>) = db.transaction {
+        insertRow(tx)
+        meta.forEach { (k, v) -> q.setMeta(k, v) }
+        q.insertEvent(NotificationKind.MONEY_RECEIVED.name, tx.id, tx.createdAt)
+    }
+
+    /** The log after [seq], oldest first. */
+    fun eventsAfter(seq: Long, limit: Long): List<EventRow> = q.eventsAfter(seq, limit).executeAsList().map {
+        EventRow(it.seq, NotificationKind.valueOf(it.kind), it.transaction_id, it.created_at)
+    }
 
     fun get(id: String): Transaction? = q.getTransaction(id).executeAsOneOrNull()?.toDomain()
 
@@ -99,12 +114,14 @@ internal class ServerStore(driver: SqlDriver) {
     }
 
     /**
-     * Settles a held transaction: its new status, and the settlement row removed, together. A failed
-     * QR payment gives its payment request back (ADR-0016 §4).
+     * Settles a held transaction: its new status, the settlement row removed, and the
+     * TRANSACTION_SETTLED event (ADR-0017 §1), together. A failed QR payment gives its payment request
+     * back (ADR-0016 §4).
      */
     fun settle(id: String, status: TransactionStatus, failureReason: ErrorCode?, updatedAt: Long) = db.transaction {
         q.updateTransactionStatus(status.name, failureReason?.name, updatedAt, id)
         q.deleteSettlement(id)
+        q.insertEvent(NotificationKind.TRANSACTION_SETTLED.name, id, updatedAt)
         if (status == TransactionStatus.FAILED) q.reopenPaymentRequest(id)
     }
 

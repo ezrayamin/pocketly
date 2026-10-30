@@ -110,7 +110,13 @@ describe('biometric confirmation (FR-TRF-04, ADR-0012)', () => {
 
 describe('restart while PENDING (NFR-REL-03)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pocketly-'));
-  const files = { serverPath: join(dir, 'server.db'), cachePath: join(dir, 'cache.db') };
+  // Each test its own files: a core left from the test before still catches up in the background.
+  let files: { serverPath: string; cachePath: string };
+  let n = 0;
+  beforeEach(() => {
+    n++;
+    files = { serverPath: join(dir, `server-${n}.db`), cachePath: join(dir, `cache-${n}.db`) };
+  });
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   it('the pending row is still there, and its key settles it after the restart', async () => {

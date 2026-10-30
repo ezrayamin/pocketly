@@ -233,8 +233,26 @@ internal class PaymentFlow(
     suspend fun getTransferStatus(id: String): TransferResult {
         val attempt = attempt(id)
         attempt.running?.let { return it.await() }
-        if (attempt.state != TransferState.PENDING) return result(attempt, TransferAuthOutcome.NOT_REQUIRED)
+        if (attempt.state != TransferState.PENDING) return settledResult(attempt) // settled, maybe by an event
         return run(attempt) { checkStatus(attempt) }
+    }
+
+    /**
+     * ADR-0017 §2: the server's event says a payment this install has PENDING settled. Its attempt (rebuilt
+     * from the replica after a restart) moves as a status check would, and the replica's wallet with it,
+     * so an open result screen and a later status check agree with the notification. Called before the
+     * event's row replaces the pending one. Whichever of this and a status check moves the attempt
+     * first wins; the other finds it settled.
+     */
+    fun applySettled(tx: Transaction) {
+        if (tx.status == TransactionStatus.PENDING) return
+        val attempt = try {
+            attempt(tx.idempotencyKey)
+        } catch (e: CoreException) {
+            return // not a payment of this install's
+        }
+        if (attempt.state != TransferState.PENDING) return
+        adjustWallet(settle(attempt, tx, TransferEvent.STATUS_SUCCESS, TransferEvent.STATUS_FAILED))
     }
 
     // ── steps ────────────────────────────────────────────────────────────
@@ -332,6 +350,7 @@ internal class PaymentFlow(
             dropPlaceholder(attempt)
             return result(attempt, TransferAuthOutcome.NOT_REQUIRED).copy(balance = cachedBalance())
         }
+        if (attempt.state != TransferState.PENDING) return settledResult(attempt) // an event settled it meanwhile
         if (tx.status == TransactionStatus.PENDING) {
             cache.upsert(tx)
             attempt.transaction = tx
@@ -342,23 +361,29 @@ internal class PaymentFlow(
 
     /** The server's transaction for this key: SUCCESS, FAILED (recorded: never retryable) or PENDING. */
     private fun applyServerAnswer(attempt: Attempt, tx: Transaction, auth: TransferAuthOutcome, ok: TransferEvent, failed: TransferEvent): TransferResult {
-        val wasHeld = attempt.state == TransferState.PENDING
         if (tx.status == TransactionStatus.PENDING) return timedOut(attempt, auth) // a replay of a held transfer
+        val delta = settle(attempt, tx, ok, failed)
         cache.upsert(tx) // history row (and the placeholder goes)
+        adjustWallet(delta)
+        return result(attempt, auth).copy(balance = cachedBalance())
+    }
+
+    /**
+     * Moves the attempt to the server's outcome and returns what that changes in the replica's wallet
+     * (ADR-0014 §5, ADR-0015 §3): what the outcome adds to what's held.
+     */
+    private fun settle(attempt: Attempt, tx: Transaction, ok: TransferEvent, failed: TransferEvent): Pair<Long, Long> {
+        val held = if (attempt.state == TransferState.PENDING) heldDelta(attempt) else NO_CHANGE
         attempt.transaction = tx
-        // ADR-0014 §5, ADR-0015 §3: the replica moves at once, by what this answer adds to what's held.
-        val held = if (wasHeld) heldDelta(attempt) else NO_CHANGE
         if (tx.status == TransactionStatus.SUCCESS) {
             move(attempt, ok)
             val settled = settledDelta(attempt)
-            adjustWallet(settled.first - held.first to settled.second - held.second)
-        } else {
-            move(attempt, failed)
-            attempt.failureReason = tx.failureReason ?: ErrorCode.SERVER_ERROR
-            attempt.retryable = false // the server recorded it: the same key returns this again
-            adjustWallet(-held.first to -held.second) // released
+            return settled.first - held.first to settled.second - held.second
         }
-        return result(attempt, auth).copy(balance = cachedBalance())
+        move(attempt, failed)
+        attempt.failureReason = tx.failureReason ?: ErrorCode.SERVER_ERROR
+        attempt.retryable = false // the server recorded it: the same key returns this again
+        return -held.first to -held.second // released
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
@@ -497,6 +522,10 @@ internal class PaymentFlow(
     }
 
     private fun cachedBalance(): Money? = cache.getWallet()?.first?.balance
+
+    /** A status check's answer once settled: the outcome and the replica's balance. */
+    private fun settledResult(attempt: Attempt): TransferResult =
+        result(attempt, TransferAuthOutcome.NOT_REQUIRED).copy(balance = cachedBalance())
 
     private fun result(attempt: Attempt, auth: TransferAuthOutcome): TransferResult {
         val failed = attempt.state == TransferState.FAILED

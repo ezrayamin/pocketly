@@ -14,11 +14,12 @@ export const SERVER_SCHEMA: readonly string[] = [
   "CREATE TABLE server_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )",
   "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL, request_id TEXT )",
   "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL, failure_reason TEXT )",
-  "CREATE TABLE server_payment_request ( id TEXT NOT NULL PRIMARY KEY, merchant_id TEXT NOT NULL, amount INTEGER NOT NULL, expires_at INTEGER NOT NULL, paid_by TEXT )"
+  "CREATE TABLE server_payment_request ( id TEXT NOT NULL PRIMARY KEY, merchant_id TEXT NOT NULL, amount INTEGER NOT NULL, expires_at INTEGER NOT NULL, paid_by TEXT )",
+  "CREATE TABLE server_event ( seq INTEGER NOT NULL PRIMARY KEY, kind TEXT NOT NULL, transaction_id TEXT NOT NULL, created_at INTEGER NOT NULL )"
 ];
 
 /** Schema version (SQLDelight's: highest .sqm + 1). */
-export const SERVER_VERSION = 4;
+export const SERVER_VERSION = 5;
 
 /** <n>.sqm: from version n to n + 1. */
 export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
@@ -32,6 +33,9 @@ export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
   "3": [
     "ALTER TABLE server_transfer_key ADD COLUMN request_id TEXT",
     "CREATE TABLE server_payment_request ( id TEXT NOT NULL PRIMARY KEY, merchant_id TEXT NOT NULL, amount INTEGER NOT NULL, expires_at INTEGER NOT NULL, paid_by TEXT )"
+  ],
+  "4": [
+    "CREATE TABLE server_event ( seq INTEGER NOT NULL PRIMARY KEY, kind TEXT NOT NULL, transaction_id TEXT NOT NULL, created_at INTEGER NOT NULL )"
   ]
 };
 
@@ -121,6 +125,18 @@ export const SERVER_SQL = {
     "sql": "DELETE FROM server_payment_request",
     "params": 0
   },
+  "insertEvent": {
+    "sql": "INSERT INTO server_event(kind, transaction_id, created_at) VALUES (?, ?, ?)",
+    "params": 3
+  },
+  "eventsAfter": {
+    "sql": "SELECT * FROM server_event WHERE seq > ? ORDER BY seq LIMIT ?",
+    "params": 2
+  },
+  "deleteAllEvents": {
+    "sql": "DELETE FROM server_event",
+    "params": 0
+  },
   "getMeta": {
     "sql": "SELECT value FROM server_meta WHERE key = ?",
     "params": 1
@@ -140,14 +156,19 @@ export const CACHE_SCHEMA: readonly string[] = [
   "CREATE TABLE cache_transaction ( id TEXT NOT NULL PRIMARY KEY, idempotency_key TEXT NOT NULL, type TEXT NOT NULL, category TEXT NOT NULL, amount INTEGER NOT NULL, counterparty_kind TEXT, counterparty_id TEXT, counterparty_name TEXT, counterparty_phone TEXT, note TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL )",
   "CREATE INDEX cache_transaction_newest ON cache_transaction(created_at DESC, id DESC)",
   "CREATE TABLE cache_wallet ( id TEXT NOT NULL PRIMARY KEY, balance INTEGER NOT NULL, daily_limit INTEGER NOT NULL, used_today INTEGER NOT NULL, updated_at INTEGER NOT NULL, cached_at INTEGER NOT NULL )",
-  "CREATE TABLE cache_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )"
+  "CREATE TABLE cache_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )",
+  "CREATE TABLE cache_notification ( id TEXT NOT NULL PRIMARY KEY, seq INTEGER NOT NULL, kind TEXT NOT NULL, transaction_id TEXT NOT NULL, created_at INTEGER NOT NULL, read INTEGER NOT NULL )"
 ];
 
 /** Schema version (SQLDelight's: highest .sqm + 1). */
-export const CACHE_VERSION = 1;
+export const CACHE_VERSION = 2;
 
 /** <n>.sqm: from version n to n + 1. */
-export const CACHE_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {};
+export const CACHE_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
+  "1": [
+    "CREATE TABLE cache_notification ( id TEXT NOT NULL PRIMARY KEY, seq INTEGER NOT NULL, kind TEXT NOT NULL, transaction_id TEXT NOT NULL, created_at INTEGER NOT NULL, read INTEGER NOT NULL )"
+  ]
+};
 
 export const CACHE_SQL = {
   "upsertTransaction": {
@@ -232,6 +253,30 @@ export const CACHE_SQL = {
   "setMeta": {
     "sql": "INSERT OR REPLACE INTO cache_meta(key, value) VALUES (?, ?)",
     "params": 2
+  },
+  "insertNotification": {
+    "sql": "INSERT OR IGNORE INTO cache_notification(id, seq, kind, transaction_id, created_at, read) VALUES (?, ?, ?, ?, ?, 0)",
+    "params": 5
+  },
+  "notifications": {
+    "sql": "SELECT * FROM cache_notification ORDER BY seq DESC LIMIT ?",
+    "params": 1
+  },
+  "unreadCount": {
+    "sql": "SELECT COUNT(*) AS n FROM cache_notification WHERE read = 0",
+    "params": 0
+  },
+  "markNotificationsRead": {
+    "sql": "UPDATE cache_notification SET read = 1 WHERE read = 0",
+    "params": 0
+  },
+  "trimNotifications": {
+    "sql": "DELETE FROM cache_notification WHERE seq NOT IN (SELECT seq FROM cache_notification ORDER BY seq DESC LIMIT ?)",
+    "params": 1
+  },
+  "deleteAllNotifications": {
+    "sql": "DELETE FROM cache_notification",
+    "params": 0
   },
   "deleteSyncMeta": {
     "sql": "DELETE FROM cache_meta WHERE key <> 'installId'",

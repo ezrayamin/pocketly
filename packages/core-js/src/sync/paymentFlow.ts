@@ -291,8 +291,27 @@ export class PaymentFlow {
   async getTransferStatus(id: string): Promise<TransferResult> {
     const attempt = await this.attempt(id);
     if (attempt.running) return attempt.running;
-    if (attempt.state !== 'PENDING') return this.result(attempt, 'NOT_REQUIRED');
+    if (attempt.state !== 'PENDING') return this.settledResult(attempt); // settled, maybe by an event
     return this.run(attempt, () => this.checkStatus(attempt));
+  }
+
+  /**
+   * ADR-0017 §2: the server's event says a payment this install has PENDING settled. Its attempt (rebuilt
+   * from the replica after a restart) moves as a status check would, and the replica's wallet with it,
+   * so an open result screen and a later status check agree with the notification. Called before the
+   * event's row replaces the pending one. Whichever of this and a status check moves the attempt
+   * first wins; the other finds it settled.
+   */
+  async applySettled(tx: Transaction): Promise<void> {
+    if (tx.status === 'PENDING') return;
+    let attempt: Attempt;
+    try {
+      attempt = await this.attempt(tx.idempotencyKey);
+    } catch {
+      return; // not a payment of this install's
+    }
+    if (attempt.state !== 'PENDING') return;
+    await this.adjustWallet(this.settle(attempt, tx, 'STATUS_SUCCESS', 'STATUS_FAILED'));
   }
 
   // ── steps ────────────────────────────────────────────────────────────
@@ -404,6 +423,7 @@ export class PaymentFlow {
       await this.dropPlaceholder(attempt);
       return { ...this.result(attempt, 'NOT_REQUIRED'), balance: await this.cachedBalance() };
     }
+    if (attempt.state !== 'PENDING') return this.settledResult(attempt); // an event settled it meanwhile
     if (tx.status === 'PENDING') {
       await this.deps.cache.upsert(tx);
       attempt.transaction = tx;
@@ -420,23 +440,30 @@ export class PaymentFlow {
     ok: TransferEvent,
     failed: TransferEvent,
   ): Promise<TransferResult> {
-    const wasHeld = attempt.state === 'PENDING';
     if (tx.status === 'PENDING') return this.timedOut(attempt, auth); // a replay of a held transfer
+    const delta = this.settle(attempt, tx, ok, failed);
     await this.deps.cache.upsert(tx); // history row (and the placeholder goes)
+    await this.adjustWallet(delta);
+    return { ...this.result(attempt, auth), balance: await this.cachedBalance() };
+  }
+
+  /**
+   * Moves the attempt to the server's outcome, at once (before any await, so an event and a status check
+   * can't both apply it), and returns what that changes in the replica's wallet (ADR-0014 §5, ADR-0015
+   * §3): what the outcome adds to what's held.
+   */
+  private settle(attempt: Attempt, tx: Transaction, ok: TransferEvent, failed: TransferEvent): WalletDelta {
+    const held = attempt.state === 'PENDING' ? heldDelta(attempt) : NO_CHANGE;
     attempt.transaction = tx;
-    // ADR-0014 §5, ADR-0015 §3: the replica moves at once, by what this answer adds to what's held.
-    const held = wasHeld ? heldDelta(attempt) : NO_CHANGE;
     if (tx.status === 'SUCCESS') {
       this.move(attempt, ok);
       const settled = settledDelta(attempt);
-      await this.adjustWallet([settled[0] - held[0], settled[1] - held[1]]);
-    } else {
-      this.move(attempt, failed);
-      attempt.failureReason = tx.failureReason ?? 'SERVER_ERROR';
-      attempt.retryable = false; // the server recorded it: the same key returns this again
-      await this.adjustWallet([-held[0], -held[1]]); // released
+      return [settled[0] - held[0], settled[1] - held[1]];
     }
-    return { ...this.result(attempt, auth), balance: await this.cachedBalance() };
+    this.move(attempt, failed);
+    attempt.failureReason = tx.failureReason ?? 'SERVER_ERROR';
+    attempt.retryable = false; // the server recorded it: the same key returns this again
+    return [-held[0], -held[1]]; // released
   }
 
   // ── helpers ──────────────────────────────────────────────────────────
@@ -556,6 +583,11 @@ export class PaymentFlow {
 
   private async cachedBalance(): Promise<number | undefined> {
     return (await this.deps.cache.getWallet())?.wallet.balance;
+  }
+
+  /** A status check's answer once settled: the outcome and the replica's balance. */
+  private async settledResult(attempt: Attempt): Promise<TransferResult> {
+    return { ...this.result(attempt, 'NOT_REQUIRED'), balance: await this.cachedBalance() };
   }
 
   private result(attempt: Attempt, auth: TransferAuthOutcome): TransferResult {

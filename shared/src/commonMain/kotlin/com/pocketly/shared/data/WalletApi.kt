@@ -6,11 +6,13 @@ import com.pocketly.shared.domain.Counterparty
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.NotificationKind
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyResult
 import com.pocketly.shared.domain.TopUpMethod
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.Wallet
+import kotlinx.coroutines.flow.Flow
 
 /** requirements §4.1 `TransferRequest`: what the idempotency key protects (ADR-0014). [note] is normalized. */
 data class TransferRequest(val recipientId: String, val amount: Money, val note: String? = null)
@@ -30,10 +32,18 @@ data class OpenPaymentRequest(val id: String, val amount: Money, val expiresAt: 
 data class ChangesPage(val items: List<Transaction>, val nextToken: String?, val hasMore: Boolean)
 
 /**
+ * One entry of the server's event log (ADR-0017 §1): requirements §4.1's `WalletEvent`. [seq] counts
+ * from 1 in log order (the notification's id is `evt-<seq>`); [transaction] is as it is now.
+ */
+data class WalletEvent(val seq: Long, val kind: NotificationKind, val transaction: Transaction, val createdAt: Long)
+
+/** A page of the event log, oldest first. */
+data class EventsPage(val items: List<WalletEvent>, val hasMore: Boolean)
+
+/**
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping FakeWalletApi for a real
  * implementation only changes `bridge/di/CoreModule.kt`. History reads the local replica
  * (ADR-0009), so the backend exposes a change feed instead of paged history.
- * payMerchant / incomingEvents() arrive with M4.
  * Mirrors packages/core-js/src/data/walletApi.ts.
  */
 interface WalletApi {
@@ -90,6 +100,15 @@ interface WalletApi {
 
     /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
     suspend fun getTransferByKey(idempotencyKey: String): Transaction
+
+    /** ADR-0017 §1: the event log after [afterSeq], oldest first, at most [limit]. */
+    suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage
+
+    /**
+     * ADR-0017 §1: "the log grew" signals (a websocket with a real backend). A signal carries nothing:
+     * the client reads [getEvents] after it, so a missed one costs a delay, never an event.
+     */
+    fun incomingEvents(): Flow<Unit>
 }
 
 /** What the server answers on an OTP check: the result, plus a session token and the account's user id (ADR-0016 §6) when verified. */

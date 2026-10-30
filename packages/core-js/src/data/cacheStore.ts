@@ -1,6 +1,6 @@
 import { CoreError } from '@pocketly/core-contract';
-import type { Contact, Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
-import { CACHE_SCHEMA, CACHE_SQL } from './db/sql.generated';
+import type { AppNotification, Contact, Transaction, TransactionPage, TxFilter, Wallet } from '@pocketly/core-contract';
+import { CACHE_MIGRATIONS, CACHE_SCHEMA, CACHE_SQL, CACHE_VERSION } from './db/sql.generated';
 import { rowToTransaction, transactionValues } from './db/rows';
 import { bind, migrate, type SqlDriver } from './db/sqlDriver';
 
@@ -8,6 +8,8 @@ const CURSOR = /^(\d+):(.+)$/;
 const META_SYNC_TOKEN = 'syncToken';
 const META_LAST_SYNCED_AT = 'lastSyncedAt';
 const META_INSTALL_ID = 'installId';
+/** ADR-0017 §2: the last server event applied. Cleared with the replica. */
+const META_EVENT_CURSOR = 'eventCursor';
 
 /** ADR-0014 §4: ids of the app's own pending rows, until the server's row replaces them. */
 export const PLACEHOLDER_PREFIX = 'local-';
@@ -35,14 +37,75 @@ export class CacheStore {
   }
 
   init(): Promise<void> {
-    return migrate(this.db, CACHE_SCHEMA);
+    return migrate(this.db, CACHE_SCHEMA, CACHE_VERSION, CACHE_MIGRATIONS);
   }
 
   async clear(): Promise<void> {
     this.cleared++;
     await this.db.run(CACHE_SQL.deleteAllTransactions.sql, []);
     await this.db.run(CACHE_SQL.deleteWallet.sql, []);
-    await this.db.run(CACHE_SQL.deleteSyncMeta.sql, []);
+    await this.db.run(CACHE_SQL.deleteSyncMeta.sql, []); // the event cursor too
+    await this.db.run(CACHE_SQL.deleteAllNotifications.sql, []);
+  }
+
+  // ── Notifications (ADR-0017 §2) ──────────────────────────────────────
+
+  /** The last server event applied (0: none). */
+  async eventCursor(): Promise<number> {
+    return Number((await this.getMeta(META_EVENT_CURSOR)) ?? 0);
+  }
+
+  /**
+   * One event, applied once, all or nothing: the transaction into the replica (its pending row goes),
+   * the notification if any (ignored if its id is known), the cursor, and the newest `kept` kept.
+   */
+  async applyEvent(
+    seq: number,
+    tx: Transaction,
+    notification: { id: string; kind: string; createdAt: number } | undefined,
+    kept: number,
+  ): Promise<void> {
+    await this.db.batch([
+      { sql: CACHE_SQL.upsertTransaction.sql, values: transactionValues(tx) },
+      { sql: CACHE_SQL.dropSettledPlaceholders.sql, values: [] },
+      ...(notification
+        ? [
+            {
+              sql: CACHE_SQL.insertNotification.sql,
+              values: [notification.id, seq, notification.kind, tx.id, notification.createdAt],
+            },
+          ]
+        : []),
+      { sql: CACHE_SQL.setMeta.sql, values: [META_EVENT_CURSOR, String(seq)] },
+      { sql: CACHE_SQL.trimNotifications.sql, values: [kept] },
+    ]);
+  }
+
+  /** The newest `limit`, with their transactions as the replica has them now. */
+  async notifications(limit: number): Promise<AppNotification[]> {
+    const rows = await this.db.query(CACHE_SQL.notifications.sql, [limit]);
+    const out: AppNotification[] = [];
+    for (const r of rows) {
+      const transaction = await this.get(r.transaction_id as string);
+      if (!transaction) continue;
+      out.push({
+        id: r.id as string,
+        kind: r.kind as AppNotification['kind'],
+        transaction,
+        createdAt: Number(r.created_at),
+        read: Number(r.read) !== 0,
+      });
+    }
+    return out;
+  }
+
+  async unreadCount(): Promise<number> {
+    const [row] = await this.db.query(CACHE_SQL.unreadCount.sql, []);
+    return Number(row.n);
+  }
+
+  async markNotificationsRead(): Promise<void> {
+    await this.db.run(CACHE_SQL.markNotificationsRead.sql, []);
   }
 
   /** Server rows in; a placeholder whose server row has arrived goes (ADR-0014 §4). */

@@ -78,6 +78,19 @@ export class NetworkSimulator {
     return { holdMs, fails };
   }
 
+  /**
+   * Runs before an event-log read (ADR-0017): OFFLINE, TIMEOUT and ALWAYS_FAIL as beforeCall, and
+   * normalLatencyMs, but no draws. The core reads the log by itself after each signal, so a draw here
+   * would shift the seeded sequence the developer's own calls see.
+   */
+  async beforeEventRead(): Promise<void> {
+    const { mode, normalLatencyMs } = this.simulation;
+    if (mode === 'OFFLINE') throw new CoreError('NETWORK_UNAVAILABLE', 'Simulated offline mode');
+    if (mode === 'TIMEOUT') return new Promise<void>(() => {});
+    if (normalLatencyMs > 0) await new Promise((resolve) => setTimeout(resolve, normalLatencyMs));
+    if (mode === 'ALWAYS_FAIL') throw new CoreError('SERVER_ERROR', 'Simulated server error');
+  }
+
   /** Runs before every backend call: waits, then maybe fails. Never resolves in TIMEOUT. */
   async beforeCall(): Promise<void> {
     const { mode, failureRatePercent, normalLatencyMs } = this.simulation;

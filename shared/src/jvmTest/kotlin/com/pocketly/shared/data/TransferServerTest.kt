@@ -342,11 +342,11 @@ class TransferServerTest {
                 st.execute("PRAGMA user_version = 1")
             }
         }
-        assertEquals(4L, ServerDatabase.Schema.version)
+        assertEquals(5L, ServerDatabase.Schema.version)
         val api = FakeWalletApi(ServerStore(JdbcSqliteDriver(url, Properties(), ServerDatabase.Schema)), TimeZoneHolder()).also { it.open(DatasetConfig.DEFAULT) }
         assertEquals(TransactionStatus.FAILED, api.transfer(TransferRequest("u-01", Money(100)), "after-migration").status) // empty ledger
         java.sql.DriverManager.getConnection(url).use { c ->
-            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(4, rs.getInt(1)) } }
+            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(5, rs.getInt(1)) } }
         }
     }
 
@@ -385,7 +385,7 @@ class TransferServerTest {
         val settled = api.getTransaction("trf-1")
         assertEquals(TransactionStatus.FAILED to ErrorCode.SERVER_ERROR, settled.status to settled.failureReason)
         java.sql.DriverManager.getConnection(url).use { c ->
-            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(4, rs.getInt(1)) } }
+            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(5, rs.getInt(1)) } }
         }
     }
 

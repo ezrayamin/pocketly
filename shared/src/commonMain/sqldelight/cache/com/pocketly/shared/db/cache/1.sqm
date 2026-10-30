@@ -1,0 +1,11 @@
+-- Schema version 1 → 2 (slice 7, ADR-0017 §2): in-app notifications. Cache.sq holds the same table for
+-- new databases. The JS generator reads this file too.
+
+CREATE TABLE cache_notification (
+  id TEXT NOT NULL PRIMARY KEY,
+  seq INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  read INTEGER NOT NULL
+);

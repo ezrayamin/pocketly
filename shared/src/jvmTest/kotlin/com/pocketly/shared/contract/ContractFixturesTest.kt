@@ -256,8 +256,8 @@ class ContractFixturesTest {
     @Test
     fun theReplicaIsSeparateFromTheServer() = runTest {
         core.getTransactions(null, 20, null) // synced
-        core.simulateIncomingTransfer() // server-side change
         core.setNetworkSimulation(NetworkSimulation(NetworkMode.OFFLINE, failureRatePercent = 0))
+        core.simulateIncomingTransfer() // server-side change; its event can't reach the core offline
         kotlin.test.assertFalse("sim-000001" in core.getTransactions(null, 20, null).items.map { it.id })
         core.setNetworkSimulation(NetworkSimulation.NORMAL)
         assertEquals("sim-000001", core.getTransactions(null, 20, null).items.first().id)

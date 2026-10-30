@@ -3,6 +3,7 @@ import type {
   Contact,
   Counterparty,
   DatasetConfig,
+  NotificationKind,
   OtpSendResult,
   OtpVerifyResult,
   TopUpMethod,
@@ -55,10 +56,27 @@ export interface ChangesPage {
   hasMore: boolean;
 }
 
+/** One entry of the server's event log (ADR-0017 §1): requirements §4.1's `WalletEvent`. */
+export interface WalletEvent {
+  /** Counts from 1 in log order; the notification's id is `evt-<seq>`. */
+  seq: number;
+  kind: NotificationKind;
+  /** The transaction as it is now (a settled one: SUCCESS or FAILED). */
+  transaction: Transaction;
+  /** When the server logged it. */
+  createdAt: number;
+}
+
+/** A page of the event log, oldest first. */
+export interface EventsPage {
+  items: WalletEvent[];
+  hasMore: boolean;
+}
+
 /**
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping the fake for a real backend
  * only changes the wiring in `jsCore.ts`. History reads the local replica (ADR-0009), so the
- * backend exposes a change feed instead of paged history. QR/events arrive with M4.
+ * backend exposes a change feed instead of paged history.
  * Mirrors shared/.../data/WalletApi.kt.
  */
 export interface WalletApi {
@@ -104,6 +122,14 @@ export interface WalletApi {
   getAccountUserId(phone: string): Promise<string>;
   /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
   getTransferByKey(idempotencyKey: string): Promise<Transaction>;
+  /** ADR-0017 §1: the event log after `afterSeq`, oldest first, at most `limit`. */
+  getEvents(afterSeq: number, limit: number): Promise<EventsPage>;
+  /**
+   * ADR-0017 §1: "the log grew" signals (a websocket with a real backend). A signal carries nothing:
+   * the client reads getEvents after it, so a missed one costs a delay, never an event. Returns the
+   * unsubscribe. Kotlin: a Flow<Unit>.
+   */
+  incomingEvents(listener: () => void): () => void;
 }
 
 /** Developer-menu controls (FR-DEV-*). Only the fake backend implements this. */

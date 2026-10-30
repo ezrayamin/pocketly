@@ -59,6 +59,16 @@ CREATE TABLE server_payment_request (
   paid_by TEXT
 );
 
+-- ADR-0017 §1: the event log the client catches up from (incoming transfers, settlements), written in
+-- the same transaction as the change. seq is the rowid: after resetData empties it, it restarts at 1.
+-- Version 5 (4.sqm).
+CREATE TABLE server_event (
+  seq INTEGER NOT NULL PRIMARY KEY,
+  kind TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 insertTransaction:
 INSERT OR REPLACE INTO server_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -130,6 +140,15 @@ UPDATE server_payment_request SET paid_by = NULL WHERE paid_by = ?;
 
 deleteAllPaymentRequests:
 DELETE FROM server_payment_request;
+
+insertEvent:
+INSERT INTO server_event(kind, transaction_id, created_at) VALUES (?, ?, ?);
+
+eventsAfter:
+SELECT * FROM server_event WHERE seq > ? ORDER BY seq LIMIT ?;
+
+deleteAllEvents:
+DELETE FROM server_event;
 
 getMeta:
 SELECT value FROM server_meta WHERE key = ?;

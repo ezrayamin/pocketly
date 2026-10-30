@@ -2,6 +2,7 @@ import { CoreError } from '@pocketly/core-contract';
 import type { Contact, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
 import type {
   ChangesPage,
+  EventsPage,
   PaymentTarget,
   QrPaymentRequest,
   ServerOtpVerify,
@@ -81,6 +82,15 @@ export class TimeoutWalletApi implements WalletApi {
 
   getTransferByKey(idempotencyKey: string): Promise<Transaction> {
     return this.withTimeout(() => this.inner.getTransferByKey(idempotencyKey));
+  }
+
+  getEvents(afterSeq: number, limit: number): Promise<EventsPage> {
+    return this.withTimeout(() => this.inner.getEvents(afterSeq, limit));
+  }
+
+  /** Signals only: nothing to time out. */
+  incomingEvents(listener: () => void): () => void {
+    return this.inner.incomingEvents(listener);
   }
 
   private withTimeout<T>(call: () => Promise<T>, kind: CallKind = 'read'): Promise<T> {

@@ -327,3 +327,31 @@ data class QrPaymentReview(
     val fee: Money,
     val balanceAfter: Money,
 )
+
+// ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ───────────────────────
+
+/**
+ * MONEY_RECEIVED: an incoming transfer (FR-NOTIF-01). TRANSACTION_SETTLED: a transfer, top-up or QR
+ * payment this install saw PENDING settled SUCCESS or FAILED (FR-NOTIF-02).
+ */
+enum class NotificationKind { MONEY_RECEIVED, TRANSACTION_SETTLED }
+
+/** One in-app notification. The words are the app's. Mirrors core-contract's AppNotification. */
+data class AppNotification(
+    /** The server event's id (`evt-<n>`): unique, so an event delivered twice is one notification. */
+    val id: String,
+    val kind: NotificationKind,
+    /** The transaction as the event left it (TRANSACTION_SETTLED: SUCCESS or FAILED). */
+    val transaction: Transaction,
+    /** When the server logged the event. */
+    val createdAt: EpochMillis,
+    val read: Boolean,
+) {
+    companion object {
+        /** FR-NOTIF-03: how many the replica keeps; older ones are dropped. */
+        const val KEPT = 50
+    }
+}
+
+/** getNotifications (FR-NOTIF-03): from the replica, so it works offline. [items]: newest first. */
+data class NotificationList(val items: List<AppNotification>, val unreadCount: Int)

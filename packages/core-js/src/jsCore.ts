@@ -4,11 +4,13 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PRICE_INTERVAL_MS,
   MAX_PAGE_SIZE,
+  NOTIFICATIONS_KEPT,
   OTP_LENGTH,
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -20,6 +22,7 @@ import type {
   ErrorCode,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
@@ -61,6 +64,7 @@ import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
 import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
+import { EventSync } from './sync/eventSync';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
 import { PaymentFlow } from './sync/paymentFlow';
@@ -114,6 +118,7 @@ export class JsCore implements Core {
   private readonly pin: PinAuth;
   private readonly biometric: BiometricAuth;
   private readonly payments: PaymentFlow;
+  private readonly events: EventSync;
 
   constructor(options: JsCoreOptions) {
     const backend = new FakeWalletApi(
@@ -160,6 +165,16 @@ export class JsCore implements Core {
       randomBytes: (size) => options.crypto.randomBytes(size),
       clock: options.clock ?? Date.now,
     });
+    // ADR-0017 §2: catch up on start and after each "new events" signal; failures wait for the next one.
+    this.events = new EventSync(this.api, cache, (tx) => this.payments.applySettled(tx));
+    const catchUp = () => void this.events.catchUp().catch(() => undefined);
+    this.ready.then(
+      () => {
+        this.api.incomingEvents(catchUp);
+        catchUp();
+      },
+      () => undefined,
+    );
   }
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -212,7 +227,11 @@ export class JsCore implements Core {
     let stale: StaleInfo | undefined;
     if (cursor === undefined) {
       try {
-        await this.ledgerSync.sync(); // the first page is a refresh
+        // The first page is a refresh: the event log first, so a settlement there notifies before the
+        // change feed brings its row (ADR-0017 §2).
+        const generation = this.cache.generation;
+        await this.events.catchUp();
+        await this.ledgerSync.sync(generation);
       } catch (e) {
         const error = toCoreError(e);
         const cachedAt = STALEABLE.has(error.code) ? await this.cache.lastSyncedAt() : undefined;
@@ -391,6 +410,20 @@ export class JsCore implements Core {
   async setDailyLimit(minor: number): Promise<void> {
     await this.ready;
     await this.backend.setDailyLimit(minor);
+  }
+
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): Subscription {
+    return this.events.subscribe(onNew);
+  }
+
+  async getNotifications(): Promise<NotificationList> {
+    await this.ready;
+    return { items: await this.cache.notifications(NOTIFICATIONS_KEPT), unreadCount: await this.cache.unreadCount() };
+  }
+
+  async markNotificationsRead(): Promise<void> {
+    await this.ready;
+    await this.cache.markNotificationsRead();
   }
 
   formatMoney(minor: number): string {

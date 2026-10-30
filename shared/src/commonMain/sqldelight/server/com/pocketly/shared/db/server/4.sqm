@@ -1,0 +1,9 @@
+-- Schema version 4 → 5 (slice 7, ADR-0017 §1): the event log the client catches up from.
+-- The JS generator reads this file too.
+
+CREATE TABLE server_event (
+  seq INTEGER NOT NULL PRIMARY KEY,
+  kind TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);

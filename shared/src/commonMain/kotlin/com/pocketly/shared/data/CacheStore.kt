@@ -3,10 +3,12 @@ package com.pocketly.shared.data
 import app.cash.sqldelight.db.SqlDriver
 import com.pocketly.shared.data.db.Rows.toDomain
 import com.pocketly.shared.db.cache.CacheDatabase
+import com.pocketly.shared.domain.AppNotification
 import com.pocketly.shared.domain.Contact
 import com.pocketly.shared.domain.CoreException
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
+import com.pocketly.shared.domain.NotificationKind
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
 import com.pocketly.shared.domain.TxFilter
@@ -31,7 +33,40 @@ internal class CacheStore(driver: SqlDriver) {
         generation++
         q.deleteAllTransactions()
         q.deleteWallet()
-        q.deleteSyncMeta()
+        q.deleteSyncMeta() // the event cursor too
+        q.deleteAllNotifications()
+    }
+
+    // ── Notifications (ADR-0017 §2) ──────────────────────────────────────
+
+    /** The last server event applied (0: none). */
+    fun eventCursor(): Long = q.getMeta(META_EVENT_CURSOR).executeAsOneOrNull()?.toLong() ?: 0L
+
+    /**
+     * One event, applied once, all or nothing: the transaction into the replica (its pending row goes),
+     * the notification if any (ignored if its id is known), the cursor, and the newest [kept] kept.
+     */
+    fun applyEvent(seq: Long, tx: Transaction, notification: NewNotification?, kept: Int) = db.transaction {
+        write(tx, ifAbsent = false)
+        q.dropSettledPlaceholders()
+        notification?.let { q.insertNotification(it.id, seq, it.kind.name, tx.id, it.createdAt) }
+        q.setMeta(META_EVENT_CURSOR, seq.toString())
+        q.trimNotifications(kept.toLong())
+    }
+
+    /** What [applyEvent] records for a notifying event. */
+    data class NewNotification(val id: String, val kind: NotificationKind, val createdAt: Long)
+
+    /** The newest [limit], with their transactions as the replica has them now. */
+    fun notifications(limit: Int): List<AppNotification> = q.notifications(limit.toLong()).executeAsList().mapNotNull { r ->
+        val transaction = get(r.transaction_id) ?: return@mapNotNull null
+        AppNotification(r.id, NotificationKind.valueOf(r.kind), transaction, r.created_at, r.read != 0L)
+    }
+
+    fun unreadCount(): Int = q.unreadCount().executeAsOne().toInt()
+
+    fun markNotificationsRead() {
+        q.markNotificationsRead()
     }
 
     /** Server rows in; a placeholder whose server row has arrived goes (ADR-0014 §4). */
@@ -145,6 +180,9 @@ internal class CacheStore(driver: SqlDriver) {
         private const val META_SYNC_TOKEN = "syncToken"
         private const val META_LAST_SYNCED_AT = "lastSyncedAt"
         private const val META_INSTALL_ID = "installId"
+
+        /** ADR-0017 §2: the last server event applied. Cleared with the replica. */
+        private const val META_EVENT_CURSOR = "eventCursor"
 
         /** ",A,B," for the shared SQL's instr() filter; "" = no filter. */
         private fun filterList(values: List<String>?) = if (values.isNullOrEmpty()) "" else values.joinToString(",", ",", ",")

@@ -58,6 +58,11 @@ internal class TimeoutWalletApi(
     override suspend fun getTransferByKey(idempotencyKey: String): Transaction =
         withTimeoutOf { inner.getTransferByKey(idempotencyKey) }
 
+    override suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage = withTimeoutOf { inner.getEvents(afterSeq, limit) }
+
+    /** Signals only: nothing to time out. */
+    override fun incomingEvents() = inner.incomingEvents()
+
     private suspend fun <T> withTimeoutOf(kind: CallKind = CallKind.READ, call: suspend () -> T): T {
         val timeout = timeoutMs(kind)
         return try {
