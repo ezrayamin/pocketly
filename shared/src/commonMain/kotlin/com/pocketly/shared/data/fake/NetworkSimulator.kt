@@ -83,19 +83,18 @@ internal class NetworkSimulator {
     }
 
     /**
-     * Runs before an event-log read (ADR-0017): OFFLINE, TIMEOUT and ALWAYS_FAIL as [beforeCall], and
-     * normalLatencyMs, but no draws. The core reads the log by itself after each signal, so a draw here
-     * would shift the seeded sequence the developer's own calls see.
+     * Runs before an event-log read (ADR-0017), the socket's channel: OFFLINE, TIMEOUT and ALWAYS_FAIL as
+     * [beforeCall], but no latency and no draws. The core reads the log by itself (after each signal, and
+     * before each history refresh, one read at a time), so a draw here would shift the seeded sequence the
+     * developer's own calls see, and a delay would hold a fast refresh behind a slow one.
      */
     suspend fun beforeEventRead() {
-        val sim = simulation
-        when (sim.mode) {
+        when (simulation.mode) {
             NetworkMode.OFFLINE -> throw CoreException(ErrorCode.NETWORK_UNAVAILABLE, "Simulated offline mode")
             NetworkMode.TIMEOUT -> awaitCancellation()
+            NetworkMode.ALWAYS_FAIL -> throw CoreException(ErrorCode.SERVER_ERROR, "Simulated server error")
             else -> Unit
         }
-        if (sim.normalLatencyMs > 0) delay(sim.normalLatencyMs.toLong())
-        if (sim.mode == NetworkMode.ALWAYS_FAIL) throw CoreException(ErrorCode.SERVER_ERROR, "Simulated server error")
     }
 
     /** Runs before every backend call: waits, then maybe fails. Never returns in TIMEOUT. */

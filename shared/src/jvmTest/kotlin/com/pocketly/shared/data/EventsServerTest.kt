@@ -181,6 +181,15 @@ class EventsServerTest {
     }
 
     @Test
+    fun aLogReadTakesNoSimulatedLatency() = runBlocking {
+        val api = openServer()
+        api.networkSimulation = NetworkSimulation(NetworkMode.NORMAL, 0, normalLatencyMs = 5_000)
+        val start = System.currentTimeMillis()
+        api.getEvents(0, 10)
+        assertTrue(System.currentTimeMillis() - start < 1_000)
+    }
+
+    @Test
     fun aLogReadDrawsNothingFromTheSeededSequence() = runBlocking {
         val sim = NetworkSimulation(NetworkMode.NORMAL, 50, seed = 7)
         suspend fun outcomes(api: FakeWalletApi, readEvents: Boolean): List<String> {

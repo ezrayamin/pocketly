@@ -79,15 +79,15 @@ export class NetworkSimulator {
   }
 
   /**
-   * Runs before an event-log read (ADR-0017): OFFLINE, TIMEOUT and ALWAYS_FAIL as beforeCall, and
-   * normalLatencyMs, but no draws. The core reads the log by itself after each signal, so a draw here
-   * would shift the seeded sequence the developer's own calls see.
+   * Runs before an event-log read (ADR-0017), the socket's channel: OFFLINE, TIMEOUT and ALWAYS_FAIL as
+   * beforeCall, but no latency and no draws. The core reads the log by itself (after each signal, and
+   * before each history refresh, one read at a time), so a draw here would shift the seeded sequence the
+   * developer's own calls see, and a delay would hold a fast refresh behind a slow one.
    */
   async beforeEventRead(): Promise<void> {
-    const { mode, normalLatencyMs } = this.simulation;
+    const { mode } = this.simulation;
     if (mode === 'OFFLINE') throw new CoreError('NETWORK_UNAVAILABLE', 'Simulated offline mode');
     if (mode === 'TIMEOUT') return new Promise<void>(() => {});
-    if (normalLatencyMs > 0) await new Promise((resolve) => setTimeout(resolve, normalLatencyMs));
     if (mode === 'ALWAYS_FAIL') throw new CoreError('SERVER_ERROR', 'Simulated server error');
   }
 

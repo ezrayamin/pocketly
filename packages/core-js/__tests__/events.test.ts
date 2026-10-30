@@ -136,6 +136,14 @@ describe('fake server: the event log (fixtures/events.json → server, ADR-0017 
     expect(await error(api.getEvents(0, 10))).toBe('SERVER_ERROR');
   });
 
+  it('a log read takes no simulated latency: a refresh never waits behind a slow one', async () => {
+    const api = await openServer();
+    api.network.set({ mode: 'NORMAL', failureRatePercent: 0, normalLatencyMs: 5_000 });
+    const start = Date.now();
+    await api.getEvents(0, 10);
+    expect(Date.now() - start).toBeLessThan(1_000);
+  });
+
   it('a log read draws nothing from the seeded sequence', async () => {
     const simulation: NetworkSimulation = { mode: 'NORMAL', failureRatePercent: 50, seed: 7 };
     const outcomes = async (api: FakeWalletApi, readEvents: boolean) => {
