@@ -8,8 +8,26 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 
-/** server_transfer_key: the request a key was first used for (FR-FAKE-02/03). */
-internal data class TransferKeyRow(val recipientId: String, val amount: Money, val note: String?, val transactionId: String)
+/**
+ * server_transfer_key: the request a key was first used for (FR-FAKE-02/03). [recipientId]: a
+ * transfer's recipient, a top-up's payment method, a QR payment's merchant (with its [requestId]).
+ */
+internal data class TransferKeyRow(
+    val recipientId: String,
+    val amount: Money,
+    val note: String?,
+    val transactionId: String,
+    val requestId: String? = null,
+)
+
+/** server_payment_request: a dynamic QR code's request (ADR-0016 §4). [paidBy] null while open. */
+internal data class PaymentRequestRow(
+    val id: String,
+    val merchantId: String,
+    val amount: Long,
+    val expiresAt: Long,
+    val paidBy: String? = null,
+)
 
 /** server_pending_settlement: a held transfer or a top-up being processed, and how it ends. */
 internal data class Settlement(
@@ -28,12 +46,14 @@ internal class ServerStore(driver: SqlDriver) {
     private val db = ServerDatabase(driver)
     private val q = db.serverQueries
 
-    fun replaceAll(transactions: List<Transaction>, meta: Map<String, String>) = db.transaction {
+    fun replaceAll(transactions: List<Transaction>, paymentRequests: List<PaymentRequestRow>, meta: Map<String, String>) = db.transaction {
         q.deleteAllTransactions()
         q.deleteAllMeta()
         q.deleteAllTransferKeys()
         q.deleteAllSettlements()
+        q.deleteAllPaymentRequests()
         transactions.forEach(::insertRow)
+        paymentRequests.forEach { q.insertPaymentRequest(it.id, it.merchantId, it.amount, it.expiresAt, it.paidBy) }
         meta.forEach { (k, v) -> q.setMeta(k, v) }
     }
 
@@ -49,14 +69,24 @@ internal class ServerStore(driver: SqlDriver) {
     fun usedSince(from: Long): Long = q.usedSince(from).executeAsOne()
 
     fun getTransferKey(key: String): TransferKeyRow? = q.getTransferKey(key).executeAsOneOrNull()?.let {
-        TransferKeyRow(it.recipient_id, Money(it.amount), it.note, it.transaction_id)
+        TransferKeyRow(it.recipient_id, Money(it.amount), it.note, it.transaction_id, it.request_id)
     }
 
-    /** A new transfer or top-up, its key, the meta that counts it, and its settlement: all or nothing. */
-    fun recordTransfer(tx: Transaction, key: TransferKeyRow, meta: Map<String, String>, settlement: Settlement?) = db.transaction {
+    /**
+     * A new transfer, top-up or QR payment, its key, the meta that counts it, its settlement, and the
+     * payment request it pays: all or nothing.
+     */
+    fun recordTransfer(
+        tx: Transaction,
+        key: TransferKeyRow,
+        meta: Map<String, String>,
+        settlement: Settlement?,
+        paysRequest: String? = null,
+    ) = db.transaction {
         insertRow(tx)
-        q.insertTransferKey(tx.idempotencyKey, key.recipientId, key.amount.minor, key.note, key.transactionId)
+        q.insertTransferKey(tx.idempotencyKey, key.recipientId, key.amount.minor, key.note, key.transactionId, key.requestId)
         meta.forEach { (k, v) -> q.setMeta(k, v) }
+        paysRequest?.let { q.markPaymentRequestPaid(tx.id, it) }
         settlement?.let { q.insertSettlement(it.transactionId, it.resolveAt, if (it.fails) 1 else 0, it.failureReason?.name) }
     }
 
@@ -68,10 +98,18 @@ internal class ServerStore(driver: SqlDriver) {
         settlement(it.transaction_id, it.resolve_at, it.fails, it.failure_reason)
     }
 
-    /** Settles a held transfer or a processed top-up: its new status, and the settlement row removed, together. */
+    /**
+     * Settles a held transaction: its new status, and the settlement row removed, together. A failed
+     * QR payment gives its payment request back (ADR-0016 §4).
+     */
     fun settle(id: String, status: TransactionStatus, failureReason: ErrorCode?, updatedAt: Long) = db.transaction {
         q.updateTransactionStatus(status.name, failureReason?.name, updatedAt, id)
         q.deleteSettlement(id)
+        if (status == TransactionStatus.FAILED) q.reopenPaymentRequest(id)
+    }
+
+    fun getPaymentRequest(id: String): PaymentRequestRow? = q.getPaymentRequest(id).executeAsOneOrNull()?.let {
+        PaymentRequestRow(it.id, it.merchant_id, it.amount, it.expires_at, it.paid_by)
     }
 
     fun getMeta(key: String): String? = q.getMeta(key).executeAsOneOrNull()

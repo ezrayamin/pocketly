@@ -16,6 +16,10 @@ enum class ErrorCode(val retryable: Boolean) {
     SECURE_STORAGE_UNAVAILABLE(true),
     /** ADR-0015: the payment method refused a top-up. A recorded FAILED transaction. */
     PAYMENT_DECLINED(false),
+    /** ADR-0016 §4: a dynamic QR code's payment request expired. */
+    QR_EXPIRED(false),
+    /** ADR-0016 §4: a dynamic QR code's payment request was paid already. */
+    QR_ALREADY_PAID(false),
 }
 
 /**

@@ -1248,23 +1248,28 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
       });
 
       describe('My QR (FR-QR-05)', () => {
-        const mine = qrFixture.myQr.cases.find((c) => c.phone === TEST_PHONE)!;
+        const { payloadPrefix } = qrFixture.myQr;
+        const USER_ID = new RegExp(qrFixture.myQr.userIdPattern);
 
-        it('is this account\'s user id, IDs only; scanning it is refused as yourself', async () => {
+        it('is this account\'s random user id, IDs only; scanning it is refused as yourself', async () => {
           const payload = await core.getMyQr();
-          expect(payload).toBe(mine.payload);
-          expect(core.parseQr(payload)).toEqual({ ok: true, kind: 'USER', userId: mine.userId });
-          await expectCoreError(core.startTransfer(mine.userId), 'INVALID_ARGUMENT');
+          expect(payload.startsWith(payloadPrefix)).toBe(true);
+          const userId = payload.slice(payloadPrefix.length);
+          expect(userId).toMatch(USER_ID);
+          expect(core.parseQr(payload)).toEqual({ ok: true, kind: 'USER', userId });
+          await expectCoreError(core.startTransfer(userId), 'INVALID_ARGUMENT');
           await expect(core.startTransfer('u-01')).resolves.toBeDefined(); // another user's code: the Send flow
         });
 
-        it('once fetched it works offline; resetAuth forgets it', async () => {
-          await core.getMyQr();
+        it('stays the same offline and after resetData; resetAuth forgets it', async () => {
+          const payload = await core.getMyQr();
           core.setNetworkSimulation(OFFLINE);
-          expect(await core.getMyQr()).toBe(mine.payload);
+          expect(await core.getMyQr()).toBe(payload);
           core.setNetworkSimulation(NETWORK_NORMAL);
+          await core.resetData(DEFAULT_DATASET);
+          expect(await core.getMyQr()).toBe(payload);
           await core.resetAuth();
-          await expectCoreError(core.getMyQr(), 'NOT_FOUND');
+          await expectCoreError(core.getMyQr(), 'NOT_FOUND'); // the same phone verified again keeps it: qrServer tests
         });
       });
     });

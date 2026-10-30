@@ -90,7 +90,7 @@ by the core, NFR-ARCH-01): "+$25.00 from Andi Pratama", "Your transfer to Budi w
 
 ## Consequences
 
-- Server schema 4 adds `server_event` (with ADR-0016's tables); cache schema 2 adds
+- Server schema 5 (`4.sqm`, after ADR-0016's schema 4) adds `server_event`; cache schema 2 adds
   `cache_notification`, migrated in place (`1.sqm` for the cache).
 - The fake server now runs timers (settlement); tests use the frozen clock plus an explicit
   "run due timers" hook, as `advanceServerClock` does today.

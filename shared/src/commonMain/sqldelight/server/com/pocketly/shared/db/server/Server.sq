@@ -27,14 +27,16 @@ CREATE TABLE server_meta (
   value TEXT NOT NULL
 );
 
--- FR-TRF-05, FR-FAKE-02/03 (ADR-0014): every transfer key the server applied, with its request.
--- Added in schema version 2 (1.sqm).
+-- FR-TRF-05, FR-FAKE-02/03 (ADR-0014): every key the server applied, with its request: a transfer's
+-- recipient, a top-up's payment method (ADR-0015) or a QR payment's merchant and request (ADR-0016).
+-- Added in schema version 2 (1.sqm); request_id since version 4 (3.sqm).
 CREATE TABLE server_transfer_key (
   idempotency_key TEXT NOT NULL PRIMARY KEY,
   recipient_id TEXT NOT NULL,
   amount INTEGER NOT NULL,
   note TEXT,
-  transaction_id TEXT NOT NULL
+  transaction_id TEXT NOT NULL,
+  request_id TEXT
 );
 
 -- FR-FAKE-05: transfers held as PENDING (TIMEOUT mode) and top-ups being processed (ADR-0015),
@@ -45,6 +47,16 @@ CREATE TABLE server_pending_settlement (
   resolve_at INTEGER NOT NULL,
   fails INTEGER NOT NULL,
   failure_reason TEXT
+);
+
+-- ADR-0016 §4: dynamic QR codes' payment requests. paid_by: the transaction that paid it (SUCCESS or
+-- held PENDING), 'external' for a seeded paid one; NULL while it can be paid. Version 4 (3.sqm).
+CREATE TABLE server_payment_request (
+  id TEXT NOT NULL PRIMARY KEY,
+  merchant_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  paid_by TEXT
 );
 
 insertTransaction:
@@ -78,8 +90,8 @@ updateTransactionStatus:
 UPDATE server_transaction SET status = ?, failure_reason = ?, updated_at = ? WHERE id = ?;
 
 insertTransferKey:
-INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id, request_id)
+VALUES (?, ?, ?, ?, ?, ?);
 
 getTransferKey:
 SELECT * FROM server_transfer_key WHERE idempotency_key = ?;
@@ -102,6 +114,22 @@ DELETE FROM server_pending_settlement WHERE transaction_id = ?;
 
 deleteAllSettlements:
 DELETE FROM server_pending_settlement;
+
+insertPaymentRequest:
+INSERT INTO server_payment_request(id, merchant_id, amount, expires_at, paid_by) VALUES (?, ?, ?, ?, ?);
+
+getPaymentRequest:
+SELECT * FROM server_payment_request WHERE id = ?;
+
+markPaymentRequestPaid:
+UPDATE server_payment_request SET paid_by = ? WHERE id = ?;
+
+-- A held QR payment that settles FAILED gives its request back (ADR-0016 §4).
+reopenPaymentRequest:
+UPDATE server_payment_request SET paid_by = NULL WHERE paid_by = ?;
+
+deleteAllPaymentRequests:
+DELETE FROM server_payment_request;
 
 getMeta:
 SELECT value FROM server_meta WHERE key = ?;

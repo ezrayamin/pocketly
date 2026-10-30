@@ -5,10 +5,23 @@ import { rowToTransaction, transactionValues } from '../db/rows';
 
 /** server_transfer_key: the request a key was first used for (FR-FAKE-02/03). */
 export interface TransferKeyRow {
+  /** A transfer's recipient, a top-up's payment method, a QR payment's merchant. */
   recipientId: string;
   amount: number;
   note?: string;
   transactionId: string;
+  /** A QR payment's payment request (ADR-0016 §4). */
+  requestId?: string;
+}
+
+/** server_payment_request: a dynamic QR code's request (ADR-0016 §4). */
+export interface PaymentRequestRow {
+  id: string;
+  merchantId: string;
+  amount: number;
+  expiresAt: number;
+  /** The transaction that paid it, 'external' for a seeded paid one; absent while open. */
+  paidBy?: string;
 }
 
 /** server_pending_settlement: a held transfer or a top-up being processed, and how it ends. */
@@ -31,12 +44,21 @@ export class ServerStore {
     return migrate(this.db, SERVER_SCHEMA, SERVER_VERSION, SERVER_MIGRATIONS);
   }
 
-  async replaceAll(transactions: readonly Transaction[], meta: Record<string, string>): Promise<void> {
+  async replaceAll(
+    transactions: readonly Transaction[],
+    paymentRequests: readonly PaymentRequestRow[],
+    meta: Record<string, string>,
+  ): Promise<void> {
     await this.db.run(SERVER_SQL.deleteAllTransactions.sql, []);
     await this.db.run(SERVER_SQL.deleteAllMeta.sql, []);
     await this.db.run(SERVER_SQL.deleteAllTransferKeys.sql, []);
     await this.db.run(SERVER_SQL.deleteAllSettlements.sql, []);
+    await this.db.run(SERVER_SQL.deleteAllPaymentRequests.sql, []);
     await this.db.runMany(SERVER_SQL.insertTransaction.sql, transactions.map(transactionValues));
+    await this.db.runMany(
+      SERVER_SQL.insertPaymentRequest.sql,
+      paymentRequests.map((r) => [r.id, r.merchantId, r.amount, r.expiresAt, r.paidBy ?? null]),
+    );
     for (const [key, value] of Object.entries(meta)) await this.setMeta(key, value);
   }
 
@@ -72,24 +94,39 @@ export class ServerStore {
       amount: Number(row.amount),
       note: row.note === null ? undefined : (row.note as string),
       transactionId: row.transaction_id as string,
+      ...(row.request_id != null ? { requestId: row.request_id as string } : {}),
     };
   }
 
-  /** A new transfer or top-up, its key, the meta that counts it, and its settlement: all or nothing. */
+  /**
+   * A new transfer, top-up or QR payment, its key, the meta that counts it, its settlement, and
+   * the payment request it pays: all or nothing.
+   */
   async recordTransfer(
     tx: Transaction,
     key: TransferKeyRow,
     meta: Record<string, string>,
     settlement?: Omit<SettlementRow, 'transactionId'>,
+    paysRequest?: string,
   ): Promise<void> {
     const commands: SqlCommand[] = [
       { sql: SERVER_SQL.insertTransaction.sql, values: transactionValues(tx) },
       {
         sql: SERVER_SQL.insertTransferKey.sql,
-        values: [tx.idempotencyKey, key.recipientId, key.amount, key.note ?? null, key.transactionId],
+        values: [
+          tx.idempotencyKey,
+          key.recipientId,
+          key.amount,
+          key.note ?? null,
+          key.transactionId,
+          key.requestId ?? null,
+        ],
       },
       ...Object.entries(meta).map(([k, v]) => ({ sql: SERVER_SQL.setMeta.sql, values: [k, v] })),
     ];
+    if (paysRequest !== undefined) {
+      commands.push({ sql: SERVER_SQL.markPaymentRequestPaid.sql, values: [tx.id, paysRequest] });
+    }
     if (settlement) {
       commands.push({
         sql: SERVER_SQL.insertSettlement.sql,
@@ -108,12 +145,28 @@ export class ServerStore {
     return row ? rowToSettlement(row) : undefined;
   }
 
-  /** Settles a held transfer or a processed top-up: its new status, and the settlement row removed, together. */
+  /**
+   * Settles a held transaction: its new status, and the settlement row removed, together. A failed
+   * QR payment gives its payment request back (ADR-0016 §4).
+   */
   async settle(id: string, status: TransactionStatus, failureReason: ErrorCode | undefined, updatedAt: number): Promise<void> {
     await this.db.batch([
       { sql: SERVER_SQL.updateTransactionStatus.sql, values: [status, failureReason ?? null, updatedAt, id] },
       { sql: SERVER_SQL.deleteSettlement.sql, values: [id] },
+      ...(status === 'FAILED' ? [{ sql: SERVER_SQL.reopenPaymentRequest.sql, values: [id] }] : []),
     ]);
+  }
+
+  async getPaymentRequest(id: string): Promise<PaymentRequestRow | undefined> {
+    const [r] = await this.db.query(SERVER_SQL.getPaymentRequest.sql, [id]);
+    if (!r) return undefined;
+    return {
+      id: r.id as string,
+      merchantId: r.merchant_id as string,
+      amount: Number(r.amount),
+      expiresAt: Number(r.expires_at),
+      ...(r.paid_by != null ? { paidBy: r.paid_by as string } : {}),
+    };
   }
 
   async getMeta(key: string): Promise<string | undefined> {

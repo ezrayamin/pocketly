@@ -3,6 +3,9 @@ package com.pocketly.shared.data.fake
 import com.pocketly.shared.data.ChangesPage
 import com.pocketly.shared.data.ContactSearch
 import com.pocketly.shared.data.FakeBackendControls
+import com.pocketly.shared.data.OpenPaymentRequest
+import com.pocketly.shared.data.PaymentTarget
+import com.pocketly.shared.data.QrPaymentRequest
 import com.pocketly.shared.data.ServerOtpVerify
 import com.pocketly.shared.data.TimeZoneHolder
 import com.pocketly.shared.data.TopUpRequest
@@ -54,6 +57,8 @@ internal class FakeWalletApi(
     otpClock: () -> Long = ::currentTimeMillis,
     /** Where the server's own work runs (the core's database thread in the app). */
     serverDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** For the account's user id (ADR-0016 §6). The app passes its secure generator. */
+    private val randomBytes: (Int) -> ByteArray = { kotlin.random.Random.nextBytes(it) },
 ) : WalletApi, FakeBackendControls {
     private val network = NetworkSimulator()
     private val otp = OtpServer(otpClock)
@@ -65,13 +70,33 @@ internal class FakeWalletApi(
 
     override suspend fun verifyOtp(phone: String, code: String): ServerOtpVerify {
         network.beforeCall()
-        return otp.verify(phone, code).also {
-            if (it.result.outcome == OtpVerifyOutcome.VERIFIED) {
-                store.setMeta(META_ACCOUNT_PHONE, phone)
-                accountPhone = phone
+        val verified = otp.verify(phone, code)
+        if (verified.result.outcome != OtpVerifyOutcome.VERIFIED) return verified
+        return serial.withLock {
+            // The same phone keeps its id; another phone is another account.
+            val userId = accountUserId?.takeIf { phone == accountPhone } ?: newUserId()
+            store.setMeta(META_ACCOUNT_PHONE, phone)
+            store.setMeta(META_ACCOUNT_USER_ID, userId)
+            accountPhone = phone
+            accountUserId = userId
+            verified.copy(userId = userId)
+        }
+    }
+
+    override suspend fun getAccountUserId(): String {
+        network.beforeCall()
+        return serial.withLock {
+            if (accountPhone == null) throw CoreException(ErrorCode.NOT_FOUND, "No verified account")
+            accountUserId ?: newUserId().also {
+                // Verified before user ids existed: the account gets one now.
+                store.setMeta(META_ACCOUNT_USER_ID, it)
+                accountUserId = it
             }
         }
     }
+
+    /** `u-` + 12 random hex digits: says nothing about the phone (ADR-0016 §6). */
+    private fun newUserId(): String = "u-" + randomBytes(6).joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
     @Volatile
     private var frozenNow: Long? = null
@@ -80,6 +105,9 @@ internal class FakeWalletApi(
     private var dailyLimit = SeedData.DAILY_LIMIT
     private var transfers = 0
     private var topUps = 0
+    private var qrPayments = 0
+    @Volatile
+    private var accountUserId: String? = null
     @Volatile
     private var accountPhone: String? = null
 
@@ -106,6 +134,8 @@ internal class FakeWalletApi(
         dailyLimit = store.getMeta(META_DAILY_LIMIT)?.toLong()?.let(::Money) ?: SeedData.DAILY_LIMIT
         transfers = store.getMeta(META_TRANSFERS)?.toInt() ?: 0
         topUps = store.getMeta(META_TOP_UPS)?.toInt() ?: 0
+        qrPayments = store.getMeta(META_QR_PAYMENTS)?.toInt() ?: 0
+        accountUserId = store.getMeta(META_ACCOUNT_USER_ID)
         accountPhone = store.getMeta(META_ACCOUNT_PHONE)
     }
 
@@ -123,8 +153,11 @@ internal class FakeWalletApi(
         dailyLimit = SeedData.DAILY_LIMIT
         transfers = 0
         topUps = 0
+        qrPayments = 0
+        val now = now()
         store.replaceAll(
-            SeedData.generate(config, now()) + config.extraTransactions,
+            SeedData.generate(config, now) + config.extraTransactions,
+            SeedData.seedPaymentRequests(now),
             mapOf(
                 META_SEEDED to "1",
                 META_FROZEN_NOW to (config.nowMillis?.toString() ?: ""),
@@ -132,7 +165,11 @@ internal class FakeWalletApi(
                 META_DAILY_LIMIT to SeedData.DAILY_LIMIT.minor.toString(),
                 META_TRANSFERS to "0",
                 META_TOP_UPS to "0",
-            ) + listOfNotNull(accountPhone?.let { META_ACCOUNT_PHONE to it }), // the account outlives a dataset reset
+                META_QR_PAYMENTS to "0",
+            ) + listOfNotNull( // the account outlives a dataset reset
+                accountPhone?.let { META_ACCOUNT_PHONE to it },
+                accountUserId?.let { META_ACCOUNT_USER_ID to it },
+            ),
         )
     }
 
@@ -160,6 +197,9 @@ internal class FakeWalletApi(
 
     override suspend fun getContact(userId: String): Contact {
         network.beforeCall()
+        // This account, from a scanned My QR (ADR-0016 §6): the client refuses it by its phone.
+        val self = accountPhone
+        if (userId == accountUserId && self != null) return Contact(userId, "You", self)
         return DIRECTORY.firstOrNull { it.userId == userId } ?: throw CoreException(ErrorCode.NOT_FOUND, "No user $userId")
     }
 
@@ -190,6 +230,25 @@ internal class FakeWalletApi(
         return tx
     }
 
+    override suspend fun getPaymentTarget(merchantId: String, requestId: String?): PaymentTarget {
+        network.beforeCall()
+        return serial.withLock {
+            settleDue()
+            paymentTarget(merchantId, requestId)
+        }
+    }
+
+    override suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction {
+        // As transfer: the server's work runs in serverScope, which the client's timeout doesn't stop.
+        val work = serverScope.async {
+            val hold = network.beforeTransfer()
+            hold to serial.withLock { applyQrPayment(request, idempotencyKey, hold) }
+        }
+        val (hold, tx) = work.await()
+        if (hold != null) awaitCancellation() // TIMEOUT: the answer never comes
+        return tx
+    }
+
     override suspend fun getTransferByKey(idempotencyKey: String): Transaction {
         network.beforeCall()
         return serial.withLock {
@@ -203,7 +262,8 @@ internal class FakeWalletApi(
     private fun applyTransfer(request: TransferRequest, idempotencyKey: String, hold: NetworkSimulator.Hold?): Transaction {
         settleDue()
         store.getTransferKey(idempotencyKey)?.let { known ->
-            val same = known.recipientId == request.recipientId && known.amount == request.amount && known.note == request.note
+            val same = known.recipientId == request.recipientId && known.amount == request.amount && known.note == request.note &&
+                known.requestId == null
             if (!same) throw CoreException(ErrorCode.IDEMPOTENCY_CONFLICT, "This key was used for a different transfer")
             return store.get(known.transactionId) ?: throw CoreException(ErrorCode.SERVER_ERROR, "Recorded transfer is missing")
         }
@@ -245,6 +305,66 @@ internal class FakeWalletApi(
         return tx
     }
 
+    /** ADR-0016 §4: the merchant, and its request if any. Runs under [serial]. */
+    private fun paymentTarget(merchantId: String, requestId: String?): PaymentTarget {
+        val merchant = SeedData.MERCHANTS.firstOrNull { it.counterparty.id == merchantId }
+            ?: throw CoreException(ErrorCode.INVALID_QR, "No merchant $merchantId")
+        if (requestId == null) return PaymentTarget(merchant.counterparty, merchant.category, null)
+        val request = store.getPaymentRequest(requestId)?.takeIf { it.merchantId == merchantId }
+            ?: throw CoreException(ErrorCode.INVALID_QR, "No request $requestId")
+        if (request.paidBy != null) throw CoreException(ErrorCode.QR_ALREADY_PAID, "This code was paid already")
+        if (request.expiresAt <= now()) throw CoreException(ErrorCode.QR_EXPIRED, "This code has expired")
+        return PaymentTarget(merchant.counterparty, merchant.category, OpenPaymentRequest(request.id, Money(request.amount), request.expiresAt))
+    }
+
+    /** FR-QR-04, ADR-0016 §4: as [applyTransfer], for a merchant. Runs under [serial]. */
+    private fun applyQrPayment(request: QrPaymentRequest, idempotencyKey: String, hold: NetworkSimulator.Hold?): Transaction {
+        settleDue()
+        store.getTransferKey(idempotencyKey)?.let { known ->
+            val same = known.recipientId == request.merchantId && known.amount == request.amount && known.note == null &&
+                known.requestId == request.requestId
+            if (!same) throw CoreException(ErrorCode.IDEMPOTENCY_CONFLICT, "This key was used for a different request")
+            return store.get(known.transactionId) ?: throw CoreException(ErrorCode.SERVER_ERROR, "Recorded QR payment is missing")
+        }
+        if (idempotencyKey.isEmpty()) throw CoreException(ErrorCode.INVALID_ARGUMENT, "idempotencyKey is required")
+        val target = paymentTarget(request.merchantId, request.requestId)
+        if (!TransferPolicy.isValidAmount(request.amount.minor)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid payment amount")
+        if (target.request != null && target.request.amount != request.amount) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "The amount isn't the code's")
+        }
+
+        val now = now()
+        val remaining = maxOf(0L, dailyLimit.minor - usedToday(now))
+        val refused = TransferPolicy.exceededLimit(request.amount.minor, AmountLimits(Money(store.balance()), Money(remaining)))
+        val n = qrPayments + 1
+        val tx = Transaction(
+            id = "qrp-$n",
+            idempotencyKey = idempotencyKey,
+            type = TransactionType.QR_PAYMENT,
+            category = target.category,
+            amount = request.amount,
+            counterparty = target.merchant,
+            note = null,
+            status = when {
+                refused != null -> TransactionStatus.FAILED
+                hold != null -> TransactionStatus.PENDING
+                else -> TransactionStatus.SUCCESS
+            },
+            failureReason = refused?.let { if (it == AmountRejectReason.INSUFFICIENT_FUNDS) ErrorCode.INSUFFICIENT_FUNDS else ErrorCode.DAILY_LIMIT_EXCEEDED },
+            createdAt = now,
+            updatedAt = now,
+        )
+        store.recordTransfer(
+            tx,
+            TransferKeyRow(request.merchantId, request.amount, null, tx.id, request.requestId),
+            mapOf(META_QR_PAYMENTS to n.toString()),
+            if (tx.status == TransactionStatus.PENDING && hold != null) Settlement(tx.id, now + hold.holdMs, hold.fails) else null,
+            paysRequest = request.requestId.takeIf { refused == null }, // paid (or held): nobody pays it again
+        )
+        qrPayments = n
+        return tx
+    }
+
     /**
      * ADR-0015 §4. Runs under [serial]. A new top-up is recorded PENDING with a settlement row
      * saying how it ends, so one still processing when the app dies settles on the next start.
@@ -258,7 +378,8 @@ internal class FakeWalletApi(
         settleDue()
         val counterparty = TopUpPolicy.counterparty(request.method)
         store.getTransferKey(idempotencyKey)?.let { known ->
-            val same = known.recipientId == counterparty.id && known.amount == request.amount && known.note == null
+            val same = known.recipientId == counterparty.id && known.amount == request.amount && known.note == null &&
+                known.requestId == null
             if (!same) throw CoreException(ErrorCode.IDEMPOTENCY_CONFLICT, "This key was used for a different request")
             val original = store.get(known.transactionId)
                 ?: throw CoreException(ErrorCode.SERVER_ERROR, "Recorded top-up is missing")
@@ -391,6 +512,10 @@ internal class FakeWalletApi(
         private const val META_DAILY_LIMIT = "dailyLimit"
         private const val META_TRANSFERS = "transfers"
         private const val META_TOP_UPS = "topUps"
+        private const val META_QR_PAYMENTS = "qrPayments"
+
+        /** ADR-0016 §6: the verified account's user id, random, kept with its phone across resets. */
+        private const val META_ACCOUNT_USER_ID = "accountUserId"
 
         /** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
         private const val META_ACCOUNT_PHONE = "accountPhone"

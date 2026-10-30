@@ -121,11 +121,8 @@
     ]
   },
   "myQr": {
-    "_comment": "ADR-0016 §6: the fake server's user id for a verified phone (E.164) is 'u-' + the first 12 hex digits of SHA-256(UTF-8 phone). getMyQr returns pocketly://user/v1?u=<userId>. startTransfer(<this account's userId>) is INVALID_ARGUMENT (yourself), as for its phone.",
-    "cases": [
-      {"phone": "+6281234567890", "userId": "u-62397bbd6a8c", "payload": "pocketly://user/v1?u=u-62397bbd6a8c"},
-      {"phone": "+6281234567781", "userId": "u-04b5f2e5925c", "payload": "pocketly://user/v1?u=u-04b5f2e5925c"},
-      {"phone": "+6285712345678", "userId": "u-c31accb6bb3c", "payload": "pocketly://user/v1?u=u-c31accb6bb3c"}
-    ]
+    "_comment": "ADR-0016 §6: the fake server gives a verified account a random user id, 'u-' + 12 lowercase hex digits, kept with its phone (the same phone verified again keeps it; another phone gets a new one) and across resetData. getMyQr returns pocketly://user/v1?u=<userId>. startTransfer(<this account's userId>) is INVALID_ARGUMENT (yourself), as for its phone.",
+    "userIdPattern": "^u-[0-9a-f]{12}$",
+    "payloadPrefix": "pocketly://user/v1?u="
   }
 }

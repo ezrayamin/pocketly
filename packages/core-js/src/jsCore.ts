@@ -26,6 +26,9 @@ import type {
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   StaleInfo,
   Subscription,
@@ -48,6 +51,7 @@ import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { parseQr, userQrPayload } from './domain/qrPolicy';
 import { checkTopUpAmount } from './domain/topUpPolicy';
 import { BiometricAuth } from './security/biometricAuth';
 import type { BiometricSigner } from './security/biometricSigner';
@@ -59,7 +63,7 @@ import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
-import { TransferFlow } from './sync/transferFlow';
+import { PaymentFlow } from './sync/paymentFlow';
 
 const now: () => number =
   typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -109,10 +113,15 @@ export class JsCore implements Core {
   storageMs = 0;
   private readonly pin: PinAuth;
   private readonly biometric: BiometricAuth;
-  private readonly transfers: TransferFlow;
+  private readonly payments: PaymentFlow;
 
   constructor(options: JsCoreOptions) {
-    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone, options.clock ?? Date.now);
+    const backend = new FakeWalletApi(
+      new ServerStore(options.server),
+      () => this.zone,
+      options.clock ?? Date.now,
+      (size) => options.crypto.randomBytes(size),
+    );
     const cache = new CacheStore(options.cache);
     this.backend = backend;
     this.api = new TimeoutWalletApi(backend, (kind) => {
@@ -142,7 +151,7 @@ export class JsCore implements Core {
       iterations: options.pinIterations,
     });
     this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
-    this.transfers = new TransferFlow({
+    this.payments = new PaymentFlow({
       api: this.api,
       cache,
       pin: this.pin,
@@ -161,7 +170,7 @@ export class JsCore implements Core {
   private async reset(config: ServerDataset): Promise<void> {
     await this.ready;
     await this.backend.reset(config);
-    this.transfers.reset();
+    this.payments.reset();
     await this.cache.clear();
     try {
       await this.ledgerSync.sync();
@@ -272,7 +281,7 @@ export class JsCore implements Core {
   async logout(): Promise<void> {
     // The replica first: if the secrets then fail to go, nothing of the history is left behind.
     await this.ready;
-    this.transfers.reset();
+    this.payments.reset();
     await this.cache.clear();
     await this.biometric.reset();
   }
@@ -291,8 +300,10 @@ export class JsCore implements Core {
     if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
     if (!new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(code)) throw new CoreError('INVALID_ARGUMENT', `the code has ${OTP_LENGTH} digits`);
     await this.ready;
-    const { sessionToken, ...result } = await this.api.verifyOtp(phone, code);
-    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) await this.pin.rememberVerifiedPhone(phone, sessionToken);
+    const { sessionToken, userId, ...result } = await this.api.verifyOtp(phone, code);
+    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) {
+      await this.pin.rememberVerifiedPhone(phone, sessionToken, userId);
+    }
     return result;
   }
 
@@ -322,31 +333,31 @@ export class JsCore implements Core {
 
   async searchContacts(query: string): Promise<ContactSearch> {
     await this.ready;
-    return this.transfers.searchContacts(query);
+    return this.payments.searchContacts(query);
   }
 
   async startTransfer(recipientId: string): Promise<TransferDraft> {
     await this.ready;
-    return this.transfers.startTransfer(recipientId);
+    return this.payments.startTransfer(recipientId);
   }
 
   checkTransferAmount(text: string): AmountCheck {
-    return this.transfers.checkTransferAmount(text);
+    return this.payments.checkTransferAmount(text);
   }
 
   async reviewTransfer(amount: number, note?: string): Promise<TransferReview> {
     await this.ready;
-    return this.transfers.reviewTransfer(amount, note);
+    return this.payments.reviewTransfer(amount, note);
   }
 
   async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
     await this.ready;
-    return this.transfers.confirmTransfer(id, auth);
+    return this.payments.confirmTransfer(id, auth);
   }
 
   async getTransferStatus(id: string): Promise<TransferResult> {
     await this.ready;
-    return this.transfers.getTransferStatus(id);
+    return this.payments.getTransferStatus(id);
   }
 
   checkTopUpAmount(text: string): AmountCheck {
@@ -355,7 +366,26 @@ export class JsCore implements Core {
 
   async reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
     await this.ready;
-    return this.transfers.reviewTopUp(amount, method);
+    return this.payments.reviewTopUp(amount, method);
+  }
+
+  parseQr(text: string): QrCode {
+    return parseQr(text);
+  }
+
+  async startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft> {
+    await this.ready;
+    return this.payments.startQrPayment(merchantId, requestId);
+  }
+
+  async reviewQrPayment(amount: number): Promise<QrPaymentReview> {
+    await this.ready;
+    return this.payments.reviewQrPayment(amount);
+  }
+
+  async getMyQr(): Promise<string> {
+    await this.ready;
+    return userQrPayload(await this.pin.myUserId(() => this.api.getAccountUserId()));
   }
 
   async setDailyLimit(minor: number): Promise<void> {

@@ -1,0 +1,12 @@
+-- Schema version 3 → 4 (slice 7, ADR-0016 §4): QR payments. Dynamic codes' payment requests, and the
+-- request a key was used for, so the idempotency check compares it too. The JS generator reads this file too.
+
+ALTER TABLE server_transfer_key ADD COLUMN request_id TEXT;
+
+CREATE TABLE server_payment_request (
+  id TEXT NOT NULL PRIMARY KEY,
+  merchant_id TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  paid_by TEXT
+);

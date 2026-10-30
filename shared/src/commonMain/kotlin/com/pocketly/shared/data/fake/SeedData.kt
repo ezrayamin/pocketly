@@ -40,9 +40,10 @@ internal object SeedData {
         Counterparty(CounterpartyKind.USER, "u-" + (i + 1).toString().padStart(2, '0'), name, phone)
     }
 
-    private class Merchant(val counterparty: Counterparty, val category: Category)
+    class Merchant(val counterparty: Counterparty, val category: Category)
 
-    private val MERCHANTS: List<Merchant> = listOf(
+    /** The seed's merchants; also the fake server's merchant directory (ADR-0016 §4). */
+    val MERCHANTS: List<Merchant> = listOf(
         "Corner Coffee" to Category.FOOD,
         "Noodle House" to Category.FOOD,
         "Metro Transit" to Category.TRANSPORT,
@@ -56,6 +57,20 @@ internal object SeedData {
     ).mapIndexed { i, (name, category) ->
         val id = "m-" + (i + 1).toString().padStart(2, '0')
         Merchant(Counterparty(CounterpartyKind.MERCHANT, id, name), category)
+    }
+
+    /**
+     * ADR-0016 §4: the fake server's seeded payment requests (dynamic QR codes), relative to the
+     * seed clock: open, expired, already paid, and more than the opening balance (fixtures/qr.json).
+     */
+    fun seedPaymentRequests(now: Long): List<PaymentRequestRow> {
+        val year = 365L * 24 * 60 * 60_000
+        return listOf(
+            PaymentRequestRow("pr-0001", "m-01", 1_250, now + year),
+            PaymentRequestRow("pr-0002", "m-02", 4_500, now - 60 * 60_000),
+            PaymentRequestRow("pr-0003", "m-02", 3_000, now + year, paidBy = "external"),
+            PaymentRequestRow("pr-0004", "m-05", 2_000_000, now + year),
+        )
     }
 
     private val PAYMENT_METHODS = listOf(

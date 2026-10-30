@@ -1,5 +1,7 @@
 import type {
+  Category,
   Contact,
+  Counterparty,
   DatasetConfig,
   OtpSendResult,
   OtpVerifyResult,
@@ -8,8 +10,11 @@ import type {
   Wallet,
 } from '@pocketly/core-contract';
 
-/** What the server answers on an OTP check: the result, plus a session token when verified. */
-export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string };
+/**
+ * What the server answers on an OTP check: the result, plus a session token and the account's
+ * user id (ADR-0016 §6) when verified.
+ */
+export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string; userId?: string };
 
 /** requirements §4.1 `TransferRequest`: what the idempotency key protects (ADR-0014). */
 export interface TransferRequest {
@@ -23,6 +28,23 @@ export interface TransferRequest {
 export interface TopUpRequest {
   method: TopUpMethod;
   amount: number;
+}
+
+/** ADR-0016: what a QR payment's idempotency key protects. */
+export interface QrPaymentRequest {
+  merchantId: string;
+  /** A dynamic code's payment request. */
+  requestId?: string;
+  amount: number;
+}
+
+/** ADR-0016 §4: what a scanned merchant code points at, from the server. */
+export interface PaymentTarget {
+  merchant: Counterparty;
+  /** The category a payment to this merchant gets. */
+  category: Category;
+  /** Dynamic code only: still open and unexpired. */
+  request?: { id: string; amount: number; expiresAt: number };
 }
 
 /** One page of server changes, ordered by (updatedAt, id). */
@@ -64,7 +86,22 @@ export interface WalletApi {
    * share transfer()'s table, so a key used for either kind conflicts with the other.
    */
   topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction>;
-  /** FR-TRF-09 status check, either kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+  /**
+   * ADR-0016 §4: the merchant (and its open, unexpired payment request). INVALID_QR for an unknown
+   * merchant or request, or a request of another merchant; QR_EXPIRED; QR_ALREADY_PAID.
+   */
+  getPaymentTarget(merchantId: string, requestId?: string): Promise<PaymentTarget>;
+  /**
+   * FR-QR-04 (ADR-0016 §4): as transfer(), for a merchant. A payment request is paid once: another
+   * key for a paid request is QR_ALREADY_PAID; a refusal leaves it open.
+   */
+  payMerchant(request: QrPaymentRequest, idempotencyKey: string): Promise<Transaction>;
+  /**
+   * ADR-0016 §6: the verified account's user id, for sessions from before verifyOtp returned it.
+   * NOT_FOUND without one.
+   */
+  getAccountUserId(): Promise<string>;
+  /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
   getTransferByKey(idempotencyKey: string): Promise<Transaction>;
 }
 

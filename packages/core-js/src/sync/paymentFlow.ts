@@ -8,9 +8,13 @@ import {
 } from '@pocketly/core-contract';
 import type {
   AmountCheck,
+  Category,
   Contact,
   ContactSearch,
+  Counterparty,
   ErrorCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   TopUpMethod,
   TopUpReview,
   Transaction,
@@ -56,18 +60,34 @@ interface TopUpAttempt extends AttemptBase {
   readonly method: TopUpMethod;
 }
 
-type Attempt = TransferAttempt | TopUpAttempt;
+/** ADR-0016: money out to a merchant, approved like a transfer. */
+interface QrAttempt extends AttemptBase {
+  readonly kind: 'QR_PAYMENT';
+  readonly merchant: Counterparty;
+  /** The merchant's, from the server: the pending row's category. */
+  readonly category: Category;
+  readonly requestId?: string;
+}
+
+type Attempt = TransferAttempt | TopUpAttempt | QrAttempt;
 
 /** A change to the replica's wallet: balance, and today's outgoing total. */
 type WalletDelta = readonly [balance: number, usedToday: number];
 
-interface Draft {
-  recipient: Contact;
-  balance: number;
-  dailyRemaining: number;
-}
+/** The amount step's limits, fresh from the server. One draft at a time: a transfer's or a QR payment's. */
+type Draft =
+  | { kind: 'TRANSFER'; recipient: Contact; balance: number; dailyRemaining: number }
+  | {
+      kind: 'QR_PAYMENT';
+      merchant: Counterparty;
+      category: Category;
+      /** A dynamic code's open request: its amount is the only one allowed. */
+      request?: { id: string; amount: number; expiresAt: number };
+      balance: number;
+      dailyRemaining: number;
+    };
 
-export interface TransferFlowDeps {
+export interface PaymentFlowDeps {
   /** Behind the timeout (NFR-REL-01): reads after readTimeoutMs, the submission after writeTimeoutMs. */
   api: WalletApi;
   cache: CacheStore;
@@ -82,15 +102,16 @@ export interface TransferFlowDeps {
 
 /**
  * F5, the client side of a transfer (ADR-0014): draft → review (the key) → confirm (approval,
- * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. F6's top-ups (ADR-0015) are
- * attempts too: review → confirm (no approval) → the same outcomes. Every state change goes
- * through the §3.2 state machine. Mirrors shared/.../sync/TransferFlow.kt.
+ * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. F6's top-ups (ADR-0015) and F7's
+ * QR payments (ADR-0016) are attempts too, with the same outcomes: a top-up needs no approval, a
+ * QR payment is approved like a transfer. Every state change goes through the §3.2 state machine.
+ * Mirrors shared/.../sync/PaymentFlow.kt.
  */
-export class TransferFlow {
+export class PaymentFlow {
   private draft: Draft | undefined;
   private readonly attempts = new Map<string, Attempt>();
 
-  constructor(private readonly deps: TransferFlowDeps) {}
+  constructor(private readonly deps: PaymentFlowDeps) {}
 
   /** Logout / resetData: forget the draft and every attempt (the replica is cleared too). */
   reset(): void {
@@ -128,7 +149,12 @@ export class TransferFlow {
     if (recipient.phone === self.value) throw new CoreError('INVALID_ARGUMENT', "You can't send money to yourself");
     if (fresh.status === 'rejected') throw toCoreError(fresh.reason);
     const wallet = fresh.value;
-    const draft = { recipient, balance: wallet.balance, dailyRemaining: Math.max(0, wallet.dailyLimit - wallet.usedToday) };
+    const draft = {
+      kind: 'TRANSFER' as const,
+      recipient,
+      balance: wallet.balance,
+      dailyRemaining: Math.max(0, wallet.dailyLimit - wallet.usedToday),
+    };
     this.draft = draft;
     return {
       recipient,
@@ -145,6 +171,7 @@ export class TransferFlow {
 
   async reviewTransfer(amount: number, note?: string): Promise<TransferReview> {
     const draft = this.currentDraft();
+    if (draft.kind !== 'TRANSFER') throw new CoreError('NOT_FOUND', 'No transfer started');
     if (!isValidTransferAmount(amount)) throw new CoreError('INVALID_ARGUMENT', 'Invalid transfer amount');
     const over = exceededLimit(amount, draft);
     if (over !== undefined) throw new CoreError(over, 'Amount is over the limit');
@@ -169,6 +196,69 @@ export class TransferFlow {
     };
   }
 
+  /**
+   * FR-QR-03 (ADR-0016 §4): the merchant and its request, and a fresh wallet, in parallel. The
+   * server's answer is reported first, so both cores fail the same way whichever call ends first.
+   */
+  async startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft> {
+    const [target, fresh] = await Promise.allSettled([
+      this.deps.api.getPaymentTarget(merchantId, requestId),
+      this.deps.fetchWallet(), // as FR-TRF-11: fresh, or no payment
+    ]);
+    if (target.status === 'rejected') throw toCoreError(target.reason);
+    if (fresh.status === 'rejected') throw toCoreError(fresh.reason);
+    const { merchant, category, request } = target.value;
+    const wallet = fresh.value;
+    const draft: Draft = {
+      kind: 'QR_PAYMENT',
+      merchant,
+      category,
+      ...(request !== undefined ? { request } : {}),
+      balance: wallet.balance,
+      dailyRemaining: Math.max(0, wallet.dailyLimit - wallet.usedToday),
+    };
+    this.draft = draft;
+    return {
+      merchant,
+      ...(request !== undefined ? { requestId: request.id, amount: request.amount, expiresAt: request.expiresAt } : {}),
+      balance: draft.balance,
+      dailyRemaining: draft.dailyRemaining,
+      minAmount: TRANSFER_MIN_MINOR,
+      maxAmount: Math.min(draft.balance, draft.dailyRemaining),
+    };
+  }
+
+  async reviewQrPayment(amount: number): Promise<QrPaymentReview> {
+    const draft = this.currentDraft();
+    if (draft.kind !== 'QR_PAYMENT') throw new CoreError('NOT_FOUND', 'No QR payment started');
+    if (!isValidTransferAmount(amount)) throw new CoreError('INVALID_ARGUMENT', 'Invalid payment amount');
+    if (draft.request !== undefined && draft.request.amount !== amount) {
+      throw new CoreError('INVALID_ARGUMENT', "The amount isn't the code's");
+    }
+    const over = exceededLimit(amount, draft);
+    if (over !== undefined) throw new CoreError(over, 'Amount is over the limit');
+    const key = this.newAttemptKey();
+    const requestId = draft.request?.id;
+    this.attempts.set(key, {
+      kind: 'QR_PAYMENT',
+      key,
+      merchant: draft.merchant,
+      category: draft.category,
+      ...(requestId !== undefined ? { requestId } : {}),
+      amount,
+      state: 'DRAFT',
+    });
+    return {
+      id: key,
+      idempotencyKey: key,
+      merchant: draft.merchant,
+      ...(requestId !== undefined ? { requestId } : {}),
+      amount,
+      fee: TRANSFER_FEE_MINOR,
+      balanceAfter: draft.balance - amount,
+    };
+  }
+
   /** FR-TOP-01/02: a fresh wallet (FR-TRF-11: no top-up from cached data), then the attempt and its key. */
   async reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
     if (!isTopUpMethod(method)) throw new CoreError('INVALID_ARGUMENT', 'Unknown top-up method');
@@ -183,8 +273,8 @@ export class TransferFlow {
   async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
     const attempt = await this.attempt(id);
     if (attempt.running) return attempt.running;
-    if (attempt.state === 'DRAFT' && attempt.kind === 'TRANSFER' && auth === undefined) {
-      throw new CoreError('INVALID_ARGUMENT', 'A new transfer needs biometrics or the PIN');
+    if (attempt.state === 'DRAFT' && attempt.kind !== 'TOP_UP' && auth === undefined) {
+      throw new CoreError('INVALID_ARGUMENT', 'A new payment needs biometrics or the PIN');
     }
     if (attempt.state === 'DRAFT' && attempt.kind === 'TOP_UP' && auth !== undefined) {
       throw new CoreError('INVALID_ARGUMENT', 'A top-up takes no authorization');
@@ -194,7 +284,7 @@ export class TransferFlow {
     }
     return this.run(attempt, () => {
       if (attempt.state !== 'DRAFT') return this.retry(attempt);
-      return attempt.kind === 'TRANSFER' ? this.authorizeAndSend(attempt, auth!) : this.sendTopUp(attempt);
+      return attempt.kind === 'TOP_UP' ? this.sendTopUp(attempt) : this.authorizeAndSend(attempt, auth!);
     });
   }
 
@@ -207,7 +297,7 @@ export class TransferFlow {
 
   // ── steps ────────────────────────────────────────────────────────────
 
-  private async authorizeAndSend(attempt: TransferAttempt, auth: TransferAuth): Promise<TransferResult> {
+  private async authorizeAndSend(attempt: TransferAttempt | QrAttempt, auth: TransferAuth): Promise<TransferResult> {
     this.move(attempt, 'CONFIRM');
     let outcome: TransferAuthOutcome;
     let extra: Pick<TransferResult, 'attemptsLeft' | 'lockedUntil'> = {};
@@ -233,15 +323,27 @@ export class TransferFlow {
   }
 
   private async authorize(
-    attempt: TransferAttempt,
+    attempt: TransferAttempt | QrAttempt,
     auth: TransferAuth,
   ): Promise<{ outcome: TransferAuthOutcome; extra: Pick<TransferResult, 'attemptsLeft' | 'lockedUntil'> }> {
     if (auth.method === 'BIOMETRIC') {
       if (auth.prompt === undefined) throw new CoreError('INVALID_ARGUMENT', 'BIOMETRIC needs a prompt');
-      const outcome = await this.deps.biometric.approveTransfer(
-        { amount: attempt.amount, recipientId: attempt.recipient.userId, idempotencyKey: attempt.key },
-        auth.prompt,
-      );
+      // Each kind signs its own message (ADR-0012, ADR-0016 §2).
+      const outcome =
+        attempt.kind === 'TRANSFER'
+          ? await this.deps.biometric.approveTransfer(
+              { amount: attempt.amount, recipientId: attempt.recipient.userId, idempotencyKey: attempt.key },
+              auth.prompt,
+            )
+          : await this.deps.biometric.approveQrPayment(
+              {
+                amount: attempt.amount,
+                merchantId: attempt.merchant.id,
+                ...(attempt.requestId !== undefined ? { requestId: attempt.requestId } : {}),
+                idempotencyKey: attempt.key,
+              },
+              auth.prompt,
+            );
       return { outcome, extra: {} };
     }
     if (auth.method !== 'PIN' || auth.pin === undefined) throw new CoreError('INVALID_ARGUMENT', 'PIN needs a pin');
@@ -353,6 +455,11 @@ export class TransferFlow {
   private send(attempt: Attempt): Promise<Transaction> {
     const { key, amount } = attempt;
     if (attempt.kind === 'TOP_UP') return this.deps.api.topUp({ method: attempt.method, amount }, key);
+    if (attempt.kind === 'QR_PAYMENT') {
+      const { merchant, requestId } = attempt;
+      const request = { merchantId: merchant.id, ...(requestId !== undefined ? { requestId } : {}), amount };
+      return this.deps.api.payMerchant(request, key);
+    }
     const { recipient, note } = attempt;
     const request = { recipientId: recipient.userId, amount, ...(note !== undefined ? { note } : {}) };
     return this.deps.api.transfer(request, key);
@@ -372,6 +479,9 @@ export class TransferFlow {
     if (attempt.kind === 'TOP_UP') {
       return { ...common, type: 'TOP_UP', category: 'TOP_UP', counterparty: topUpCounterparty(attempt.method) };
     }
+    if (attempt.kind === 'QR_PAYMENT') {
+      return { ...common, type: 'QR_PAYMENT', category: attempt.category, counterparty: attempt.merchant };
+    }
     const { recipient, note } = attempt;
     return {
       ...common,
@@ -388,7 +498,12 @@ export class TransferFlow {
     if (known) return known;
     const row = await this.deps.cache.getByIdempotencyKey(id);
     const method = row?.type === 'TOP_UP' ? topUpMethodOf(row.counterparty) : undefined;
-    if (row === undefined || row.counterparty === undefined || (row.type !== 'TRANSFER_OUT' && method === undefined)) {
+    const merchant = row?.type === 'QR_PAYMENT' && row.counterparty?.kind === 'MERCHANT' ? row.counterparty : undefined;
+    if (
+      row === undefined ||
+      row.counterparty === undefined ||
+      (row.type !== 'TRANSFER_OUT' && method === undefined && merchant === undefined)
+    ) {
       throw new CoreError('NOT_FOUND', `No transfer ${id}`);
     }
     const common = {
@@ -402,6 +517,8 @@ export class TransferFlow {
     const restored: Attempt =
       method !== undefined
         ? { ...common, kind: 'TOP_UP', method }
+        : merchant !== undefined
+        ? { ...common, kind: 'QR_PAYMENT', merchant, category: row.category }
         : {
             ...common,
             kind: 'TRANSFER',
@@ -455,16 +572,16 @@ export class TransferFlow {
 const NO_CHANGE: WalletDelta = [0, 0];
 
 /**
- * What the server counts while the attempt is PENDING: a held transfer is already out of the
+ * What the server counts while the attempt is PENDING: a held transfer or QR payment is already out of the
  * balance and in today's total; a pending top-up isn't in the balance yet (ADR-0015 §3).
  */
 function heldDelta(attempt: Attempt): WalletDelta {
-  return attempt.kind === 'TRANSFER' ? [-attempt.amount, attempt.amount] : NO_CHANGE;
+  return attempt.kind === 'TOP_UP' ? NO_CHANGE : [-attempt.amount, attempt.amount];
 }
 
 /** What a SUCCESS changes in all. A top-up never counts toward the daily limit. */
 function settledDelta(attempt: Attempt): WalletDelta {
-  return attempt.kind === 'TRANSFER' ? [-attempt.amount, attempt.amount] : [attempt.amount, 0];
+  return attempt.kind === 'TOP_UP' ? [attempt.amount, 0] : [-attempt.amount, attempt.amount];
 }
 
 /** RFC 4122 version 4 from 16 random bytes, lowercase. */

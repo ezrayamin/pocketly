@@ -116,10 +116,12 @@ each that is roughly +160 KB of kmpCore bridge (BM-08 will say).
 
 ### 6. My QR (F8)
 
-- **Whose ID:** the fake server gives the account a user ID when the phone is verified (OTP,
-  ADR-0013): `u-` + the first 12 hex digits of SHA-256(phone), so it's stable per phone and
-  reveals nothing about it. `getMyQr` asks the server once and keeps it in secure storage with
-  the verified phone (cleared with it by `resetAuth` / `logout`). Scanning your own code: `parseQr`
+- **Whose ID:** the fake server gives the account a **random** user ID when the phone is verified
+  (OTP, ADR-0013): `u-` + 12 hex digits, kept with that phone (verifying it again keeps the ID)
+  and across dataset resets. A hash of the phone would reveal nothing in theory, but phone numbers
+  are few enough to enumerate, so any function of the phone could be reversed; a random ID can't.
+  `verifyOtp` returns it and the core keeps it in the secure session with the phone (cleared with
+  it by `resetAuth` / `logout`); a session from before this asks the server once (`getMyQr`). Scanning your own code: `parseQr`
   gives USER, `startTransfer` refuses it, and the scanner says "That's your own code".
 - **Rendering** is UI: `react-native-qrcode-svg` on the `react-native-svg` the app already ships,
   so no new native code. Both builds use it.

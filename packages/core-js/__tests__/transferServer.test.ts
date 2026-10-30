@@ -255,10 +255,12 @@ describe('fake server: TIMEOUT mode (FR-FAKE-05)', () => {
 });
 
 describe('server schema migrations', () => {
-  it('1 → 3: adds the transfer tables to a version-1 database and keeps its data', async () => {
+  it('1 → 4: adds the transfer tables to a version-1 database and keeps its data', async () => {
     const driver = nodeSqliteDriver();
     // A slice-5 database: version 1, without the tables 1.sqm adds.
-    for (const statement of SERVER_SCHEMA.filter((s) => !/server_transfer_key|server_pending_settlement/.test(s))) {
+    for (const statement of SERVER_SCHEMA.filter(
+      (s) => !/server_transfer_key|server_pending_settlement|server_payment_request/.test(s),
+    )) {
       await driver.exec(statement);
     }
     await driver.exec('PRAGMA user_version = 1');
@@ -268,15 +270,15 @@ describe('server schema migrations', () => {
     const api = await openServer(driver);
     const [row] = await driver.query('PRAGMA user_version', []);
     expect(Number(row.user_version)).toBe(SERVER_VERSION);
-    expect(SERVER_VERSION).toBe(3);
+    expect(SERVER_VERSION).toBe(4);
     expect((await api.transfer({ recipientId: 'u-01', amount: 100 }, 'after-migration')).status).toBe('FAILED'); // empty ledger
   });
 
-  it('2 → 3: a held settlement from version 2 has no reason and still settles as SERVER_ERROR (ADR-0015 §4)', async () => {
+  it('2 → 4: a held settlement from version 2 has no reason and still settles as SERVER_ERROR (ADR-0015 §4)', async () => {
     const driver = nodeSqliteDriver();
-    // A slice-6 database: version 2, settlements without failure_reason.
-    for (const statement of SERVER_SCHEMA) {
-      await driver.exec(statement.replace(', failure_reason TEXT )', ' )'));
+    // A slice-6 database: version 2, settlements without failure_reason, keys without request_id.
+    for (const statement of SERVER_SCHEMA.filter((s) => !/server_payment_request/.test(s))) {
+      await driver.exec(statement.replace(', failure_reason TEXT )', ' )').replace(', request_id TEXT )', ' )'));
     }
     await driver.exec('PRAGMA user_version = 2');
     const now = DEFAULT_DATASET.nowMillis!;
@@ -290,7 +292,7 @@ describe('server schema migrations', () => {
 
     const api = await openServer(driver);
     const [row] = await driver.query('PRAGMA user_version', []);
-    expect(Number(row.user_version)).toBe(3);
+    expect(Number(row.user_version)).toBe(4);
     api.advanceClock(1);
     expect(await api.getTransaction('trf-1')).toMatchObject({ status: 'FAILED', failureReason: 'SERVER_ERROR' });
   });

@@ -1,6 +1,8 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.domain.Category
 import com.pocketly.shared.domain.Contact
+import com.pocketly.shared.domain.Counterparty
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
@@ -15,6 +17,14 @@ data class TransferRequest(val recipientId: String, val amount: Money, val note:
 
 /** ADR-0015: what a top-up's idempotency key protects. */
 data class TopUpRequest(val method: TopUpMethod, val amount: Money)
+
+/** ADR-0016: what a QR payment's idempotency key protects. */
+data class QrPaymentRequest(val merchantId: String, val requestId: String?, val amount: Money)
+
+/** ADR-0016 §4: what a scanned merchant code points at, from the server. [request]: dynamic code only. */
+data class PaymentTarget(val merchant: Counterparty, val category: Category, val request: OpenPaymentRequest?)
+
+data class OpenPaymentRequest(val id: String, val amount: Money, val expiresAt: Long)
 
 /** One page of server changes, ordered by (updatedAt, id). */
 data class ChangesPage(val items: List<Transaction>, val nextToken: String?, val hasMore: Boolean)
@@ -59,12 +69,27 @@ interface WalletApi {
      */
     suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction
 
-    /** FR-TRF-09 status check, either kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+    /**
+     * ADR-0016 §4: the merchant (and its open, unexpired payment request). INVALID_QR for an unknown
+     * merchant or request, or a request of another merchant; QR_EXPIRED; QR_ALREADY_PAID.
+     */
+    suspend fun getPaymentTarget(merchantId: String, requestId: String?): PaymentTarget
+
+    /**
+     * FR-QR-04 (ADR-0016 §4): as [transfer], for a merchant. A payment request is paid once: another
+     * key for a paid request is QR_ALREADY_PAID; a refusal leaves it open.
+     */
+    suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction
+
+    /** ADR-0016 §6: the verified account's user id (for sessions from before verifyOtp returned it). NOT_FOUND without one. */
+    suspend fun getAccountUserId(): String
+
+    /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
     suspend fun getTransferByKey(idempotencyKey: String): Transaction
 }
 
-/** What the server answers on an OTP check: the result, plus a session token when verified. */
-data class ServerOtpVerify(val result: OtpVerifyResult, val sessionToken: String? = null)
+/** What the server answers on an OTP check: the result, plus a session token and the account's user id (ADR-0016 §6) when verified. */
+data class ServerOtpVerify(val result: OtpVerifyResult, val sessionToken: String? = null, val userId: String? = null)
 
 /** Developer-menu controls (FR-DEV-*). Only the fake backend implements this. */
 interface FakeBackendControls {

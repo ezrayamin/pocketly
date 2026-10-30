@@ -281,3 +281,49 @@ data class TopUpReview(
     val fee: Money,
     val balanceAfter: Money,
 )
+
+// ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────────
+
+/** Mirrors core-contract's QrKind. */
+enum class QrKind { MERCHANT, USER }
+
+/** Mirrors core-contract's QrRejectReason. */
+enum class QrRejectReason { TOO_LONG, MALFORMED, UNSUPPORTED_VERSION, UNKNOWN_KIND }
+
+/** parseQr: what a code says, IDs only. Mirrors core-contract's QrCode. */
+data class QrCode(
+    val reason: QrRejectReason? = null,
+    val kind: QrKind? = null,
+    val merchantId: String? = null,
+    val requestId: String? = null,
+    val userId: String? = null,
+) {
+    val ok: Boolean get() = reason == null
+}
+
+/** startQrPayment. Mirrors core-contract's QrPaymentDraft. */
+data class QrPaymentDraft(
+    val merchant: Counterparty,
+    val requestId: String?,
+    /** Dynamic code only: the request's amount, locked. */
+    val amount: Money?,
+    val expiresAt: EpochMillis?,
+    val balance: Money,
+    val dailyRemaining: Money,
+    val minAmount: Money,
+    val maxAmount: Money,
+) {
+    /** [amount] unwrapped for Swift: a nullable value class is exported as an opaque `id`. */
+    val amountMinor: Long? get() = amount?.minor
+}
+
+/** reviewQrPayment. Mirrors core-contract's QrPaymentReview. */
+data class QrPaymentReview(
+    val id: String,
+    val idempotencyKey: String,
+    val merchant: Counterparty,
+    val requestId: String?,
+    val amount: Money,
+    val fee: Money,
+    val balanceAfter: Money,
+)

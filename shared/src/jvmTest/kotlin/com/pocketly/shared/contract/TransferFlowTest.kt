@@ -25,7 +25,7 @@ import com.pocketly.shared.security.FakeBiometricSigner.Scan
 import com.pocketly.shared.security.MemorySecureStore
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.domain.PhoneLookup
-import com.pocketly.shared.sync.TransferFlow
+import com.pocketly.shared.sync.PaymentFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -64,8 +64,17 @@ class TransferFlowTest {
 
     @Test
     fun idempotencyKeysAreVersion4() {
-        assertEquals("ffffffff-ffff-4fff-bfff-ffffffffffff", TransferFlow.uuidV4(ByteArray(16) { -1 }))
-        assertEquals("00000000-0000-4000-8000-000000000000", TransferFlow.uuidV4(ByteArray(16)))
+        assertEquals("ffffffff-ffff-4fff-bfff-ffffffffffff", PaymentFlow.uuidV4(ByteArray(16) { -1 }))
+        assertEquals("00000000-0000-4000-8000-000000000000", PaymentFlow.uuidV4(ByteArray(16)))
+    }
+
+    @Test
+    fun aQrPaymentSignsItsOwnMessageNotATransfers() = runBlocking {
+        core.startQrPayment("m-01", "pr-0001")
+        val r = core.reviewQrPayment(Money(1_250))
+        val result = core.confirmTransfer(r.id, biometric)
+        assertEquals(Triple(TransferState.SUCCESS, TransferAuthOutcome.OK, "qrp-1"), Triple(result.state, result.auth, result.transaction?.id))
+        assertEquals(BiometricMessages.qrPayment(1_250, "m-01", "pr-0001", r.idempotencyKey), signer.messages.last())
     }
 
     @Test

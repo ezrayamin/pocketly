@@ -5,11 +5,21 @@ import { exceededLimit, isValidTransferAmount, normalizeNote } from '../../domai
 import { localEpochDay, localMidnight } from '../../domain/zonedCalendar';
 import { matchDirectory } from '../contactSearch';
 import { validateTransaction } from '../transactionDtoValidator';
-import { CONTACTS, DAILY_LIMIT, WALLET_ID, generateTransactions, simulatedIncomingTransfer } from '../seedData';
+import {
+  CONTACTS,
+  DAILY_LIMIT,
+  MERCHANTS,
+  WALLET_ID,
+  generateTransactions,
+  seedPaymentRequests,
+  simulatedIncomingTransfer,
+} from '../seedData';
 import type { UserTimeZone } from '../timeZone';
 import type {
   ChangesPage,
   FakeBackendControls,
+  PaymentTarget,
+  QrPaymentRequest,
   ServerOtpVerify,
   TopUpRequest,
   TransferRequest,
@@ -31,6 +41,9 @@ const META_SIMULATED_INCOMING = 'simulatedIncoming';
 const META_DAILY_LIMIT = 'dailyLimit';
 const META_TRANSFERS = 'transfers';
 const META_TOP_UPS = 'topUps';
+const META_QR_PAYMENTS = 'qrPayments';
+/** ADR-0016 §6: the verified account's user id, random, kept with its phone across resets. */
+const META_ACCOUNT_USER_ID = 'accountUserId';
 /** The phone this account verified by OTP (ADR-0013): no transfers to it. Kept by reset. */
 const META_ACCOUNT_PHONE = 'accountPhone';
 
@@ -50,6 +63,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   private dailyLimit = DAILY_LIMIT;
   private transfers = 0;
   private topUps = 0;
+  private qrPayments = 0;
+  private accountUserId: string | undefined;
   private accountPhone: string | undefined;
   /**
    * Kotlin runs backend calls in parallel; here they interleave at every await. Anything that
@@ -64,6 +79,9 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     private readonly timeZone: () => UserTimeZone,
     /** The OTP side's clock (ADR-0013): the device's, not the dataset's frozen one. */
     otpClock: () => number = Date.now,
+    /** For the account's user id (ADR-0016 §6). The app passes its secure generator. */
+    private readonly randomBytes: (size: number) => Uint8Array = (size) =>
+      Uint8Array.from({ length: size }, () => Math.floor(Math.random() * 256)),
   ) {
     this.otp = new OtpServer(otpClock);
   }
@@ -76,11 +94,33 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   async verifyOtp(phone: string, code: string): Promise<ServerOtpVerify> {
     await this.network.beforeCall();
     const result = this.otp.verify(phone, code);
-    if (result.outcome === 'VERIFIED') {
-      await this.store.setMeta(META_ACCOUNT_PHONE, phone);
-      this.accountPhone = phone;
-    }
-    return result;
+    if (result.outcome !== 'VERIFIED') return result;
+    // The same phone keeps its id; another phone is another account.
+    const kept = phone === this.accountPhone ? this.accountUserId : undefined;
+    const userId = kept ?? this.newUserId();
+    await this.store.setMeta(META_ACCOUNT_PHONE, phone);
+    await this.store.setMeta(META_ACCOUNT_USER_ID, userId);
+    this.accountPhone = phone;
+    this.accountUserId = userId;
+    return { ...result, userId };
+  }
+
+  async getAccountUserId(): Promise<string> {
+    await this.network.beforeCall();
+    return this.exclusive(async () => {
+      if (this.accountPhone === undefined) throw new CoreError('NOT_FOUND', 'No verified account');
+      if (this.accountUserId === undefined) {
+        // Verified before user ids existed: the account gets one now.
+        this.accountUserId = this.newUserId();
+        await this.store.setMeta(META_ACCOUNT_USER_ID, this.accountUserId);
+      }
+      return this.accountUserId;
+    });
+  }
+
+  /** `u-` + 12 random hex digits: says nothing about the phone (ADR-0016 §6). */
+  private newUserId(): string {
+    return `u-${Array.from(this.randomBytes(6), (b) => b.toString(16).padStart(2, '0')).join('')}`;
   }
 
   now(): number {
@@ -100,6 +140,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     this.dailyLimit = Number((await this.store.getMeta(META_DAILY_LIMIT)) ?? DAILY_LIMIT);
     this.transfers = Number((await this.store.getMeta(META_TRANSFERS)) ?? 0);
     this.topUps = Number((await this.store.getMeta(META_TOP_UPS)) ?? 0);
+    this.qrPayments = Number((await this.store.getMeta(META_QR_PAYMENTS)) ?? 0);
+    this.accountUserId = await this.store.getMeta(META_ACCOUNT_USER_ID);
     this.accountPhone = await this.store.getMeta(META_ACCOUNT_PHONE);
   }
 
@@ -123,15 +165,19 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
       this.dailyLimit = DAILY_LIMIT;
       this.transfers = 0;
       this.topUps = 0;
-      await this.store.replaceAll([...generateTransactions(config, this.now()), ...extra], {
+      this.qrPayments = 0;
+      const now = this.now();
+      await this.store.replaceAll([...generateTransactions(config, now), ...extra], seedPaymentRequests(now), {
         [META_SEEDED]: '1',
         [META_FROZEN_NOW]: config.nowMillis === undefined ? '' : String(config.nowMillis),
         [META_SIMULATED_INCOMING]: '0',
         [META_DAILY_LIMIT]: String(DAILY_LIMIT),
         [META_TRANSFERS]: '0',
         [META_TOP_UPS]: '0',
+        [META_QR_PAYMENTS]: '0',
         // The account outlives a dataset reset.
         ...(this.accountPhone !== undefined ? { [META_ACCOUNT_PHONE]: this.accountPhone } : {}),
+        ...(this.accountUserId !== undefined ? { [META_ACCOUNT_USER_ID]: this.accountUserId } : {}),
       });
     });
   }
@@ -159,6 +205,10 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
 
   async getContact(userId: string): Promise<Contact> {
     await this.network.beforeCall();
+    // This account, from a scanned My QR (ADR-0016 §6): the client refuses it by its phone.
+    if (userId === this.accountUserId && this.accountPhone !== undefined) {
+      return { userId, name: 'You', phone: this.accountPhone };
+    }
     const contact = DIRECTORY.find((c) => c.userId === userId);
     if (!contact) throw new CoreError('NOT_FOUND', `No user ${userId}`);
     return contact;
@@ -183,6 +233,22 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     return this.exclusive(() => this.settleProcessed(tx));
   }
 
+  async getPaymentTarget(merchantId: string, requestId?: string): Promise<PaymentTarget> {
+    await this.network.beforeCall();
+    return this.exclusive(async () => {
+      await this.settleDue();
+      return this.paymentTarget(merchantId, requestId);
+    });
+  }
+
+  async payMerchant(request: QrPaymentRequest, idempotencyKey: string): Promise<Transaction> {
+    const hold = await this.network.beforeTransfer();
+    // From here the server has the request: it finishes even if the client stops waiting (ADR-0007 §2).
+    const tx = await this.exclusive(() => this.applyQrPayment(request, idempotencyKey, hold));
+    if (hold !== undefined) return new Promise<Transaction>(() => {}); // TIMEOUT: the answer never comes
+    return tx;
+  }
+
   async getTransferByKey(idempotencyKey: string): Promise<Transaction> {
     await this.network.beforeCall();
     return this.exclusive(async () => {
@@ -204,7 +270,10 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     const known = await this.store.getTransferKey(idempotencyKey);
     if (known !== undefined) {
       const same =
-        known.recipientId === request.recipientId && known.amount === request.amount && known.note === request.note;
+        known.recipientId === request.recipientId &&
+        known.amount === request.amount &&
+        known.note === request.note &&
+        known.requestId === undefined;
       if (!same) throw new CoreError('IDEMPOTENCY_CONFLICT', 'This key was used for a different transfer');
       const original = await this.store.get(known.transactionId);
       if (!original) throw new CoreError('SERVER_ERROR', 'Recorded transfer is missing');
@@ -246,6 +315,79 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     return tx;
   }
 
+  /** ADR-0016 §4: the merchant, and its request if any. Runs inside `exclusive`. */
+  private async paymentTarget(merchantId: string, requestId: string | undefined): Promise<PaymentTarget> {
+    const merchant = MERCHANTS.find((m) => m.counterparty.id === merchantId);
+    if (!merchant) throw new CoreError('INVALID_QR', `No merchant ${merchantId}`);
+    const target: PaymentTarget = { merchant: { ...merchant.counterparty }, category: merchant.category };
+    if (requestId === undefined) return target;
+    const request = await this.store.getPaymentRequest(requestId);
+    if (!request || request.merchantId !== merchantId) throw new CoreError('INVALID_QR', `No request ${requestId}`);
+    if (request.paidBy !== undefined) throw new CoreError('QR_ALREADY_PAID', 'This code was paid already');
+    if (request.expiresAt <= this.now()) throw new CoreError('QR_EXPIRED', 'This code has expired');
+    return { ...target, request: { id: request.id, amount: request.amount, expiresAt: request.expiresAt } };
+  }
+
+  /** FR-QR-04, ADR-0016 §4: as applyTransfer, for a merchant. Runs inside `exclusive`. */
+  private async applyQrPayment(
+    request: QrPaymentRequest,
+    idempotencyKey: string,
+    hold: { holdMs: number; fails: boolean } | undefined,
+  ): Promise<Transaction> {
+    await this.settleDue();
+    const known = await this.store.getTransferKey(idempotencyKey);
+    if (known !== undefined) {
+      const same =
+        known.recipientId === request.merchantId &&
+        known.amount === request.amount &&
+        known.note === undefined &&
+        known.requestId === request.requestId;
+      if (!same) throw new CoreError('IDEMPOTENCY_CONFLICT', 'This key was used for a different request');
+      const original = await this.store.get(known.transactionId);
+      if (!original) throw new CoreError('SERVER_ERROR', 'Recorded QR payment is missing');
+      return original;
+    }
+    if (idempotencyKey.length === 0) throw new CoreError('INVALID_ARGUMENT', 'idempotencyKey is required');
+    const target = await this.paymentTarget(request.merchantId, request.requestId);
+    if (!isValidTransferAmount(request.amount)) throw new CoreError('INVALID_ARGUMENT', 'Invalid payment amount');
+    if (target.request !== undefined && target.request.amount !== request.amount) {
+      throw new CoreError('INVALID_ARGUMENT', "The amount isn't the code's");
+    }
+
+    const now = this.now();
+    const refused = exceededLimit(request.amount, {
+      balance: await this.store.balance(),
+      dailyRemaining: Math.max(0, this.dailyLimit - (await this.usedToday(now))),
+    });
+    const n = this.qrPayments + 1;
+    const tx: Transaction = {
+      id: `qrp-${n}`,
+      idempotencyKey,
+      type: 'QR_PAYMENT',
+      category: target.category,
+      amount: request.amount,
+      counterparty: target.merchant,
+      status: refused !== undefined ? 'FAILED' : hold !== undefined ? 'PENDING' : 'SUCCESS',
+      ...(refused !== undefined ? { failureReason: refused } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.store.recordTransfer(
+      tx,
+      {
+        recipientId: request.merchantId,
+        amount: request.amount,
+        transactionId: tx.id,
+        ...(request.requestId !== undefined ? { requestId: request.requestId } : {}),
+      },
+      { [META_QR_PAYMENTS]: String(n) },
+      tx.status === 'PENDING' && hold ? { resolveAt: now + hold.holdMs, fails: hold.fails } : undefined,
+      refused === undefined ? request.requestId : undefined, // paid (or held): nobody pays it again
+    );
+    this.qrPayments = n;
+    return tx;
+  }
+
   /**
    * ADR-0015 §4. Runs inside `exclusive`. A new top-up is recorded PENDING with a settlement row
    * saying how it ends, so one still processing when the app dies settles on the next start.
@@ -260,7 +402,11 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
     const counterparty = topUpCounterparty(request.method);
     const known = await this.store.getTransferKey(idempotencyKey);
     if (known !== undefined) {
-      const same = known.recipientId === counterparty.id && known.amount === request.amount && known.note === undefined;
+      const same =
+        known.recipientId === counterparty.id &&
+        known.amount === request.amount &&
+        known.note === undefined &&
+        known.requestId === undefined;
       if (!same) throw new CoreError('IDEMPOTENCY_CONFLICT', 'This key was used for a different request');
       const original = await this.store.get(known.transactionId);
       if (!original) throw new CoreError('SERVER_ERROR', 'Recorded top-up is missing');

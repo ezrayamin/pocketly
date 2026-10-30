@@ -5,8 +5,8 @@ import { DEFAULT_DATASET, NETWORK_NORMAL } from '@pocketly/core-contract';
 import type { Core } from '@pocketly/core-contract';
 import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
 import transfer from '@pocketly/core-contract/fixtures/transfer.json';
-import { transferMessage } from '../src/security/biometricMessages';
-import { uuidV4 } from '../src/sync/transferFlow';
+import { qrPaymentMessage, transferMessage } from '../src/security/biometricMessages';
+import { uuidV4 } from '../src/sync/paymentFlow';
 import { MemorySecureStore } from '../src/security/secureStore';
 import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { testCore } from '../testing/testCore';
@@ -52,6 +52,16 @@ describe('biometric confirmation (FR-TRF-04, ADR-0012)', () => {
     expect(result).toMatchObject({ state: 'SUCCESS', auth: 'OK' });
     expect(signer.messages.at(-1)).toBe(transferMessage({ amount: 15_000, recipientId: 'u-01', idempotencyKey: r.idempotencyKey }));
     expect(signer.prompts.at(-1)).toEqual(PROMPT);
+  });
+
+  it("a QR payment signs its own message, not a transfer's (ADR-0016 §2)", async () => {
+    await core.startQrPayment('m-01', 'pr-0001');
+    const r = await core.reviewQrPayment(1_250);
+    const result = await core.confirmTransfer(r.id, BIOMETRIC);
+    expect(result).toMatchObject({ state: 'SUCCESS', auth: 'OK', transaction: { id: 'qrp-1', type: 'QR_PAYMENT' } });
+    expect(signer.messages.at(-1)).toBe(
+      qrPaymentMessage({ amount: 1_250, merchantId: 'm-01', requestId: 'pr-0001', idempotencyKey: r.idempotencyKey }),
+    );
   });
 
   it('cancel returns to review with nothing sent; the PIN still works after', async () => {

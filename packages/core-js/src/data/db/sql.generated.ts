@@ -12,12 +12,13 @@ export const SERVER_SCHEMA: readonly string[] = [
   "CREATE TABLE server_transaction ( id TEXT NOT NULL PRIMARY KEY, idempotency_key TEXT NOT NULL, type TEXT NOT NULL, category TEXT NOT NULL, amount INTEGER NOT NULL, counterparty_kind TEXT, counterparty_id TEXT, counterparty_name TEXT, counterparty_phone TEXT, note TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL )",
   "CREATE INDEX server_transaction_changes ON server_transaction(updated_at, id)",
   "CREATE TABLE server_meta ( key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL )",
-  "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL )",
-  "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL, failure_reason TEXT )"
+  "CREATE TABLE server_transfer_key ( idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL, request_id TEXT )",
+  "CREATE TABLE server_pending_settlement ( transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL, failure_reason TEXT )",
+  "CREATE TABLE server_payment_request ( id TEXT NOT NULL PRIMARY KEY, merchant_id TEXT NOT NULL, amount INTEGER NOT NULL, expires_at INTEGER NOT NULL, paid_by TEXT )"
 ];
 
 /** Schema version (SQLDelight's: highest .sqm + 1). */
-export const SERVER_VERSION = 3;
+export const SERVER_VERSION = 4;
 
 /** <n>.sqm: from version n to n + 1. */
 export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
@@ -27,6 +28,10 @@ export const SERVER_MIGRATIONS: Readonly<Record<number, readonly string[]>> = {
   ],
   "2": [
     "ALTER TABLE server_pending_settlement ADD COLUMN failure_reason TEXT"
+  ],
+  "3": [
+    "ALTER TABLE server_transfer_key ADD COLUMN request_id TEXT",
+    "CREATE TABLE server_payment_request ( id TEXT NOT NULL PRIMARY KEY, merchant_id TEXT NOT NULL, amount INTEGER NOT NULL, expires_at INTEGER NOT NULL, paid_by TEXT )"
   ]
 };
 
@@ -65,8 +70,8 @@ export const SERVER_SQL = {
     "params": 4
   },
   "insertTransferKey": {
-    "sql": "INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id) VALUES (?, ?, ?, ?, ?)",
-    "params": 5
+    "sql": "INSERT INTO server_transfer_key(idempotency_key, recipient_id, amount, note, transaction_id, request_id) VALUES (?, ?, ?, ?, ?, ?)",
+    "params": 6
   },
   "getTransferKey": {
     "sql": "SELECT * FROM server_transfer_key WHERE idempotency_key = ?",
@@ -94,6 +99,26 @@ export const SERVER_SQL = {
   },
   "deleteAllSettlements": {
     "sql": "DELETE FROM server_pending_settlement",
+    "params": 0
+  },
+  "insertPaymentRequest": {
+    "sql": "INSERT INTO server_payment_request(id, merchant_id, amount, expires_at, paid_by) VALUES (?, ?, ?, ?, ?)",
+    "params": 5
+  },
+  "getPaymentRequest": {
+    "sql": "SELECT * FROM server_payment_request WHERE id = ?",
+    "params": 1
+  },
+  "markPaymentRequestPaid": {
+    "sql": "UPDATE server_payment_request SET paid_by = ? WHERE id = ?",
+    "params": 2
+  },
+  "reopenPaymentRequest": {
+    "sql": "UPDATE server_payment_request SET paid_by = NULL WHERE paid_by = ?",
+    "params": 1
+  },
+  "deleteAllPaymentRequests": {
+    "sql": "DELETE FROM server_payment_request",
     "params": 0
   },
   "getMeta": {
