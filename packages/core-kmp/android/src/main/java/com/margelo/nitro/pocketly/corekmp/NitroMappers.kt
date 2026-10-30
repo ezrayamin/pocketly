@@ -2,6 +2,7 @@ package com.margelo.nitro.pocketly.corekmp
 
 import com.pocketly.shared.bridge.BridgeConversions
 import com.pocketly.shared.domain.AmountCheck as KAmountCheck
+import com.pocketly.shared.domain.AppNotification as KAppNotification
 import com.pocketly.shared.domain.BalanceCheck as KBalanceCheck
 import com.pocketly.shared.domain.Category as KCategory
 import com.pocketly.shared.domain.CategoryTotal as KCategoryTotal
@@ -27,6 +28,7 @@ import com.pocketly.shared.domain.PinCheck as KPinCheck
 import com.pocketly.shared.domain.UnlockResult as KUnlockResult
 import com.pocketly.shared.domain.NetworkMode as KNetworkMode
 import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
+import com.pocketly.shared.domain.NotificationList as KNotificationList
 import com.pocketly.shared.domain.PriceTick as KPriceTick
 import com.pocketly.shared.domain.QrCode as KQrCode
 import com.pocketly.shared.domain.QrPaymentDraft as KQrPaymentDraft
@@ -122,6 +124,12 @@ internal fun KTransaction.toNitro() = Transaction(
     createdAt = createdAt.toDouble(),
     updatedAt = updatedAt.toDouble(),
 )
+
+internal fun KAppNotification.toNitro() =
+    AppNotification(id, NotificationKind.valueOf(kind.name), transaction.toNitro(), createdAt.toDouble(), read)
+
+internal fun KNotificationList.toNitro() =
+    NotificationList(Array(items.size) { items[it].toNitro() }, unreadCount.toDouble())
 
 internal fun KTransactionPage.toNitro() = TransactionPage(
     items = Array(items.size) { items[it].toNitro() },

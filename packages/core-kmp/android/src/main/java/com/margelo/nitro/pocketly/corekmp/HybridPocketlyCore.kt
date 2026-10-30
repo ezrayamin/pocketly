@@ -131,6 +131,15 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 
     override fun getMyQr(): Promise<String> = Promise.async { core.getMyQr() }
 
+    override fun subscribeNotifications(onNew: (notifications: Array<AppNotification>) -> Unit): HybridNotificationSubscriptionSpec {
+        val cancellable = core.subscribeNotifications { added -> onNew(Array(added.size) { added[it].toNitro() }) }
+        return HybridNotificationSubscription(cancellable)
+    }
+
+    override fun getNotifications(): Promise<NotificationList> = Promise.async { core.getNotifications().toNitro() }
+
+    override fun markNotificationsRead(): Promise<Unit> = Promise.async { core.markNotificationsRead() }
+
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
 
     override fun parseMoney(input: String): MoneyParseResult = core.parseMoney(input).toNitro()
@@ -153,5 +162,11 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
 @DoNotStrip
 @Keep
 class HybridPriceSubscription(private val cancellable: Cancellable) : HybridPriceSubscriptionSpec() {
+    override fun unsubscribe() = cancellable.cancel()
+}
+
+@DoNotStrip
+@Keep
+class HybridNotificationSubscription(private val cancellable: Cancellable) : HybridNotificationSubscriptionSpec() {
     override fun unsubscribe() = cancellable.cancel()
 }

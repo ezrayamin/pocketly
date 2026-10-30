@@ -124,6 +124,14 @@ namespace margelo::nitro::pocketly { enum class QrKind; }
 namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
 // Forward declaration of `QrPaymentReview` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -193,12 +201,16 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "QrKind.hpp"
 #include "QrPaymentDraft.hpp"
 #include "QrPaymentReview.hpp"
+#include <memory>
+#include "HybridNotificationSubscriptionSpec.hpp"
+#include "AppNotification.hpp"
+#include <functional>
+#include "NotificationKind.hpp"
+#include "NotificationList.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
-#include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "PriceTick.hpp"
-#include <functional>
 
 #include "PocketlyCoreKmp-Swift-Cxx-Umbrella.hpp"
 
@@ -536,6 +548,30 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<std::string>> getMyQr() override {
       auto __result = _swiftPart.getMyQr();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<HybridNotificationSubscriptionSpec> subscribeNotifications(const std::function<void(const std::vector<AppNotification>& /* notifications */)>& onNew) override {
+      auto __result = _swiftPart.subscribeNotifications(onNew);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<NotificationList>> getNotifications() override {
+      auto __result = _swiftPart.getNotifications();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> markNotificationsRead() override {
+      auto __result = _swiftPart.markNotificationsRead();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

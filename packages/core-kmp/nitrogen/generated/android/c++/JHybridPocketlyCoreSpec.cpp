@@ -109,6 +109,14 @@ namespace margelo::nitro::pocketly { enum class QrKind; }
 namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
 // Forward declaration of `QrPaymentReview` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -236,11 +244,19 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JQrPaymentDraft.hpp"
 #include "QrPaymentReview.hpp"
 #include "JQrPaymentReview.hpp"
+#include <memory>
+#include "HybridNotificationSubscriptionSpec.hpp"
+#include "JHybridNotificationSubscriptionSpec.hpp"
+#include "NotificationList.hpp"
+#include "JNotificationList.hpp"
+#include "AppNotification.hpp"
+#include "JAppNotification.hpp"
+#include "NotificationKind.hpp"
+#include "JNotificationKind.hpp"
 #include "MoneyParseResult.hpp"
 #include "JMoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include "JMoneyParseError.hpp"
-#include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "JHybridPriceSubscriptionSpec.hpp"
 #include "DatasetSeed.hpp"
@@ -253,10 +269,11 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JTransferAuth.hpp"
 #include "TransferAuthMethod.hpp"
 #include "JTransferAuthMethod.hpp"
-#include "PriceTick.hpp"
 #include <functional>
-#include "JFunc_void_std__vector_PriceTick_.hpp"
+#include "JFunc_void_std__vector_AppNotification_.hpp"
 #include <NitroModules/JNICallable.hpp>
+#include "PriceTick.hpp"
+#include "JFunc_void_std__vector_PriceTick_.hpp"
 #include "JPriceTick.hpp"
 
 namespace margelo::nitro::pocketly {
@@ -779,6 +796,42 @@ namespace margelo::nitro::pocketly {
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
         auto __result = jni::static_ref_cast<jni::JString>(__boxedResult);
         __promise->resolve(__result->toStdString());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<HybridNotificationSubscriptionSpec> JHybridPocketlyCoreSpec::subscribeNotifications(const std::function<void(const std::vector<AppNotification>& /* notifications */)>& onNew) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridNotificationSubscriptionSpec::JavaPart>(jni::alias_ref<JFunc_void_std__vector_AppNotification_::javaobject> /* onNew */)>("subscribeNotifications_cxx");
+    auto __result = method(_javaPart, JFunc_void_std__vector_AppNotification__cxx::fromCpp(onNew));
+    return __result->getJHybridNotificationSubscriptionSpec();
+  }
+  std::shared_ptr<Promise<NotificationList>> JHybridPocketlyCoreSpec::getNotifications() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getNotifications");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<NotificationList>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JNotificationList>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridPocketlyCoreSpec::markNotificationsRead() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("markNotificationsRead");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
         jni::JniException __jniError(__throwable);

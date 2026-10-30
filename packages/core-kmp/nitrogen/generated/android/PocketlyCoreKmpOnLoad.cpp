@@ -16,7 +16,9 @@
 #include <NitroModules/HybridObjectRegistry.hpp>
 
 #include "JHybridPriceSubscriptionSpec.hpp"
+#include "JHybridNotificationSubscriptionSpec.hpp"
 #include "JHybridPocketlyCoreSpec.hpp"
+#include "JFunc_void_std__vector_AppNotification_.hpp"
 #include "JFunc_void_std__vector_PriceTick_.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
@@ -43,7 +45,9 @@ void registerAllNatives() {
 
   // Register native JNI methods
   margelo::nitro::pocketly::JHybridPriceSubscriptionSpec::CxxPart::registerNatives();
+  margelo::nitro::pocketly::JHybridNotificationSubscriptionSpec::CxxPart::registerNatives();
   margelo::nitro::pocketly::JHybridPocketlyCoreSpec::CxxPart::registerNatives();
+  margelo::nitro::pocketly::JFunc_void_std__vector_AppNotification__cxx::registerNatives();
   margelo::nitro::pocketly::JFunc_void_std__vector_PriceTick__cxx::registerNatives();
 
   // Register Nitro Hybrid Objects

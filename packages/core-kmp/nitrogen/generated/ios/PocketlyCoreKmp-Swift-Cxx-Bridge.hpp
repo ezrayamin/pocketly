@@ -12,6 +12,8 @@
 namespace margelo::nitro::pocketly { struct AmountCheck; }
 // Forward declaration of `AmountRejectReason` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
@@ -48,6 +50,8 @@ namespace margelo::nitro::pocketly { struct Counterparty; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
 // Forward declaration of `HybridPocketlyCoreSpec` to properly resolve imports.
 namespace margelo::nitro::pocketly { class HybridPocketlyCoreSpec; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -58,6 +62,10 @@ namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `OtpSendOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
 // Forward declaration of `OtpSendResult` to properly resolve imports.
@@ -128,6 +136,8 @@ namespace margelo::nitro::pocketly { struct UnlockResult; }
 namespace margelo::nitro::pocketly { struct Wallet; }
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridNotificationSubscriptionSpec_cxx` to properly resolve imports.
+namespace PocketlyCoreKmp { class HybridNotificationSubscriptionSpec_cxx; }
 // Forward declaration of `HybridPocketlyCoreSpec_cxx` to properly resolve imports.
 namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 // Forward declaration of `HybridPriceSubscriptionSpec_cxx` to properly resolve imports.
@@ -136,6 +146,7 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 // Include C++ defined types
 #include "AmountCheck.hpp"
 #include "AmountRejectReason.hpp"
+#include "AppNotification.hpp"
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
 #include "BiometricEnableOutcome.hpp"
@@ -154,11 +165,14 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "CounterpartyKind.hpp"
 #include "DayTotal.hpp"
 #include "ErrorCode.hpp"
+#include "HybridNotificationSubscriptionSpec.hpp"
 #include "HybridPocketlyCoreSpec.hpp"
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
 #include "NetworkSimulation.hpp"
+#include "NotificationKind.hpp"
+#include "NotificationList.hpp"
 #include "OtpSendOutcome.hpp"
 #include "OtpSendResult.hpp"
 #include "OtpVerifyOutcome.hpp"
@@ -229,6 +243,18 @@ namespace margelo::nitro::pocketly::bridge::swift {
   inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
     return Result<void>::withError(error);
   }
+  
+  // pragma MARK: std::shared_ptr<HybridNotificationSubscriptionSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridNotificationSubscriptionSpec>`.
+   */
+  using std__shared_ptr_HybridNotificationSubscriptionSpec_ = std::shared_ptr<HybridNotificationSubscriptionSpec>;
+  std::shared_ptr<HybridNotificationSubscriptionSpec> create_std__shared_ptr_HybridNotificationSubscriptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridNotificationSubscriptionSpec_(std__shared_ptr_HybridNotificationSubscriptionSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridNotificationSubscriptionSpec>
+  using std__weak_ptr_HybridNotificationSubscriptionSpec_ = std::weak_ptr<HybridNotificationSubscriptionSpec>;
+  inline std__weak_ptr_HybridNotificationSubscriptionSpec_ weakify_std__shared_ptr_HybridNotificationSubscriptionSpec_(const std::shared_ptr<HybridNotificationSubscriptionSpec>& strong) noexcept { return strong; }
   
   // pragma MARK: std::shared_ptr<Promise<void>>
   /**
@@ -1332,6 +1358,73 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return Func_void_std__string_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::vector<AppNotification>
+  /**
+   * Specialized version of `std::vector<AppNotification>`.
+   */
+  using std__vector_AppNotification_ = std::vector<AppNotification>;
+  inline std::vector<AppNotification> create_std__vector_AppNotification_(size_t size) noexcept {
+    std::vector<AppNotification> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::function<void(const std::vector<AppNotification>& /* notifications */)>
+  /**
+   * Specialized version of `std::function<void(const std::vector<AppNotification>&)>`.
+   */
+  using Func_void_std__vector_AppNotification_ = std::function<void(const std::vector<AppNotification>& /* notifications */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::vector<AppNotification>& / * notifications * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__vector_AppNotification__Wrapper final {
+  public:
+    explicit Func_void_std__vector_AppNotification__Wrapper(std::function<void(const std::vector<AppNotification>& /* notifications */)>&& func): _function(std::make_unique<std::function<void(const std::vector<AppNotification>& /* notifications */)>>(std::move(func))) {}
+    inline void call(std::vector<AppNotification> notifications) const noexcept {
+      _function->operator()(notifications);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::vector<AppNotification>& /* notifications */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__vector_AppNotification_ create_Func_void_std__vector_AppNotification_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__vector_AppNotification__Wrapper wrap_Func_void_std__vector_AppNotification_(Func_void_std__vector_AppNotification_ value) noexcept {
+    return Func_void_std__vector_AppNotification__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<NotificationList>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<NotificationList>>`.
+   */
+  using std__shared_ptr_Promise_NotificationList__ = std::shared_ptr<Promise<NotificationList>>;
+  inline std::shared_ptr<Promise<NotificationList>> create_std__shared_ptr_Promise_NotificationList__() noexcept {
+    return Promise<NotificationList>::create();
+  }
+  inline PromiseHolder<NotificationList> wrap_std__shared_ptr_Promise_NotificationList__(std::shared_ptr<Promise<NotificationList>> promise) noexcept {
+    return PromiseHolder<NotificationList>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const NotificationList& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const NotificationList&)>`.
+   */
+  using Func_void_NotificationList = std::function<void(const NotificationList& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const NotificationList& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_NotificationList_Wrapper final {
+  public:
+    explicit Func_void_NotificationList_Wrapper(std::function<void(const NotificationList& /* result */)>&& func): _function(std::make_unique<std::function<void(const NotificationList& /* result */)>>(std::move(func))) {}
+    inline void call(NotificationList result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const NotificationList& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_NotificationList create_Func_void_NotificationList(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_NotificationList_Wrapper wrap_Func_void_NotificationList(Func_void_NotificationList value) noexcept {
+    return Func_void_NotificationList_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::optional<MoneyParseError>
   /**
    * Specialized version of `std::optional<MoneyParseError>`.
@@ -1635,6 +1728,24 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<std::string>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>
+  using Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ = Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>;
+  inline Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(const std::shared_ptr<HybridNotificationSubscriptionSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<NotificationList>>>
+  using Result_std__shared_ptr_Promise_NotificationList___ = Result<std::shared_ptr<Promise<NotificationList>>>;
+  inline Result_std__shared_ptr_Promise_NotificationList___ create_Result_std__shared_ptr_Promise_NotificationList___(const std::shared_ptr<Promise<NotificationList>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<NotificationList>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_NotificationList___ create_Result_std__shared_ptr_Promise_NotificationList___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<NotificationList>>>::withError(error);
   }
   
   // pragma MARK: Result<std::string>

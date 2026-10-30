@@ -3,6 +3,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -12,6 +13,7 @@ import type {
   DatasetSeed,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
@@ -38,6 +40,11 @@ type Platforms = { ios: 'swift'; android: 'kotlin' };
 
 /** A live price stream. Dropping it (or calling unsubscribe) cancels the Kotlin Flow. */
 export interface PriceSubscription extends HybridObject<Platforms> {
+  unsubscribe(): void;
+}
+
+/** F9 (ADR-0017): new notifications. Unsubscribing stops delivery, not the core's catching up. */
+export interface NotificationSubscription extends HybridObject<Platforms> {
   unsubscribe(): void;
 }
 
@@ -97,6 +104,11 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   startQrPayment(merchantId: string, requestId: string | undefined): Promise<QrPaymentDraft>;
   reviewQrPayment(amount: number): Promise<QrPaymentReview>;
   getMyQr(): Promise<string>;
+
+  // F9 (ADR-0017). Three methods: a stream (a callback plus a subscription, as subscribePrices), the list, read.
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): NotificationSubscription;
+  getNotifications(): Promise<NotificationList>;
+  markNotificationsRead(): Promise<void>;
 
   formatMoney(minor: number): string;
   parseMoney(input: string): MoneyParseResult;

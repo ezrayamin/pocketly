@@ -91,6 +91,9 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<QrPaymentDraft>> startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) override;
     std::shared_ptr<Promise<QrPaymentReview>> reviewQrPayment(double amount) override;
     std::shared_ptr<Promise<std::string>> getMyQr() override;
+    std::shared_ptr<HybridNotificationSubscriptionSpec> subscribeNotifications(const std::function<void(const std::vector<AppNotification>& /* notifications */)>& onNew) override;
+    std::shared_ptr<Promise<NotificationList>> getNotifications() override;
+    std::shared_ptr<Promise<void>> markNotificationsRead() override;
     std::string formatMoney(double minor) override;
     MoneyParseResult parseMoney(const std::string& input) override;
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;

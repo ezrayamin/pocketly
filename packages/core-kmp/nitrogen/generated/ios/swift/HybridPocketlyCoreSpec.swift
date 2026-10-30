@@ -50,6 +50,9 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func startQrPayment(merchantId: String, requestId: String?) throws -> Promise<QrPaymentDraft>
   func reviewQrPayment(amount: Double) throws -> Promise<QrPaymentReview>
   func getMyQr() throws -> Promise<String>
+  func subscribeNotifications(onNew: @escaping (_ notifications: [AppNotification]) -> Void) throws -> (any HybridNotificationSubscriptionSpec)
+  func getNotifications() throws -> Promise<NotificationList>
+  func markNotificationsRead() throws -> Promise<Void>
   func formatMoney(minor: Double) throws -> String
   func parseMoney(input: String) throws -> MoneyParseResult
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)

@@ -362,6 +362,24 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     return Promise.async { [core] in try await core.getMyQr() }
   }
 
+  func subscribeNotifications(
+    onNew: @escaping (_ notifications: [AppNotification]) -> Void
+  ) throws -> (any HybridNotificationSubscriptionSpec) {
+    let cancellable = core.subscribeNotifications(onNew: { added in onNew(added.map { $0.toNitro() }) })
+    return HybridNotificationSubscription(cancellable: cancellable)
+  }
+
+  func getNotifications() throws -> Promise<NotificationList> {
+    return Promise.async { [core] in
+      let list = try await core.getNotifications()
+      return NotificationList(items: list.items.map { $0.toNitro() }, unreadCount: Double(list.unreadCount))
+    }
+  }
+
+  func markNotificationsRead() throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.markNotificationsRead() }
+  }
+
   func parseMoney(input: String) throws -> MoneyParseResult {
     let r = core.parseMoney(input: input)
     return MoneyParseResult(
@@ -400,7 +418,31 @@ final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
   }
 }
 
+final class HybridNotificationSubscription: HybridNotificationSubscriptionSpec {
+  private let cancellable: PocketlyShared.Cancellable
+
+  init(cancellable: PocketlyShared.Cancellable) {
+    self.cancellable = cancellable
+  }
+
+  func unsubscribe() throws {
+    cancellable.cancel()
+  }
+}
+
 // MARK: - Kotlin domain → Nitro structs
+
+private extension PocketlyShared.AppNotification {
+  func toNitro() -> AppNotification {
+    AppNotification(
+      id: id,
+      kind: NotificationKind(fromString: kind.name)!,
+      transaction: transaction.toNitro(),
+      createdAt: Double(createdAt),
+      read: read
+    )
+  }
+}
 
 private extension PocketlyShared.StaleInfo {
   func toNitro() -> StaleInfo {

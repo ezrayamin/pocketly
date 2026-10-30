@@ -8,6 +8,7 @@
 #include "PocketlyCoreKmp-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridNotificationSubscriptionSpecSwift.hpp"
 #include "HybridPocketlyCoreSpecSwift.hpp"
 #include "HybridPriceSubscriptionSpecSwift.hpp"
 #include "PocketlyCoreKmp-Swift-Cxx-Umbrella.hpp"
@@ -28,6 +29,22 @@ namespace margelo::nitro::pocketly::bridge::swift {
     }
     #endif
     PocketlyCoreKmp::HybridPriceSubscriptionSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridNotificationSubscriptionSpec>
+  std::shared_ptr<HybridNotificationSubscriptionSpec> create_std__shared_ptr_HybridNotificationSubscriptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    PocketlyCoreKmp::HybridNotificationSubscriptionSpec_cxx swiftPart = PocketlyCoreKmp::HybridNotificationSubscriptionSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::pocketly::HybridNotificationSubscriptionSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridNotificationSubscriptionSpec_(std__shared_ptr_HybridNotificationSubscriptionSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::pocketly::HybridNotificationSubscriptionSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::pocketly::HybridNotificationSubscriptionSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridNotificationSubscriptionSpec\" is not implemented in Swift!");
+    }
+    #endif
+    PocketlyCoreKmp::HybridNotificationSubscriptionSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
   
@@ -203,6 +220,22 @@ namespace margelo::nitro::pocketly::bridge::swift {
   Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::vector<AppNotification>& /* notifications */)>
+  Func_void_std__vector_AppNotification_ create_Func_void_std__vector_AppNotification_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_AppNotification_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::vector<AppNotification>& notifications) mutable -> void {
+      swiftClosure.call(notifications);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const NotificationList& /* result */)>
+  Func_void_NotificationList create_Func_void_NotificationList(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_NotificationList::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const NotificationList& result) mutable -> void {
       swiftClosure.call(result);
     };
   }

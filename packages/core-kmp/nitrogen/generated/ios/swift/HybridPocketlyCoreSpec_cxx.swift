@@ -791,6 +791,70 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func subscribeNotifications(onNew: bridge.Func_void_std__vector_AppNotification_) -> bridge.Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ {
+    do {
+      let __result = try self.__implementation.subscribeNotifications(onNew: { () -> ([AppNotification]) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__vector_AppNotification_(onNew)
+        return { (__notifications: [AppNotification]) -> Void in
+          __wrappedFunction.call({ () -> bridge.std__vector_AppNotification_ in
+            var __vector = bridge.create_std__vector_AppNotification_(__notifications.count)
+            for __item in __notifications {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
+        }
+      }())
+      let __resultCpp = { () -> bridge.std__shared_ptr_HybridNotificationSubscriptionSpec_ in
+        let __cxxWrapped = __result.getCxxWrapper()
+        return __cxxWrapped.getCxxPart()
+      }()
+      return bridge.create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getNotifications() -> bridge.Result_std__shared_ptr_Promise_NotificationList___ {
+    do {
+      let __result = try self.__implementation.getNotifications()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_NotificationList__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_NotificationList__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_NotificationList__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_NotificationList___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_NotificationList___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func markNotificationsRead() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.markNotificationsRead()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func formatMoney(minor: Double) -> bridge.Result_std__string_ {
     do {
       let __result = try self.__implementation.formatMoney(minor: minor)

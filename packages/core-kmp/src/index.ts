@@ -7,6 +7,7 @@ import {
 } from '@pocketly/core-contract';
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -17,6 +18,7 @@ import type {
   DatasetConfig,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
@@ -42,7 +44,7 @@ import type {
 } from '@pocketly/core-contract';
 import type { PocketlyCore } from './specs/PocketlyCore.nitro';
 
-export type { PocketlyCore, PriceSubscription } from './specs/PocketlyCore.nitro';
+export type { NotificationSubscription, PocketlyCore, PriceSubscription } from './specs/PocketlyCore.nitro';
 
 /**
  * Adapts the Nitro hybrid object to the `Core` contract. Deliberately thin: argument
@@ -230,6 +232,19 @@ export class KmpCore implements Core {
 
   reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
     return this.native.reviewTopUp(amount, method).catch(rethrow);
+  }
+
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): Subscription {
+    const sub = this.native.subscribeNotifications(onNew);
+    return { unsubscribe: () => sub.unsubscribe() };
+  }
+
+  getNotifications(): Promise<NotificationList> {
+    return this.native.getNotifications().catch(rethrow);
+  }
+
+  markNotificationsRead(): Promise<void> {
+    return this.native.markNotificationsRead().catch(rethrow);
   }
 
   formatMoney(minor: number): string {

@@ -69,6 +69,12 @@ namespace margelo::nitro::pocketly { struct QrCode; }
 namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
 // Forward declaration of `QrPaymentReview` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -107,12 +113,15 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "QrCode.hpp"
 #include "QrPaymentDraft.hpp"
 #include "QrPaymentReview.hpp"
-#include "MoneyParseResult.hpp"
 #include <memory>
-#include "HybridPriceSubscriptionSpec.hpp"
+#include "HybridNotificationSubscriptionSpec.hpp"
+#include "AppNotification.hpp"
 #include <vector>
-#include "PriceTick.hpp"
 #include <functional>
+#include "NotificationList.hpp"
+#include "MoneyParseResult.hpp"
+#include "HybridPriceSubscriptionSpec.hpp"
+#include "PriceTick.hpp"
 
 namespace margelo::nitro::pocketly {
 
@@ -182,6 +191,9 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<QrPaymentDraft>> startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) = 0;
       virtual std::shared_ptr<Promise<QrPaymentReview>> reviewQrPayment(double amount) = 0;
       virtual std::shared_ptr<Promise<std::string>> getMyQr() = 0;
+      virtual std::shared_ptr<HybridNotificationSubscriptionSpec> subscribeNotifications(const std::function<void(const std::vector<AppNotification>& /* notifications */)>& onNew) = 0;
+      virtual std::shared_ptr<Promise<NotificationList>> getNotifications() = 0;
+      virtual std::shared_ptr<Promise<void>> markNotificationsRead() = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;
