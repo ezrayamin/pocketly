@@ -1,4 +1,4 @@
-import type { DatasetConfig, NetworkSimulation } from './types';
+import type { DatasetConfig, MinorUnits, NetworkSimulation } from './types';
 
 /** Largest amount either core accepts: 99,999,999,999.99. Well inside Number.MAX_SAFE_INTEGER. */
 export const MAX_AMOUNT_MINOR = 9_999_999_999_999;
@@ -99,3 +99,17 @@ export const RECENT_CONTACTS_LIMIT = 4;
 /** FR-FAKE-05: a transfer the server holds as PENDING settles this long after it arrived. */
 export const PENDING_RESOLVE_MIN_MS = 5_000;
 export const PENDING_RESOLVE_MAX_MS = 20_000;
+
+// ── Top-up (F6; ADR-0015). Kotlin: shared/.../domain/TopUpPolicy.kt ──
+
+/** FR-TOP-01: the smallest top-up, 5.00. */
+export const TOP_UP_MIN_MINOR = 500;
+/** FR-TOP-01: the largest top-up, 1,000.00. No balance cap, no daily limit (ADR-0015 §3). */
+export const TOP_UP_MAX_MINOR = 100_000;
+/** FR-TOP-01: the amount step's preset chips: 10, 25, 50, 100. */
+export const TOP_UP_PRESETS_MINOR: readonly MinorUnits[] = [1_000, 2_500, 5_000, 10_000];
+/** Top-ups are free. */
+export const TOP_UP_FEE_MINOR = 0;
+/** FR-TOP-02: the server processes a top-up for 2–5 s (a seeded draw; NetworkSimulation.topUpProcessingMs). */
+export const TOP_UP_PROCESSING_MIN_MS = 2_000;
+export const TOP_UP_PROCESSING_MAX_MS = 5_000;

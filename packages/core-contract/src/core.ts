@@ -18,6 +18,8 @@ import type {
   PriceTick,
   SpendingSummary,
   Subscription,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -178,22 +180,43 @@ export interface Core {
    */
   reviewTransfer(amount: MinorUnits, note?: string): Promise<TransferReview>;
   /**
-   * FR-TRF-04..09. A DRAFT attempt needs `auth`: biometrics sign the transfer message
-   * (ADR-0012), or the PIN is checked like verifyPin. Then it's sent with the attempt's key and
+   * FR-TRF-04..09, FR-TOP-03. Takes either kind of attempt: a transfer's (reviewTransfer) or a
+   * top-up's (reviewTopUp). A DRAFT transfer needs `auth`: biometrics sign the transfer message
+   * (ADR-0012), or the PIN is checked like verifyPin. A DRAFT top-up takes no `auth` and answers
+   * `auth: NOT_REQUIRED` (ADR-0015 §2). Then it's sent with the attempt's key and
    * waits up to writeTimeoutMs. A FAILED attempt whose `retryable` is true is sent again with the
    * same key and no new `auth`. A call while one is running gets that call's result (double
    * tap). SUCCESS / PENDING / non-retryable FAILED attempts just return their result.
-   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT without `auth`.
+   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT transfer without `auth`, or a
+   * top-up with one.
    */
   confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult>;
   /**
-   * FR-TRF-09: asks the server about a PENDING attempt (also one restored from the replica
-   * after a restart, NFR-REL-03). Other states return their result. Rejects with the network
-   * error when the server can't be reached (the attempt stays PENDING).
+   * FR-TRF-09, FR-TOP-03: asks the server about a PENDING attempt of either kind (also one
+   * restored from the replica after a restart, NFR-REL-03). Other states return their result.
+   * Rejects with the network error when the server can't be reached (the attempt stays PENDING).
    */
   getTransferStatus(id: string): Promise<TransferResult>;
   /** FR-TRF-10, developer menu: the fake server's daily limit, 0..MAX_AMOUNT_MINOR; resetData restores the default. */
   setDailyLimit(minor: MinorUnits): Promise<void>;
+
+  // ── Top-up (F6, FR-TOP-01..03; ADR-0015) ──────────────────────────────
+  // checkTopUpAmount (per keystroke) → reviewTopUp (creates the attempt and its key) →
+  // confirmTransfer(id) with no auth → (if PENDING) getTransferStatus(id). SUCCESS adds the
+  // amount to the balance; PENDING doesn't until the server settles it (ADR-0015 §3).
+  /**
+   * FR-TOP-01, synchronous, needs no draft and no server: the keypad rules of
+   * checkTransferAmount, then BELOW_MINIMUM (< TOP_UP_MIN_MINOR) and ABOVE_MAXIMUM
+   * (> TOP_UP_MAX_MINOR). `remainingBalance` is never set.
+   */
+  checkTopUpAmount(text: string): AmountCheck;
+  /**
+   * FR-TOP-01/02: reads the wallet fresh from the server (never cached data, so offline rejects
+   * with NETWORK_*), then creates the attempt and its idempotency key (UUID v4). The amount must
+   * pass checkTopUpAmount's limits, else INVALID_ARGUMENT. Reviewing again makes a new attempt
+   * (nothing was sent); a transfer's draft is left alone.
+   */
+  reviewTopUp(amount: MinorUnits, method: TopUpMethod): Promise<TopUpReview>;
 
   // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;

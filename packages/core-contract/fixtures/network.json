@@ -6,7 +6,8 @@
     "normalLatencyMs": 0,
     "readTimeoutMs": 10000,
     "writeTimeoutMs": 15000,
-    "seed": 1
+    "seed": 1,
+    "declineTopUps": false
   },
   "invalid": [
     {
@@ -49,6 +50,21 @@
       "mode": "NORMAL",
       "failureRatePercent": 0,
       "writeTimeoutMs": 60001
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "topUpProcessingMs": -1
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "topUpProcessingMs": 60001
+    },
+    {
+      "mode": "NORMAL",
+      "failureRatePercent": 0,
+      "topUpProcessingMs": 12.5
     }
   ],
   "modeErrors": [

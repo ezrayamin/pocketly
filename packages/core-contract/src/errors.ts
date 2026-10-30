@@ -12,6 +12,7 @@ const ERROR_CODES: readonly ErrorCode[] = [
   'NOT_FOUND',
   'INVALID_ARGUMENT',
   'SECURE_STORAGE_UNAVAILABLE',
+  'PAYMENT_DECLINED',
 ];
 
 export class CoreError extends Error {

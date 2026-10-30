@@ -1,0 +1,94 @@
+{
+  "_comment": "Hand-written (F6, ADR-0015). Both cores test against this file: Jest (core-js) and JUnit (shared/src/jvmTest). Shapes mirror transfer.json.",
+  "params": {
+    "minAmount": 500,
+    "maxAmount": 100000,
+    "presets": [1000, 2500, 5000, 10000],
+    "fee": 0,
+    "processingMinMs": 2000,
+    "processingMaxMs": 5000,
+    "idempotencyKeyPattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+  },
+  "methods": {
+    "_comment": "TopUpMethod → the transaction's counterparty: the seed's PAYMENT_METHOD counterparties (seedData.ts, SeedData.kt).",
+    "BANK_TRANSFER": { "kind": "PAYMENT_METHOD", "id": "pm-bank", "name": "Bank transfer" },
+    "CARD": { "kind": "PAYMENT_METHOD", "id": "pm-card", "name": "Card" }
+  },
+  "amountCheck": {
+    "_comment": "checkTopUpAmount over keypad text: the keypad rules of checkTransferAmount (transfer.json), then BELOW_MINIMUM (< minAmount), then ABOVE_MAXIMUM (> maxAmount): the server's order too. No draft, no wallet: remainingBalance is never set.",
+    "cases": [
+      { "input": "", "expected": { "ok": false, "reason": "EMPTY", "acceptInput": true } },
+      { "input": "0", "expected": { "ok": false, "minor": 0, "reason": "BELOW_MINIMUM", "acceptInput": true } },
+      { "input": "0.", "expected": { "ok": false, "minor": 0, "reason": "BELOW_MINIMUM", "acceptInput": true } },
+      { "input": "4.99", "expected": { "ok": false, "minor": 499, "reason": "BELOW_MINIMUM", "acceptInput": true } },
+      { "input": "5", "expected": { "ok": true, "minor": 500, "acceptInput": true } },
+      { "input": "5.", "expected": { "ok": true, "minor": 500, "acceptInput": true } },
+      { "input": "10", "expected": { "ok": true, "minor": 1000, "acceptInput": true } },
+      { "input": "25.5", "expected": { "ok": true, "minor": 2550, "acceptInput": true } },
+      { "input": "99.05", "expected": { "ok": true, "minor": 9905, "acceptInput": true } },
+      { "input": "1000", "expected": { "ok": true, "minor": 100000, "acceptInput": true } },
+      { "input": "1000.00", "expected": { "ok": true, "minor": 100000, "acceptInput": true } },
+      { "input": "1000.01", "expected": { "ok": false, "minor": 100001, "reason": "ABOVE_MAXIMUM", "acceptInput": true } },
+      { "input": "5000", "expected": { "ok": false, "minor": 500000, "reason": "ABOVE_MAXIMUM", "acceptInput": true } },
+      { "input": "99999999999", "expected": { "ok": false, "minor": 9999999999900, "reason": "ABOVE_MAXIMUM", "acceptInput": true } },
+      { "input": "150.055", "expected": { "ok": false, "reason": "TOO_MANY_DECIMALS", "acceptInput": false } },
+      { "input": "00", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "07", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": ".", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": ".5", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "1,000", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "$10", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": " 10", "expected": { "ok": false, "reason": "INVALID_FORMAT", "acceptInput": false } },
+      { "input": "-5", "expected": { "ok": false, "reason": "NEGATIVE", "acceptInput": false } },
+      { "input": "100000000000", "expected": { "ok": false, "reason": "OUT_OF_RANGE", "acceptInput": false } }
+    ]
+  },
+  "retryable": {
+    "_comment": "ADR-0015 §4: as transfers. PAYMENT_DECLINED is a recorded FAILED transaction: the user picks another method or amount and gets a new key.",
+    "NETWORK_UNAVAILABLE": true,
+    "SERVER_ERROR": true,
+    "NETWORK_TIMEOUT": true,
+    "PAYMENT_DECLINED": false,
+    "IDEMPOTENCY_CONFLICT": false
+  },
+  "server": {
+    "_comment": "The fake server's top-up endpoint, step by step on DEFAULT_DATASET (frozen clock, balance 1459085 and usedToday 1578 from golden.json), with topUpProcessingMs 0. Each step: topUp(request, key), or transfer(transfer, key) when the step has `transfer` (same shape as transfer.json's steps). A step's declineTopUps is the simulation's while it runs (default false). expect.sameAs = index of the step whose transaction is returned again (FR-FAKE-02); expect.error = the CoreError code thrown; expect.status/failureReason/id for a recorded transaction. balanceDelta = change in getWallet().balance after the step. A top-up never changes usedToday. Top-up ids are tup-<n>, n counting recorded top-ups from 1, separately from trf-<n> (resetData restarts both). A top-up's key is recorded in the same table as a transfer's, with the method's counterparty id where a transfer has the recipient's, so a key used for one kind conflicts with the other.",
+    "steps": [
+      { "key": "k-1", "request": { "method": "BANK_TRANSFER", "amount": 5000 }, "expect": { "status": "SUCCESS", "id": "tup-1" }, "balanceDelta": 5000 },
+      { "key": "k-1", "request": { "method": "BANK_TRANSFER", "amount": 5000 }, "expect": { "sameAs": 0 }, "balanceDelta": 0 },
+      { "key": "k-1", "request": { "method": "BANK_TRANSFER", "amount": 5001 }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-1", "request": { "method": "CARD", "amount": 5000 }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-1", "transfer": { "recipientId": "u-01", "amount": 5000 }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-2", "request": { "method": "BANK_TRANSFER", "amount": 499 }, "expect": { "error": "INVALID_ARGUMENT" }, "balanceDelta": 0 },
+      { "key": "k-3", "request": { "method": "CARD", "amount": 100001 }, "expect": { "error": "INVALID_ARGUMENT" }, "balanceDelta": 0 },
+      { "key": "k-4", "request": { "method": "CARD", "amount": 100000 }, "expect": { "status": "SUCCESS", "id": "tup-2" }, "balanceDelta": 100000 },
+      { "key": "k-5", "request": { "method": "CARD", "amount": 2500 }, "declineTopUps": true, "expect": { "status": "FAILED", "failureReason": "PAYMENT_DECLINED", "id": "tup-3" }, "balanceDelta": 0 },
+      { "key": "k-5", "request": { "method": "CARD", "amount": 2500 }, "expect": { "sameAs": 8 }, "balanceDelta": 0 },
+      { "key": "k-6", "transfer": { "recipientId": "u-02", "amount": 1000 }, "expect": { "status": "SUCCESS", "id": "trf-1" }, "balanceDelta": -1000 },
+      { "key": "k-6", "request": { "method": "BANK_TRANSFER", "amount": 1000 }, "expect": { "error": "IDEMPOTENCY_CONFLICT" }, "balanceDelta": 0 },
+      { "key": "k-7", "request": { "method": "BANK_TRANSFER", "amount": 500 }, "expect": { "status": "SUCCESS", "id": "tup-4" }, "balanceDelta": 500 }
+    ]
+  },
+  "processing": {
+    "_comment": "ADR-0015 §4, FR-TOP-02. Outside TIMEOUT mode, per top-up submission after setNetworkSimulation: beforeCall's two rolls (latency, then failure), then processingMs = processingMinMs + nextInt(processingMaxMs - processingMinMs + 1). With topUpProcessingMs set there is no third roll. The server records the top-up PENDING on arrival, waits processingMs outside its lock, then settles it to SUCCESS (or FAILED with PAYMENT_DECLINED). Mulberry32 (BM-PAR-04); both cores must draw the same.",
+    "simulation": { "mode": "NORMAL", "failureRatePercent": 0, "seed": 1 },
+    "processingMs": [4917, 3043, 3593]
+  },
+  "timeoutMode": {
+    "_comment": "FR-FAKE-05, as transfer.json's timeoutMode: the same two rolls per top-up (holdMs, then fails), no processing roll; the top-up is recorded PENDING with a settlement row and never answered. The settlement row carries its failure reason (server schema 3): PAYMENT_DECLINED when declineTopUps was on at arrival (whatever the roll), else SERVER_ERROR when fails, else none (SUCCESS). A row without a reason that fails settles as SERVER_ERROR (rows from schema 2).",
+    "simulation": { "mode": "TIMEOUT", "failureRatePercent": 50, "seed": 1 },
+    "holds": [
+      { "holdMs": 17529, "status": "FAILED", "failureReason": "SERVER_ERROR" },
+      { "holdMs": 11773, "status": "FAILED", "failureReason": "SERVER_ERROR" },
+      { "holdMs": 9145, "status": "SUCCESS" }
+    ],
+    "declined": {
+      "simulation": { "mode": "TIMEOUT", "failureRatePercent": 50, "seed": 1, "declineTopUps": true },
+      "holds": [
+        { "holdMs": 17529, "status": "FAILED", "failureReason": "PAYMENT_DECLINED" },
+        { "holdMs": 11773, "status": "FAILED", "failureReason": "PAYMENT_DECLINED" },
+        { "holdMs": 9145, "status": "FAILED", "failureReason": "PAYMENT_DECLINED" }
+      ]
+    }
+  }
+}
