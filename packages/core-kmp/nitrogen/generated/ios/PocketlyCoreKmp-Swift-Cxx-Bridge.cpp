@@ -175,6 +175,14 @@ namespace margelo::nitro::pocketly::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const TopUpReview& /* result */)>
+  Func_void_TopUpReview create_Func_void_TopUpReview(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PocketlyCoreKmp::Func_void_TopUpReview::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const TopUpReview& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::function<void(const std::vector<PriceTick>& /* ticks */)>
   Func_void_std__vector_PriceTick_ create_Func_void_std__vector_PriceTick_(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PocketlyCoreKmp::Func_void_std__vector_PriceTick_::fromUnsafe(swiftClosureWrapper);

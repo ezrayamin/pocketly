@@ -75,6 +75,9 @@ namespace margelo::nitro::pocketly {
         case ErrorCode::SECURE_STORAGE_UNAVAILABLE:
           static const auto fieldSECURE_STORAGE_UNAVAILABLE = clazz->getStaticField<JErrorCode>("SECURE_STORAGE_UNAVAILABLE");
           return clazz->getStaticFieldValue(fieldSECURE_STORAGE_UNAVAILABLE);
+        case ErrorCode::PAYMENT_DECLINED:
+          static const auto fieldPAYMENT_DECLINED = clazz->getStaticField<JErrorCode>("PAYMENT_DECLINED");
+          return clazz->getStaticFieldValue(fieldPAYMENT_DECLINED);
         default:
           std::string stringValue = std::to_string(static_cast<int>(value));
           throw std::invalid_argument("Invalid enum value (" + stringValue + "!");

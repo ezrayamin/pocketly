@@ -110,6 +110,10 @@ namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
 namespace margelo::nitro::pocketly { struct TransferAuth; }
 // Forward declaration of `TransferAuthMethod` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -172,6 +176,8 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransferAuthOutcome.hpp"
 #include "TransferAuth.hpp"
 #include "TransferAuthMethod.hpp"
+#include "TopUpReview.hpp"
+#include "TopUpMethod.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
 #include <memory>
@@ -467,6 +473,22 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<void>> setDailyLimit(double minor) override {
       auto __result = _swiftPart.setDailyLimit(std::forward<decltype(minor)>(minor));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline AmountCheck checkTopUpAmount(const std::string& text) override {
+      auto __result = _swiftPart.checkTopUpAmount(text);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) override {
+      auto __result = _swiftPart.reviewTopUp(std::forward<decltype(amount)>(amount), static_cast<int>(paymentMethod));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

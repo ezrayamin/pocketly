@@ -25,6 +25,8 @@ import type {
   PriceTick,
   SpendingSummary,
   Subscription,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -192,6 +194,15 @@ export class KmpCore implements Core {
 
   setDailyLimit(minor: number): Promise<void> {
     return this.native.setDailyLimit(minor).catch(rethrow);
+  }
+
+  checkTopUpAmount(text: string): AmountCheck {
+    const c = this.native.checkTopUpAmount(text);
+    return withoutUndefined({ ok: c.ok, minor: c.minor, reason: c.reason, acceptInput: c.acceptInput });
+  }
+
+  reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
+    return this.native.reviewTopUp(amount, method).catch(rethrow);
   }
 
   formatMoney(minor: number): string {

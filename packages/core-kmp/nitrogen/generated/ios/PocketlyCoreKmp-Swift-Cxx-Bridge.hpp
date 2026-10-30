@@ -82,6 +82,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `StaleInfo` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -157,6 +161,8 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
 #include "StaleInfo.hpp"
+#include "TopUpMethod.hpp"
+#include "TopUpReview.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"
@@ -518,6 +524,21 @@ namespace margelo::nitro::pocketly::bridge::swift {
   Func_void_Transaction create_Func_void_Transaction(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_Transaction_Wrapper wrap_Func_void_Transaction(Func_void_Transaction value) noexcept {
     return Func_void_Transaction_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<bool>
+  /**
+   * Specialized version of `std::optional<bool>`.
+   */
+  using std__optional_bool_ = std::optional<bool>;
+  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
+    return std::optional<bool>(value);
+  }
+  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
   }
   
   // pragma MARK: std::vector<CategoryTotal>
@@ -1066,21 +1087,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return optional.value();
   }
   
-  // pragma MARK: std::optional<bool>
-  /**
-   * Specialized version of `std::optional<bool>`.
-   */
-  using std__optional_bool_ = std::optional<bool>;
-  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
-    return std::optional<bool>(value);
-  }
-  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
-    return optional.value();
-  }
-  
   // pragma MARK: std::shared_ptr<Promise<TransferResult>>
   /**
    * Specialized version of `std::shared_ptr<Promise<TransferResult>>`.
@@ -1143,6 +1149,40 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline TransferAuth get_std__optional_TransferAuth_(const std::optional<TransferAuth>& optional) noexcept {
     return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<TopUpReview>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<TopUpReview>>`.
+   */
+  using std__shared_ptr_Promise_TopUpReview__ = std::shared_ptr<Promise<TopUpReview>>;
+  inline std::shared_ptr<Promise<TopUpReview>> create_std__shared_ptr_Promise_TopUpReview__() noexcept {
+    return Promise<TopUpReview>::create();
+  }
+  inline PromiseHolder<TopUpReview> wrap_std__shared_ptr_Promise_TopUpReview__(std::shared_ptr<Promise<TopUpReview>> promise) noexcept {
+    return PromiseHolder<TopUpReview>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const TopUpReview& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const TopUpReview&)>`.
+   */
+  using Func_void_TopUpReview = std::function<void(const TopUpReview& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const TopUpReview& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_TopUpReview_Wrapper final {
+  public:
+    explicit Func_void_TopUpReview_Wrapper(std::function<void(const TopUpReview& /* result */)>&& func): _function(std::make_unique<std::function<void(const TopUpReview& /* result */)>>(std::move(func))) {}
+    inline void call(TopUpReview result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const TopUpReview& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_TopUpReview create_Func_void_TopUpReview(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_TopUpReview_Wrapper wrap_Func_void_TopUpReview(Func_void_TopUpReview value) noexcept {
+    return Func_void_TopUpReview_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::optional<MoneyParseError>
@@ -1403,6 +1443,15 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_TransferResult___ create_Result_std__shared_ptr_Promise_TransferResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<TransferResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<TopUpReview>>>
+  using Result_std__shared_ptr_Promise_TopUpReview___ = Result<std::shared_ptr<Promise<TopUpReview>>>;
+  inline Result_std__shared_ptr_Promise_TopUpReview___ create_Result_std__shared_ptr_Promise_TopUpReview___(const std::shared_ptr<Promise<TopUpReview>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<TopUpReview>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_TopUpReview___ create_Result_std__shared_ptr_Promise_TopUpReview___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<TopUpReview>>>::withError(error);
   }
   
   // pragma MARK: Result<std::string>

@@ -33,6 +33,8 @@ public extension AmountRejectReason {
         self = .outOfRange
       case "BELOW_MINIMUM":
         self = .belowMinimum
+      case "ABOVE_MAXIMUM":
+        self = .aboveMaximum
       default:
         return nil
     }
@@ -59,6 +61,8 @@ public extension AmountRejectReason {
         return "OUT_OF_RANGE"
       case .belowMinimum:
         return "BELOW_MINIMUM"
+      case .aboveMaximum:
+        return "ABOVE_MAXIMUM"
     }
   }
 }

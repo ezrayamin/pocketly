@@ -39,6 +39,8 @@ public extension ErrorCode {
         self = .invalidArgument
       case "SECURE_STORAGE_UNAVAILABLE":
         self = .secureStorageUnavailable
+      case "PAYMENT_DECLINED":
+        self = .paymentDeclined
       default:
         return nil
     }
@@ -71,6 +73,8 @@ public extension ErrorCode {
         return "INVALID_ARGUMENT"
       case .secureStorageUnavailable:
         return "SECURE_STORAGE_UNAVAILABLE"
+      case .paymentDeclined:
+        return "PAYMENT_DECLINED"
     }
   }
 }

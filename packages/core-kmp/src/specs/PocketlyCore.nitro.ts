@@ -18,6 +18,8 @@ import type {
   PinCheck,
   PriceTick,
   SpendingSummary,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -81,6 +83,11 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   confirmTransfer(id: string, auth: TransferAuth | undefined): Promise<TransferResult>;
   getTransferStatus(id: string): Promise<TransferResult>;
   setDailyLimit(minor: number): Promise<void>;
+
+  // F6 (ADR-0015). Two methods; confirming and checking reuse confirmTransfer / getTransferStatus.
+  // Not `method`: Nitro's generated JNI code has a local of that name.
+  checkTopUpAmount(text: string): AmountCheck;
+  reviewTopUp(amount: number, paymentMethod: TopUpMethod): Promise<TopUpReview>;
 
   formatMoney(minor: number): string;
   parseMoney(input: string): MoneyParseResult;

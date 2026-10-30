@@ -47,10 +47,12 @@ namespace margelo::nitro::pocketly {
     std::optional<double> readTimeoutMs     SWIFT_PRIVATE;
     std::optional<double> writeTimeoutMs     SWIFT_PRIVATE;
     std::optional<double> seed     SWIFT_PRIVATE;
+    std::optional<bool> declineTopUps     SWIFT_PRIVATE;
+    std::optional<double> topUpProcessingMs     SWIFT_PRIVATE;
 
   public:
     NetworkSimulation() = default;
-    explicit NetworkSimulation(NetworkMode mode, double failureRatePercent, std::optional<double> normalLatencyMs, std::optional<double> readTimeoutMs, std::optional<double> writeTimeoutMs, std::optional<double> seed): mode(mode), failureRatePercent(failureRatePercent), normalLatencyMs(normalLatencyMs), readTimeoutMs(readTimeoutMs), writeTimeoutMs(writeTimeoutMs), seed(seed) {}
+    explicit NetworkSimulation(NetworkMode mode, double failureRatePercent, std::optional<double> normalLatencyMs, std::optional<double> readTimeoutMs, std::optional<double> writeTimeoutMs, std::optional<double> seed, std::optional<bool> declineTopUps, std::optional<double> topUpProcessingMs): mode(mode), failureRatePercent(failureRatePercent), normalLatencyMs(normalLatencyMs), readTimeoutMs(readTimeoutMs), writeTimeoutMs(writeTimeoutMs), seed(seed), declineTopUps(declineTopUps), topUpProcessingMs(topUpProcessingMs) {}
 
   public:
     friend bool operator==(const NetworkSimulation& lhs, const NetworkSimulation& rhs) = default;
@@ -71,7 +73,9 @@ namespace margelo::nitro {
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "normalLatencyMs"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs"))),
-        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed")))
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed"))),
+        JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "declineTopUps"))),
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "topUpProcessingMs")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pocketly::NetworkSimulation& arg) {
@@ -82,6 +86,8 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.readTimeoutMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.writeTimeoutMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "seed"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.seed));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "declineTopUps"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.declineTopUps));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "topUpProcessingMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.topUpProcessingMs));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -98,6 +104,8 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "readTimeoutMs")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "writeTimeoutMs")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "seed")))) return false;
+      if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "declineTopUps")))) return false;
+      if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "topUpProcessingMs")))) return false;
       return true;
     }
   };

@@ -86,6 +86,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `StaleInfo` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -157,6 +161,8 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "PriceTick.hpp"
 #include "SpendingSummary.hpp"
 #include "StaleInfo.hpp"
+#include "TopUpMethod.hpp"
+#include "TopUpReview.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"

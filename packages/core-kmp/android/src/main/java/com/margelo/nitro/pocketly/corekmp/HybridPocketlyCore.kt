@@ -116,6 +116,11 @@ class HybridPocketlyCore : HybridPocketlyCoreSpec() {
     override fun setDailyLimit(minor: Double): Promise<Unit> =
         Promise.async { core.setDailyLimit(Money(BridgeConversions.toLongExact(minor, "dailyLimit"))) }
 
+    override fun checkTopUpAmount(text: String): AmountCheck = core.checkTopUpAmount(text).toNitro()
+
+    override fun reviewTopUp(amount: Double, paymentMethod: TopUpMethod): Promise<TopUpReview> =
+        Promise.async { core.reviewTopUp(Money(BridgeConversions.toLongExact(amount)), paymentMethod.toDomain()).toNitro() }
+
     override fun formatMoney(minor: Double): String = core.formatMoney(BridgeConversions.toLongExact(minor))
 
     override fun parseMoney(input: String): MoneyParseResult = core.parseMoney(input).toNitro()

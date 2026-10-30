@@ -37,6 +37,7 @@ namespace margelo::nitro::pocketly {
     INVALID_FORMAT      SWIFT_NAME(invalidFormat) = 5,
     OUT_OF_RANGE      SWIFT_NAME(outOfRange) = 6,
     BELOW_MINIMUM      SWIFT_NAME(belowMinimum) = 7,
+    ABOVE_MAXIMUM      SWIFT_NAME(aboveMaximum) = 8,
   } CLOSED_ENUM;
 
 } // namespace margelo::nitro::pocketly
@@ -57,6 +58,7 @@ namespace margelo::nitro {
         case hashString("INVALID_FORMAT"): return margelo::nitro::pocketly::AmountRejectReason::INVALID_FORMAT;
         case hashString("OUT_OF_RANGE"): return margelo::nitro::pocketly::AmountRejectReason::OUT_OF_RANGE;
         case hashString("BELOW_MINIMUM"): return margelo::nitro::pocketly::AmountRejectReason::BELOW_MINIMUM;
+        case hashString("ABOVE_MAXIMUM"): return margelo::nitro::pocketly::AmountRejectReason::ABOVE_MAXIMUM;
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert \"" + unionValue + "\" to enum AmountRejectReason - invalid value!");
       }
@@ -71,6 +73,7 @@ namespace margelo::nitro {
         case margelo::nitro::pocketly::AmountRejectReason::INVALID_FORMAT: return JSIConverter<std::string>::toJSI(runtime, "INVALID_FORMAT");
         case margelo::nitro::pocketly::AmountRejectReason::OUT_OF_RANGE: return JSIConverter<std::string>::toJSI(runtime, "OUT_OF_RANGE");
         case margelo::nitro::pocketly::AmountRejectReason::BELOW_MINIMUM: return JSIConverter<std::string>::toJSI(runtime, "BELOW_MINIMUM");
+        case margelo::nitro::pocketly::AmountRejectReason::ABOVE_MAXIMUM: return JSIConverter<std::string>::toJSI(runtime, "ABOVE_MAXIMUM");
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert AmountRejectReason to JS - invalid value: "
                                     + std::to_string(static_cast<int>(arg)) + "!");
@@ -90,6 +93,7 @@ namespace margelo::nitro {
         case hashString("INVALID_FORMAT"):
         case hashString("OUT_OF_RANGE"):
         case hashString("BELOW_MINIMUM"):
+        case hashString("ABOVE_MAXIMUM"):
           return true;
         default:
           return false;

@@ -684,6 +684,37 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func checkTopUpAmount(text: std.string) -> bridge.Result_AmountCheck_ {
+    do {
+      let __result = try self.__implementation.checkTopUpAmount(text: String(text))
+      let __resultCpp = __result
+      return bridge.create_Result_AmountCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_AmountCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func reviewTopUp(amount: Double, paymentMethod: Int32) -> bridge.Result_std__shared_ptr_Promise_TopUpReview___ {
+    do {
+      let __result = try self.__implementation.reviewTopUp(amount: amount, paymentMethod: margelo.nitro.pocketly.TopUpMethod(rawValue: paymentMethod)!)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TopUpReview__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TopUpReview__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TopUpReview__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TopUpReview___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TopUpReview___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func formatMoney(minor: Double) -> bridge.Result_std__string_ {
     do {
       let __result = try self.__implementation.formatMoney(minor: minor)

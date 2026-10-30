@@ -30,6 +30,8 @@ import com.pocketly.shared.domain.NetworkSimulation as KNetworkSimulation
 import com.pocketly.shared.domain.PriceTick as KPriceTick
 import com.pocketly.shared.domain.SpendingSummary as KSpendingSummary
 import com.pocketly.shared.domain.StaleInfo as KStaleInfo
+import com.pocketly.shared.domain.TopUpMethod as KTopUpMethod
+import com.pocketly.shared.domain.TopUpReview as KTopUpReview
 import com.pocketly.shared.domain.Transaction as KTransaction
 import com.pocketly.shared.domain.TransactionPage as KTransactionPage
 import com.pocketly.shared.domain.TransactionStatus as KTransactionStatus
@@ -60,6 +62,8 @@ internal fun NetworkSimulation.toDomain() = KNetworkSimulation(
     readTimeoutMs = readTimeoutMs?.let { BridgeConversions.toIntExact(it, "readTimeoutMs") } ?: 10_000,
     seed = seed?.let { BridgeConversions.toIntExact(it, "seed") } ?: 1,
     writeTimeoutMs = writeTimeoutMs?.let { BridgeConversions.toIntExact(it, "writeTimeoutMs") } ?: 15_000,
+    declineTopUps = declineTopUps ?: false,
+    topUpProcessingMs = topUpProcessingMs?.let { BridgeConversions.toIntExact(it, "topUpProcessingMs") },
 )
 
 internal fun KNetworkSimulation.toNitro() = NetworkSimulation(
@@ -69,7 +73,11 @@ internal fun KNetworkSimulation.toNitro() = NetworkSimulation(
     readTimeoutMs = readTimeoutMs.toDouble(),
     writeTimeoutMs = writeTimeoutMs.toDouble(),
     seed = seed.toDouble(),
+    declineTopUps = declineTopUps,
+    topUpProcessingMs = topUpProcessingMs?.toDouble(),
 )
+
+internal fun TopUpMethod.toDomain() = KTopUpMethod.valueOf(name)
 
 internal fun TransferAuth.toDomain() = KTransferAuth(KTransferAuthMethod.valueOf(method.name), pin, prompt?.toDomain())
 
@@ -201,6 +209,10 @@ internal fun KAmountCheck.toNitro() = AmountCheck(
 
 internal fun KTransferReview.toNitro() = TransferReview(
     id, idempotencyKey, recipient.toNitro(), amount.minor.toDouble(), fee.minor.toDouble(), note, balanceAfter.minor.toDouble(),
+)
+
+internal fun KTopUpReview.toNitro() = TopUpReview(
+    id, idempotencyKey, TopUpMethod.valueOf(method.name), amount.minor.toDouble(), fee.minor.toDouble(), balanceAfter.minor.toDouble(),
 )
 
 internal fun KTransferResult.toNitro() = TransferResult(

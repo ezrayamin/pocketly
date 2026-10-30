@@ -59,6 +59,10 @@ namespace margelo::nitro::pocketly { struct TransferReview; }
 namespace margelo::nitro::pocketly { struct TransferResult; }
 // Forward declaration of `TransferAuth` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransferAuth; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -92,6 +96,8 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransferReview.hpp"
 #include "TransferResult.hpp"
 #include "TransferAuth.hpp"
+#include "TopUpReview.hpp"
+#include "TopUpMethod.hpp"
 #include "MoneyParseResult.hpp"
 #include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
@@ -161,6 +167,8 @@ namespace margelo::nitro::pocketly {
       virtual std::shared_ptr<Promise<TransferResult>> confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) = 0;
       virtual std::shared_ptr<Promise<TransferResult>> getTransferStatus(const std::string& id) = 0;
       virtual std::shared_ptr<Promise<void>> setDailyLimit(double minor) = 0;
+      virtual AmountCheck checkTopUpAmount(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) = 0;
       virtual std::string formatMoney(double minor) = 0;
       virtual MoneyParseResult parseMoney(const std::string& input) = 0;
       virtual std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) = 0;

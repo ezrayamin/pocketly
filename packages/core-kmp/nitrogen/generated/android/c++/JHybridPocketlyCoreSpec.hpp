@@ -85,6 +85,8 @@ namespace margelo::nitro::pocketly {
     std::shared_ptr<Promise<TransferResult>> confirmTransfer(const std::string& id, const std::optional<TransferAuth>& auth) override;
     std::shared_ptr<Promise<TransferResult>> getTransferStatus(const std::string& id) override;
     std::shared_ptr<Promise<void>> setDailyLimit(double minor) override;
+    AmountCheck checkTopUpAmount(const std::string& text) override;
+    std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) override;
     std::string formatMoney(double minor) override;
     MoneyParseResult parseMoney(const std::string& input) override;
     std::shared_ptr<HybridPriceSubscriptionSpec> subscribePrices(const std::vector<std::string>& symbols, double intervalMs, double seed, const std::function<void(const std::vector<PriceTick>& /* ticks */)>& onTicks) override;

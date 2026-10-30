@@ -95,6 +95,10 @@ namespace margelo::nitro::pocketly { struct TransferResult; }
 namespace margelo::nitro::pocketly { enum class TransferState; }
 // Forward declaration of `TransferAuthOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -208,6 +212,10 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "JTransferState.hpp"
 #include "TransferAuthOutcome.hpp"
 #include "JTransferAuthOutcome.hpp"
+#include "TopUpReview.hpp"
+#include "JTopUpReview.hpp"
+#include "TopUpMethod.hpp"
+#include "JTopUpMethod.hpp"
 #include "MoneyParseResult.hpp"
 #include "JMoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
@@ -677,6 +685,27 @@ namespace margelo::nitro::pocketly {
       auto __promise = Promise<void>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
         __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  AmountCheck JHybridPocketlyCoreSpec::checkTopUpAmount(const std::string& text) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JAmountCheck>(jni::alias_ref<jni::JString> /* text */)>("checkTopUpAmount");
+    auto __result = method(_javaPart, jni::make_jstring(text));
+    return __result->toCpp();
+  }
+  std::shared_ptr<Promise<TopUpReview>> JHybridPocketlyCoreSpec::reviewTopUp(double amount, TopUpMethod paymentMethod) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(double /* amount */, jni::alias_ref<JTopUpMethod> /* paymentMethod */)>("reviewTopUp");
+    auto __result = method(_javaPart, amount, JTopUpMethod::fromCpp(paymentMethod));
+    return [&]() {
+      auto __promise = Promise<TopUpReview>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JTopUpReview>(__boxedResult);
+        __promise->resolve(__result->toCpp());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
         jni::JniException __jniError(__throwable);

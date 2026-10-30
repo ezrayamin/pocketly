@@ -44,6 +44,8 @@ public protocol HybridPocketlyCoreSpec_protocol: HybridObject {
   func confirmTransfer(id: String, auth: TransferAuth?) throws -> Promise<TransferResult>
   func getTransferStatus(id: String) throws -> Promise<TransferResult>
   func setDailyLimit(minor: Double) throws -> Promise<Void>
+  func checkTopUpAmount(text: String) throws -> AmountCheck
+  func reviewTopUp(amount: Double, paymentMethod: TopUpMethod) throws -> Promise<TopUpReview>
   func formatMoney(minor: Double) throws -> String
   func parseMoney(input: String) throws -> MoneyParseResult
   func subscribePrices(symbols: [String], intervalMs: Double, seed: Double, onTicks: @escaping (_ ticks: [PriceTick]) -> Void) throws -> (any HybridPriceSubscriptionSpec)

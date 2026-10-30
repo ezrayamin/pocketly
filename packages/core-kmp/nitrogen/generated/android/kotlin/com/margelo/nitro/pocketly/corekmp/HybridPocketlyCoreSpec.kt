@@ -156,6 +156,14 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun checkTopUpAmount(text: String): AmountCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun reviewTopUp(amount: Double, paymentMethod: TopUpMethod): Promise<TopUpReview>
+  
+  @DoNotStrip
+  @Keep
   abstract fun formatMoney(minor: Double): String
   
   @DoNotStrip

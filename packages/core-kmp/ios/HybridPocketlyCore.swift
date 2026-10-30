@@ -65,7 +65,11 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       normalLatencyMs: try convert.toIntExact(value: simulation.normalLatencyMs ?? 0, field: "normalLatencyMs"),
       readTimeoutMs: try convert.toIntExact(value: simulation.readTimeoutMs ?? 10_000, field: "readTimeoutMs"),
       seed: try convert.toIntExact(value: simulation.seed ?? 1, field: "seed"),
-      writeTimeoutMs: try convert.toIntExact(value: simulation.writeTimeoutMs ?? 15_000, field: "writeTimeoutMs")
+      writeTimeoutMs: try convert.toIntExact(value: simulation.writeTimeoutMs ?? 15_000, field: "writeTimeoutMs"),
+      declineTopUps: simulation.declineTopUps ?? false,
+      topUpProcessingMs: try simulation.topUpProcessingMs.map {
+        KotlinInt(int: try convert.toIntExact(value: $0, field: "topUpProcessingMs"))
+      }
     ))
   }
 
@@ -77,7 +81,9 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       normalLatencyMs: Double(s.normalLatencyMs),
       readTimeoutMs: Double(s.readTimeoutMs),
       writeTimeoutMs: Double(s.writeTimeoutMs),
-      seed: Double(s.seed)
+      seed: Double(s.seed),
+      declineTopUps: s.declineTopUps,
+      topUpProcessingMs: s.topUpProcessingMs.map { Double($0.int32Value) }
     )
   }
 
@@ -278,6 +284,33 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
   func setDailyLimit(minor: Double) throws -> Promise<Void> {
     return Promise.async { [core, convert] in
       try await core.setDailyLimit(minor: try convert.toLongExact(value: minor, field: "dailyLimit"))
+    }
+  }
+
+  func checkTopUpAmount(text: String) throws -> AmountCheck {
+    let c = try core.checkTopUpAmount(text: text)
+    return AmountCheck(
+      ok: c.ok,
+      minor: c.minorUnits.map { Double($0.int64Value) },
+      reason: c.reason.map { AmountRejectReason(fromString: $0.name)! },
+      acceptInput: c.acceptInput,
+      remainingBalance: nil
+    )
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func reviewTopUp(amount: Double, paymentMethod: TopUpMethod) throws -> Promise<TopUpReview> {
+    let kMethod = PocketlyShared.TopUpMethod.entries.first { $0.name == paymentMethod.stringValue }!
+    return Promise.async { [core, convert] in
+      let r = try await core.reviewTopUp(amount: try convert.toLongExact(value: amount, field: "amount"), method: kMethod)
+      return TopUpReview(
+        id: r.id,
+        idempotencyKey: r.idempotencyKey,
+        method: TopUpMethod(fromString: r.method.name)!,
+        amount: Double(r.amount),
+        fee: Double(r.fee),
+        balanceAfter: Double(r.balanceAfter)
+      )
     }
   }
 
