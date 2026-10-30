@@ -43,4 +43,6 @@ export type RootStackParamList = {
   QrResult: { review: QrPaymentReview; result: TransferResult };
   /** F8: this account's code, as a modal (product §7.4). */
   MyQr: undefined;
+  /** F9 (FR-NOTIF-03): the bell's list; opening it marks all read. */
+  Notifications: undefined;
 };

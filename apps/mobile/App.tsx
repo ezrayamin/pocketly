@@ -13,6 +13,8 @@ import { applyDevLink } from './src/features/devmenu/devLinks';
 import { HistoryScreen } from './src/features/history/HistoryScreen';
 import { TransactionDetailScreen } from './src/features/history/TransactionDetailScreen';
 import { HomeScreen } from './src/features/home/HomeScreen';
+import { NotificationsProvider } from './src/features/notifications/NotificationsProvider';
+import { NotificationsScreen } from './src/features/notifications/NotificationsScreen';
 import { ProfileScreen } from './src/features/profile/ProfileScreen';
 import { MyQrScreen } from './src/features/qr/MyQrScreen';
 import { QrAmountScreen } from './src/features/qr/QrAmountScreen';
@@ -123,29 +125,41 @@ function MainApp({ initialTab, lockSkipped = false }: { initialTab: TabKey; lock
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer theme={NAV_THEME} ref={navigationRef}>
-        <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-          <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
-          <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
-          <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} />
-          <Stack.Screen name="SendRecipient" component={SendRecipientScreen} />
-          <Stack.Screen name="SendAmount" component={SendAmountScreen} />
-          <Stack.Screen name="SendReview" component={SendReviewScreen} />
-          <Stack.Screen name="SendPin" component={SendPinScreen} />
-          {/* A result can't be swiped back into the flow: Back goes Home (product §7.3 rule 3). */}
-          <Stack.Screen name="SendResult" component={SendResultScreen} options={{ gestureEnabled: false }} />
-          <Stack.Screen name="TopUpAmount" component={TopUpAmountScreen} />
-          <Stack.Screen name="TopUpMethod" component={TopUpMethodScreen} />
-          <Stack.Screen name="TopUpReview" component={TopUpReviewScreen} />
-          <Stack.Screen name="TopUpResult" component={TopUpResultScreen} options={{ gestureEnabled: false }} />
-          {/* Pay is a full-screen modal over the tab it was opened from (product §7.3 rule 1). */}
-          <Stack.Screen name="QrScan" component={QrScanScreen} options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="QrAmount" component={QrAmountScreen} />
-          <Stack.Screen name="QrReview" component={QrReviewScreen} />
-          <Stack.Screen name="QrResult" component={QrResultScreen} options={{ gestureEnabled: false }} />
-          <Stack.Screen name="MyQr" component={MyQrScreen} options={{ presentation: 'modal' }} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      {/* F9: banners wait while the lock screen, the privacy cover or the developer menu is up (ADR-0017 §4). */}
+      <NotificationsProvider
+        held={locked || devMenuOpen}
+        refreshToken={homeRefresh}
+        onNew={() => setHomeRefresh((n) => n + 1)}
+        onView={(n) => {
+          if (navigationRef.isReady())
+            navigationRef.navigate('TransactionDetail', { id: n.transaction.id, tx: n.transaction });
+        }}
+      >
+        <NavigationContainer theme={NAV_THEME} ref={navigationRef}>
+          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+            <Stack.Screen name="Tabs">{tabs}</Stack.Screen>
+            <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
+            <Stack.Screen name="BiometricSetup" component={BiometricSetupScreen} />
+            <Stack.Screen name="SendRecipient" component={SendRecipientScreen} />
+            <Stack.Screen name="SendAmount" component={SendAmountScreen} />
+            <Stack.Screen name="SendReview" component={SendReviewScreen} />
+            <Stack.Screen name="SendPin" component={SendPinScreen} />
+            {/* A result can't be swiped back into the flow: Back goes Home (product §7.3 rule 3). */}
+            <Stack.Screen name="SendResult" component={SendResultScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="TopUpAmount" component={TopUpAmountScreen} />
+            <Stack.Screen name="TopUpMethod" component={TopUpMethodScreen} />
+            <Stack.Screen name="TopUpReview" component={TopUpReviewScreen} />
+            <Stack.Screen name="TopUpResult" component={TopUpResultScreen} options={{ gestureEnabled: false }} />
+            {/* Pay is a full-screen modal over the tab it was opened from (product §7.3 rule 1). */}
+            <Stack.Screen name="QrScan" component={QrScanScreen} options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="QrAmount" component={QrAmountScreen} />
+            <Stack.Screen name="QrReview" component={QrReviewScreen} />
+            <Stack.Screen name="QrResult" component={QrResultScreen} options={{ gestureEnabled: false }} />
+            <Stack.Screen name="MyQr" component={MyQrScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </NotificationsProvider>
       {DEV_TOOLS_ENABLED && (
         <DevMenu
           visible={devMenuOpen && !locked}
