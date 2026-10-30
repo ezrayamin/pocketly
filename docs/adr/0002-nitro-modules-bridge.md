@@ -50,6 +50,8 @@ Two measurements point the same way:
   bridged method-or-type: new types cost about as much as new methods, so reuse structs too.
   **Slice 7** (top-up, `2026-10-30_mid-01`): 2 methods and 2 new types added 74 KB (1,668 →
   1,742 KB), the same ~18 KB each; reusing the transfer methods (ADR-0015 §1) kept it at that.
+  **QR Pay and My QR** (`2026-10-30_mid-02`): 4 methods and 5 types added 211 KB (1,742 → 1,953 KB),
+  ~23 KB each; big structs cost more (QrPaymentDraft has 8 fields).
 - **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
   batched call (BM-06).
 
