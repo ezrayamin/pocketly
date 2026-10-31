@@ -79,6 +79,8 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   private readonly eventListeners = new Set<() => void>();
   /** App mode only: one timer per held or processing transaction, settling it on time (ADR-0017 §1). */
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  /** Tests only: told the name of each read the client makes (getWallet, getChanges, getEvents). */
+  onCall: ((name: string) => void) | undefined;
 
   private readonly otp: OtpServer;
 
@@ -227,6 +229,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   async getEvents(afterSeq: number, limit: number): Promise<EventsPage> {
+    this.onCall?.('getEvents');
     await this.network.beforeEventRead();
     if (!Number.isSafeInteger(afterSeq) || afterSeq < 0) {
       throw new CoreError('INVALID_ARGUMENT', 'afterSeq must be >= 0');
@@ -575,6 +578,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   async getWallet(): Promise<Wallet> {
+    this.onCall?.('getWallet');
     await this.network.beforeCall();
     return this.exclusive(async () => {
       await this.settleDue();
@@ -590,6 +594,7 @@ export class FakeWalletApi implements WalletApi, FakeBackendControls {
   }
 
   async getChanges(afterToken: string | undefined, limit: number): Promise<ChangesPage> {
+    this.onCall?.('getChanges');
     await this.network.beforeCall();
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CHANGES_PAGE) {
       throw new CoreError('INVALID_ARGUMENT', `limit must be 1..${MAX_CHANGES_PAGE}`);

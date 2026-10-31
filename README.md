@@ -139,8 +139,8 @@ Scriptable: `pocketly://dev/network?normalLatencyMs=300`, `pocketly://dev/reset`
 ## Verified so far
 
 - Both cores pass the shared contract fixtures, including persistence, offline fallback and
-  mid-scroll inserts: 613 Jest tests for `core-js` and 219 JVM tests for the KMP core (slice 7, 2026-11-01).
-  The app has 97 Jest tests (Home, History, launch arguments, auth, Send, Top-Up, QR, notifications).
+  mid-scroll inserts: 615 Jest tests for `core-js` and 221 JVM tests for the KMP core (slice 7, 2026-11-01).
+  The app has 100 Jest tests (Home, History, launch arguments, auth, Send, Top-Up, QR, notifications).
 - Android release and perf builds of both flavors (R8 on), on a vivo V2538: same balance and
   history on both cores, data survives a restart, an offline cold start shows the replica
   with the offline banner, and History scrolls through 1,000 entries to the end.

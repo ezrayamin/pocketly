@@ -127,10 +127,10 @@ class PocketlyCore internal constructor(
     private val events = EventSync(api, cache, payments::applySettled)
 
     init {
-        // ADR-0017 §2: catch up on start and after each "new events" signal; failures wait for the next one.
+        // ADR-0017 §2: catch up after each "new events" signal (failures wait for the next one). Nothing at start:
+        // the first history refresh (Home's first load) catches up, so startup reads the log once.
         // Undispatched, so the signal subscription exists before this constructor returns.
         streamScope.launch(start = CoroutineStart.UNDISPATCHED) { api.incomingEvents().collect { catchUpQuietly() } }
-        streamScope.launch { catchUpQuietly() }
     }
 
     @Volatile
@@ -365,6 +365,11 @@ class PocketlyCore internal constructor(
 
     /** Tests only: moves the fake server's frozen clock forward (held transfers and top-ups settle by it). */
     internal fun advanceServerClock(ms: Long) = backend.advanceClock(ms)
+
+    /** Tests only: [log] is told the name of each read the client makes (getWallet, getChanges, getEvents). */
+    internal fun onServerCallForTests(log: (String) -> Unit) {
+        backend.onCall = log
+    }
 
     /** FR-TRF-10, developer menu. */
     @Throws(CoreException::class, CancellationException::class)

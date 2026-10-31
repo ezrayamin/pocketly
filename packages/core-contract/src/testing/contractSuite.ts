@@ -77,6 +77,8 @@ export interface CoreUnderTest {
   resetDataWithExtras(config: DatasetConfig, extraTransactions: Transaction[]): Promise<void>;
   /** Test-only: moves the fake server's frozen clock forward (held transfers settle by it). */
   advanceServerClock(ms: number): void;
+  /** Test-only: the reads the core has made of the fake server since it was created (getWallet, getChanges, getEvents). */
+  serverCalls(): readonly string[];
 }
 
 type CoreFactory = () => CoreUnderTest | Promise<CoreUnderTest>;
@@ -1376,6 +1378,32 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         core.setNetworkSimulation(INSTANT);
         expect((await core.getWallet()).balance).toBe(START.balance + 5_000 + 2_500);
         sub.unsubscribe();
+      });
+
+      it('nothing is lost before subscribing: earlier events are in the list and the unread count', async () => {
+        await core.simulateIncomingTransfer();
+        await core.simulateIncomingTransfer();
+        await core.getTransactions(); // a catch-up (Home's first load), with no one subscribed
+        const list = await core.getNotifications();
+        expect(list.unreadCount).toBe(2);
+        expect(list.items.map((n) => n.transaction.id)).toEqual(['sim-000002', 'sim-000001']);
+        const { got, sub } = subscribe();
+        await core.getTransactions();
+        await wait(50);
+        expect(got).toHaveLength(0); // already in the list: not delivered again
+        sub.unsubscribe();
+      });
+
+      it("a cold start reads nothing by itself; loading Home reads the event log once (ADR-0017 §2)", async () => {
+        const fresh = await createCore(); // a cold start
+        await fresh.core.getNotifications(); // local only: the databases are open
+        await wait(50); // anything started in the background has had its chance
+        expect(fresh.serverCalls()).toEqual([]); // nothing reads the server by itself at startup
+        await Promise.all([fresh.core.getWallet(), fresh.core.getTransactions(undefined, 5)]);
+        await wait(50);
+        const calls = fresh.serverCalls();
+        expect(calls.filter((c) => c === 'getEvents')).toHaveLength(1);
+        expect(calls.filter((c) => c === 'getChanges')).toHaveLength(1);
       });
 
       it('keeps the newest 50 (FR-NOTIF-03)', async () => {

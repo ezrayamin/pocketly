@@ -10,7 +10,13 @@ import type { AppNotification, Transaction } from '@pocketly/core-contract';
 import App from '../App';
 import { core } from '../src/core';
 import { badgeLabel, notificationText } from '../src/features/notifications/notificationCopy';
-import { BANNER_QUEUE_MAX, NotificationsProvider } from '../src/features/notifications/NotificationsProvider';
+import {
+  BANNER_QUEUE_MAX,
+  NotificationsProvider,
+  START_FALLBACK_MS,
+} from '../src/features/notifications/NotificationsProvider';
+import { FULLY_DRAWN_TEST_ID } from '../src/FullyDrawnMarker';
+import { markFirstScreenReady, resetFirstScreenReady } from '../src/firstScreen';
 
 /** Slice 7 (F9, ADR-0017 §4): banner, bell badge, list, and the locked-queue rule, through the real jsCore. */
 jest.setTimeout(20_000);
@@ -59,7 +65,18 @@ const settle = () =>
 beforeEach(async () => {
   core.setNetworkSimulation(NETWORK_NORMAL);
   await core.resetData(LIVE_DATASET); // clears the notifications too
+  resetFirstScreenReady(); // each test is a fresh app run
 });
+
+afterEach(() => jest.restoreAllMocks());
+
+function host(held: boolean, onView = jest.fn()) {
+  return (
+    <NotificationsProvider held={held} onView={onView}>
+      <View />
+    </NotificationsProvider>
+  );
+}
 
 describe('notification copy (ADR-0017 §3)', () => {
   const tx = (over: Partial<Transaction>): Transaction => ({
@@ -130,7 +147,9 @@ describe('notifications in the app (F9, jsCore)', () => {
     });
     await until(tree, () => has(tree, 'notification-banner'));
     expect(text(tree, 'notification-banner-title')).toBe('Money received');
-    expect(text(tree, 'notification-banner-body')).toBe(`+${core.formatMoney(tx.amount)} from ${tx.counterparty!.name}`);
+    expect(text(tree, 'notification-banner-body')).toBe(
+      `+${core.formatMoney(tx.amount)} from ${tx.counterparty!.name}`,
+    );
     await until(tree, () => has(tree, 'header-bell-badge'));
     // Home reloaded behind it.
     await until(tree, () => has(tree, `tx-${tx.id}`));
@@ -192,14 +211,64 @@ describe('notifications in the app (F9, jsCore)', () => {
   });
 });
 
+describe('notifications add nothing to startup (ADR-0017 §4)', () => {
+  it('the app subscribes only once Home shows real data', async () => {
+    const subscribe = jest.spyOn(core, 'subscribeNotifications');
+    const read = jest.spyOn(core, 'getNotifications');
+    let tree!: Tree;
+    let drawnAtSubscribe: boolean | undefined;
+    subscribe.mockImplementation((onNew) => {
+      drawnAtSubscribe ??= has(tree, FULLY_DRAWN_TEST_ID);
+      subscribe.mockRestore();
+      return core.subscribeNotifications(onNew);
+    });
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(<App launchArgs={{ skipLock: 'true' }} />);
+    });
+    await until(tree, () => has(tree, FULLY_DRAWN_TEST_ID));
+    await settle();
+    expect(drawnAtSubscribe).toBe(true);
+    expect(read).toHaveBeenCalled(); // the badge's count, read then too
+    ReactTestRenderer.act(() => tree.unmount());
+  });
+
+  it('the provider waits for the first screen, then starts', async () => {
+    const subscribe = jest.spyOn(core, 'subscribeNotifications');
+    const read = jest.spyOn(core, 'getNotifications');
+    let tree!: Tree;
+    await ReactTestRenderer.act(async () => {
+      tree = ReactTestRenderer.create(host(false));
+    });
+    await settle();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+    await ReactTestRenderer.act(async () => markFirstScreenReady());
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalled();
+    ReactTestRenderer.act(() => tree.unmount());
+  });
+
+  it(`starts anyway after ${START_FALLBACK_MS} ms if no screen gets there`, async () => {
+    jest.useFakeTimers();
+    try {
+      const subscribe = jest.spyOn(core, 'subscribeNotifications');
+      let tree!: Tree;
+      await ReactTestRenderer.act(async () => {
+        tree = ReactTestRenderer.create(host(false));
+      });
+      await ReactTestRenderer.act(async () => jest.advanceTimersByTime(START_FALLBACK_MS - 1));
+      expect(subscribe).not.toHaveBeenCalled();
+      await ReactTestRenderer.act(async () => jest.advanceTimersByTime(1));
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      ReactTestRenderer.act(() => tree.unmount());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
 describe('banners wait while held (ADR-0011, ADR-0017 §4)', () => {
-  function host(held: boolean, onView = jest.fn()) {
-    return (
-      <NotificationsProvider held={held} onView={onView}>
-        <View />
-      </NotificationsProvider>
-    );
-  }
+  beforeEach(() => markFirstScreenReady()); // started; holding is what's tested
 
   it('nothing shows while locked; the queued one shows after unlocking', async () => {
     let tree!: Tree;

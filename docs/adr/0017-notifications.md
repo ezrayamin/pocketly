@@ -35,7 +35,8 @@ asks.
 ### 2. The core delivers each event once and keeps the notifications
 
 - An `EventSync` in each core (beside LedgerSync) remembers the last event id applied (cache
-  meta). After a signal, on start and on each foreground refresh, it pages through
+  meta). After a signal and on each first-page history refresh (the first is Home's first load, so a
+  cold start reads the log once and nothing runs before Home), it pages through
   `getEvents(afterId)`, then for each event, **in one cache transaction**: upserts the
   transaction into the replica (history and balance update, NFR-MONEY-03), inserts the
   notification, and advances the cursor. Event ids are unique keys in the notifications table,
@@ -50,7 +51,7 @@ asks.
     settled SUCCESS or FAILED (FR-NOTIF-02). The PaymentFlow's attempt for it moves to the same
     state (as `getTransferStatus` would), so an open result screen and a later status check
     agree with the notification. This covers a pending transaction from before the app was
-    killed (NFR-REL-03): its event is in the log, and the catch-up on start applies it.
+    killed (NFR-REL-03): its event is in the log, and the first catch-up after the restart applies it.
 - Settling the client's own attempt through `getTransferStatus` first, then getting the event,
   is fine: the replica upsert is idempotent and the notification still appears once.
 
@@ -77,6 +78,9 @@ by the core, NFR-ARCH-01): "+$25.00 from Andi Pratama", "Your transfer to Budi w
 - **Bell and list** (FR-NOTIF-03): the Home header's bell gets the unread badge (count, "9+"
   above 9) and opens a Notifications stack screen (product §7.4); opening it marks all read.
 - **Developer menu:** "Trigger incoming transfer" (FR-DEV-04) now produces a real notification.
+- **Nothing added to startup:** the app subscribes and reads the unread count once the first screen shows
+  real data (an app-level "first screen ready" signal Home sets, which BM-01's marker also uses), or after
+  2 s if no screen gets there. What arrives before is in the list and the count.
 
 ### 5. Testing
 
@@ -84,8 +88,10 @@ by the core, NFR-ARCH-01): "+$25.00 from Andi Pratama", "Your transfer to Budi w
   log; both cores' server tests walk it.
 - Contract suite "Notifications" block: an incoming transfer notifies once, even after a
   duplicate signal and a restart; a held transfer that settles notifies and moves its attempt;
-  the 51st notification drops the oldest; logout clears them; `getNotifications` works offline.
-- Jest: banner, badge, list, the locked-queue rule. Maestro: dev link `pocketly://dev/incoming`
+  the 51st notification drops the oldest; logout clears them; `getNotifications` works offline;
+  what arrives before subscribing is in the list and the count; a cold start reads nothing from the
+  server by itself, and loading Home reads the event log exactly once (the fake server's call log).
+- Jest: banner, badge, list, the locked-queue rule, and nothing subscribed before the first screen. Maestro: dev link `pocketly://dev/incoming`
   → banner → list.
 
 ## Consequences
@@ -95,6 +101,16 @@ by the core, NFR-ARCH-01): "+$25.00 from Andi Pratama", "Your transfer to Budi w
 - The fake server now runs timers (settlement); tests use the frozen clock plus an explicit
   "run due timers" hook, as `advanceServerClock` does today.
 - BM-05's parked stream work is untouched; this stream is low-rate and isn't benchmarked.
+
+## Follow-up
+
+- **Notify by event, not by replica state.** A settlement notifies only if the catch-up finds the transaction
+  PENDING in the replica, so the catch-up must run before the history sync on Home's first load (the sync
+  would replace the pending row first). That keeps one event-log read on Home's path; with a real backend it's
+  a network round trip before the history loads. Deciding from the event itself (does this install have an
+  attempt or a pending row for this key, recorded when it went pending, keyed by event id) would let the
+  catch-up and the history sync run in parallel. Free with the fake server (event reads have no latency);
+  worth doing with a real one.
 
 ## Limits
 

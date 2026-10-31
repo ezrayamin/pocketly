@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { RefreshControl, ScrollView, StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FullyDrawnMarker } from '../../FullyDrawnMarker';
+import { useFirstScreenReady, useMarkFirstScreenReady } from '../../firstScreen';
 import { AppHeader } from '../../components/AppHeader';
 import { NoticeBanner } from '../../components/NoticeBanner';
 import { TAB_BAR_HEIGHT } from '../../components/TabBar';
@@ -20,6 +21,9 @@ import { useHomeData } from './useHomeData';
  */
 export function HomeScreen({ refreshToken = 0, onSeeAll }: { refreshToken?: number; onSeeAll?: () => void }) {
   const { data, error, refreshing, balanceHidden, refresh, toggleBalanceHidden } = useHomeData();
+  // Home showing real data is the app's first screen ready: deferred work (notifications) starts then.
+  useMarkFirstScreenReady(data !== null);
+  const firstScreenReady = useFirstScreenReady();
 
   // Reload when asked from outside (e.g. after the developer menu changed the backend).
   const firstToken = useRef(refreshToken);
@@ -67,8 +71,8 @@ export function HomeScreen({ refreshToken = 0, onSeeAll }: { refreshToken?: numb
         <QuickActions />
         <RecentActivity items={data?.recent ?? null} now={data?.wallet.updatedAt ?? 0} onSeeAll={onSeeAll} />
 
-        {/* BM-01: Home is "fully drawn" once it shows real data. */}
-        {data && <FullyDrawnMarker />}
+        {/* BM-01: Home is "fully drawn" once it shows real data (the same moment as firstScreen's signal). */}
+        {data && firstScreenReady && <FullyDrawnMarker />}
       </ScrollView>
     </SafeAreaView>
   );

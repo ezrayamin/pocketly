@@ -165,14 +165,12 @@ export class JsCore implements Core {
       randomBytes: (size) => options.crypto.randomBytes(size),
       clock: options.clock ?? Date.now,
     });
-    // ADR-0017 §2: catch up on start and after each "new events" signal; failures wait for the next one.
+    // ADR-0017 §2: catch up after each "new events" signal (failures wait for the next one). Nothing at
+    // start: the first history refresh (Home's first load) catches up, so startup reads the log once.
     this.events = new EventSync(this.api, cache, (tx) => this.payments.applySettled(tx));
     const catchUp = () => void this.events.catchUp().catch(() => undefined);
     this.ready.then(
-      () => {
-        this.api.incomingEvents(catchUp);
-        catchUp();
-      },
+      () => this.api.incomingEvents(catchUp),
       () => undefined,
     );
   }

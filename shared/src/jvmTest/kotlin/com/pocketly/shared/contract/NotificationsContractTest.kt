@@ -18,7 +18,9 @@ import com.pocketly.shared.domain.TransferState
 import com.pocketly.shared.security.MemorySecureStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
@@ -140,6 +142,39 @@ class NotificationsContractTest {
         core.setNetworkSimulation(instant)
         assertEquals(startBalance + 5_000 + 2_500, core.getWallet().balance.minor)
         sub.cancel()
+    }
+
+    @Test
+    fun nothingIsLostBeforeSubscribingEarlierEventsAreInTheListAndTheUnreadCount() = runBlocking {
+        core.simulateIncomingTransfer()
+        core.simulateIncomingTransfer()
+        core.getTransactions(null, 20, null) // a catch-up (Home's first load), with no one subscribed
+        val list = core.getNotifications()
+        assertEquals(2, list.unreadCount)
+        assertEquals(listOf("sim-000002", "sim-000001"), list.items.map { it.transaction.id })
+        val (got, sub) = subscribe()
+        core.getTransactions(null, 20, null)
+        delay(50)
+        assertEquals(0, got.size) // already in the list: not delivered again
+        sub.cancel()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aColdStartReadsNothingByItselfLoadingHomeReadsTheEventLogOnce() = runBlocking {
+        val fresh = PocketlyCore.create(JvmDatabaseDrivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), MemorySecureStore(), pinIterations = 1000)
+        val calls = Collections.synchronizedList(mutableListOf<String>())
+        fresh.onServerCallForTests { calls += it }
+        fresh.getNotifications() // local only: the databases are open
+        delay(50) // anything started in the background has had its chance
+        assertEquals(emptyList(), calls.toList()) // nothing reads the server by itself at startup
+        coroutineScope {
+            launch { fresh.getWallet() }
+            launch { fresh.getTransactions(null, 5, null) }
+        }
+        delay(50)
+        assertEquals(1, calls.count { it == "getEvents" })
+        assertEquals(1, calls.count { it == "getChanges" })
     }
 
     @Test

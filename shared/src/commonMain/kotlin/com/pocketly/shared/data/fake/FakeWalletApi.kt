@@ -137,6 +137,10 @@ internal class FakeWalletApi(
     /** App mode only: the parent of one timer per held or processing transaction (ADR-0017 §1). */
     private val timers = SupervisorJob(serverScope.coroutineContext[Job])
 
+    /** Tests only: told the name of each read the client makes (getWallet, getChanges, getEvents). */
+    @Volatile
+    internal var onCall: ((String) -> Unit)? = null
+
     override var networkSimulation: NetworkSimulation
         get() = network.get()
         set(value) = network.set(value)
@@ -220,6 +224,7 @@ internal class FakeWalletApi(
     override fun incomingEvents(): Flow<Unit> = signals.asSharedFlow()
 
     override suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage {
+        onCall?.invoke("getEvents")
         network.beforeEventRead()
         if (afterSeq < 0) throw CoreException(ErrorCode.INVALID_ARGUMENT, "afterSeq must be >= 0")
         if (limit !in 1..MAX_EVENTS_PAGE) throw CoreException(ErrorCode.INVALID_ARGUMENT, "limit must be 1..$MAX_EVENTS_PAGE")
@@ -536,6 +541,7 @@ internal class FakeWalletApi(
     }
 
     override suspend fun getWallet(): Wallet {
+        onCall?.invoke("getWallet")
         network.beforeCall()
         return serial.withLock {
             settleDue()
@@ -551,6 +557,7 @@ internal class FakeWalletApi(
     }
 
     override suspend fun getChanges(afterToken: String?, limit: Int): ChangesPage {
+        onCall?.invoke("getChanges")
         network.beforeCall()
         if (limit !in 1..MAX_CHANGES_PAGE) {
             throw CoreException(ErrorCode.INVALID_ARGUMENT, "limit must be 1..$MAX_CHANGES_PAGE")

@@ -256,10 +256,11 @@ export interface Core {
   getMyQr(): Promise<string>;
 
   // ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ────────────────────
-  // The core reads the server's event log after each "new events" signal, on start and on each
-  // first-page refresh (getTransactions), applies each event once (history and balance update, and a
-  // notification), and keeps the newest NOTIFICATIONS_KEPT in the replica. It does this whether or
-  // not anything is subscribed. logout and resetData clear them.
+  // The core reads the server's event log after each "new events" signal and on each first-page refresh
+  // (getTransactions; Home's first load is the start, so a cold start reads the log once and nothing runs
+  // before it), applies each event once (history and balance update, and a notification), and keeps the
+  // newest NOTIFICATIONS_KEPT in the replica. It does this whether or not anything is subscribed: what
+  // arrives before subscribing is in getNotifications. logout and resetData clear them.
   /**
    * FR-NOTIF-01/02: `onNew` gets the notifications each catch-up added, newest first, while
    * subscribed. Unsubscribing stops delivery, not the catching up.

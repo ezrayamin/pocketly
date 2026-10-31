@@ -4,10 +4,13 @@ import { testCore } from '../testing/testCore';
 
 runContractSuite('core-js', () => {
   const core = testCore();
+  const calls: string[] = [];
+  core['backend'].onCall = (name) => calls.push(name);
   return {
     core,
     bench: createBench(core),
     resetDataWithExtras: (config, extraTransactions) => core['reset']({ ...config, extraTransactions }),
     advanceServerClock: (ms) => core['backend'].advanceClock(ms),
+    serverCalls: () => calls,
   };
 });
