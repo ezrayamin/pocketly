@@ -13,10 +13,9 @@
 # so R8 must not rename it.
 -keepnames class com.op.sqlite.OPSQLitePackage
 
-# ADR-0016 §7: react-native-data-scanner 0.1.2 uses Google's code scanner (play-services-code-scanner 16.1.0),
-# which ships no R8 rules; minified, GmsBarcodeScanning.getClient throws a NullPointerException inside ML Kit
-# (vivo V2538, 2026-10-30; the debug build works). ML Kit wires its pieces up by reflection, so keep them whole.
--keep class com.google.mlkit.** { *; }
--keep class com.google.android.gms.internal.mlkit_code_scanner.** { *; }
--keep class com.google.android.gms.internal.mlkit_common.** { *; }
--keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }
+# ADR-0016 §7: react-native-data-scanner 0.1.2 uses Google's code scanner (play-services-code-scanner 16.1.0);
+# minified, GmsBarcodeScanning.getClient threw a NullPointerException inside ML Kit (vivo V2538, 2026-10-30; the
+# debug build worked). ML Kit finds its component registrars by name (manifest meta-data) and creates them with
+# their no-arg constructor. firebase-components 16.1.0's rule (-keep class * implements ComponentRegistrar) predates
+# R8 full mode, which no longer keeps that constructor implicitly, so ML Kit found no components. Keep it.
+-keep class * implements com.google.firebase.components.ComponentRegistrar { void <init>(); }
