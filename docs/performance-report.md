@@ -430,6 +430,7 @@ download; one that could use the platform's SQLite from JavaScript too would los
 | slice 6, transfers (`2026-10-17_mid-06`) | 34,604 KB | **+1,085 KB** | −10,333 KB | −3,950 KB |
 | slice 7, top-up (`2026-10-30_mid-01`) | 34,637 KB | +1,136 KB | −10,282 KB | −3,924 KB |
 | slice 7, QR Pay and My QR (`2026-10-30_mid-02`) | 35,414 KB | +1,354 KB | −10,064 KB | −3,872 KB |
+| slice 7, notifications (`2026-11-01_mid-01`) | 35,444 KB | +1,509 KB | −9,909 KB | −3,838 KB |
 
 Roughly fixed while the app grew by 7 MB (navigation, FlashList, op-sqlite) up to slice 4. The
 bridge library grew by 101 KB with slice 4's new bridged types and methods (StaleInfo,
@@ -446,7 +447,9 @@ types added +74 KB to the bridge (1,668 → 1,742 KB), ~18 KB each again; kmpCor
 for top-ups (ADR-0015 §1) instead of two more methods and a result struct saved roughly 50 KB. **QR Pay and
 My QR** added 4 methods and 5 types, +211 KB of bridge (~23 KB each: QrPaymentDraft is the largest struct so
 far). The barcode scanner they brought costs both builds the same (~680 KB of APK, ~400 KB of download: its
-Nitro library, ML Kit's classes kept for R8, resources), so it leaves the comparison alone.
+Nitro library, ML Kit's classes kept for R8, resources), so it leaves the comparison alone. **Notifications**
+added 3 methods, 3 types and a second subscription object with its callback: +170 KB of bridge (~21 KB per item),
+against 30 KB of JavaScript for the whole feature in jsCore and 16 KB of dex in kmpCore.
 
 ## Bridge overhead
 Overhead = end-to-end (timed in JS) − compute − storage (timed inside the core). For jsCore it is
