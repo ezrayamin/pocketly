@@ -133,14 +133,14 @@ In every build we produce (debug, demo, benchmarks; ADR-0008): **Profile → tap
 "Trigger incoming transfer", "Reset data"). Settings last for the app session. Both cores
 implement the same controls (`setNetworkSimulation`, `simulateIncomingTransfer`) with the
 same seeded failure sequence, and every backend read times out after 10 s (NFR-REL-01);
-late responses are discarded (ADR-0007). Scriptable: `pocketly://dev/network?normalLatencyMs=300`,
-`pocketly://dev/reset`, `pocketly://dev/incoming`.
+late responses are discarded (ADR-0007). An incoming transfer arrives as an in-app notification (ADR-0017).
+Scriptable: `pocketly://dev/network?normalLatencyMs=300`, `pocketly://dev/reset`, `pocketly://dev/incoming`.
 
 ## Verified so far
 
 - Both cores pass the shared contract fixtures, including persistence, offline fallback and
-  mid-scroll inserts: 157 Jest tests for `core-js` and 36 JVM tests for the KMP core. The app has 19
-  Jest tests (Home, History, launch arguments).
+  mid-scroll inserts: 613 Jest tests for `core-js` and 219 JVM tests for the KMP core (slice 7, 2026-11-01).
+  The app has 97 Jest tests (Home, History, launch arguments, auth, Send, Top-Up, QR, notifications).
 - Android release and perf builds of both flavors (R8 on), on a vivo V2538: same balance and
   history on both cores, data survives a restart, an offline cold start shows the replica
   with the offline banner, and History scrolls through 1,000 entries to the end.
@@ -155,6 +155,16 @@ late responses are discarded (ADR-0007). Scriptable: `pocketly://dev/network?nor
   a real iPhone: the simulator has no Secure Enclave, and both cores report biometrics
   unavailable there) and the screen-capture cover (`UIScreen.isCaptured` never turns on in the
   simulator).
+- Slice 7 (2026-10-30/31, vivo V2538, release builds of both cores, identical results):
+  - **Top-Up:** card and bank top-ups, a declined one, and one still processing that the status check settles.
+  - **QR Pay and My QR:** static and dynamic codes, an already-paid code rescanned, a user's code opening Send, and
+    My QR raising the screen brightness while it's open.
+  - **Notifications:** an incoming transfer shows a banner, a bell badge and a list entry; View opens the
+    transaction; opening the list clears the badge; a banner waits while the app is locked and shows after
+    unlocking; a held top-up settled by the server's timer notifies, and its result screen agrees.
+  - The installs were upgraded in place, so the server schema 4 → 5 and cache 1 → 2 migrations ran on the device.
+  - **Not verified:** the Maestro flows for slice 7 (Maestro's driver dies on the vivo; the same checks ran with
+    adb input), and slice 7 on iOS beyond building for the simulator.
 
 ## Known issues
 
