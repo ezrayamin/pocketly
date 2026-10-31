@@ -110,6 +110,28 @@ namespace margelo::nitro::pocketly { enum class TransferAuthOutcome; }
 namespace margelo::nitro::pocketly { struct TransferAuth; }
 // Forward declaration of `TransferAuthMethod` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class TransferAuthMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `MoneyParseResult` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `MoneyParseError` to properly resolve imports.
@@ -172,12 +194,23 @@ namespace margelo::nitro::pocketly { struct PriceTick; }
 #include "TransferAuthOutcome.hpp"
 #include "TransferAuth.hpp"
 #include "TransferAuthMethod.hpp"
+#include "TopUpReview.hpp"
+#include "TopUpMethod.hpp"
+#include "QrCode.hpp"
+#include "QrRejectReason.hpp"
+#include "QrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
+#include <memory>
+#include "HybridNotificationSubscriptionSpec.hpp"
+#include "AppNotification.hpp"
+#include <functional>
+#include "NotificationKind.hpp"
+#include "NotificationList.hpp"
 #include "MoneyParseResult.hpp"
 #include "MoneyParseError.hpp"
-#include <memory>
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "PriceTick.hpp"
-#include <functional>
 
 #include "PocketlyCoreKmp-Swift-Cxx-Umbrella.hpp"
 
@@ -467,6 +500,78 @@ namespace margelo::nitro::pocketly {
     }
     inline std::shared_ptr<Promise<void>> setDailyLimit(double minor) override {
       auto __result = _swiftPart.setDailyLimit(std::forward<decltype(minor)>(minor));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline AmountCheck checkTopUpAmount(const std::string& text) override {
+      auto __result = _swiftPart.checkTopUpAmount(text);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<TopUpReview>> reviewTopUp(double amount, TopUpMethod paymentMethod) override {
+      auto __result = _swiftPart.reviewTopUp(std::forward<decltype(amount)>(amount), static_cast<int>(paymentMethod));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline QrCode parseQr(const std::string& text) override {
+      auto __result = _swiftPart.parseQr(text);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<QrPaymentDraft>> startQrPayment(const std::string& merchantId, const std::optional<std::string>& requestId) override {
+      auto __result = _swiftPart.startQrPayment(merchantId, requestId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<QrPaymentReview>> reviewQrPayment(double amount) override {
+      auto __result = _swiftPart.reviewQrPayment(std::forward<decltype(amount)>(amount));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<std::string>> getMyQr() override {
+      auto __result = _swiftPart.getMyQr();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<HybridNotificationSubscriptionSpec> subscribeNotifications(const std::function<void(const std::vector<AppNotification>& /* notifications */)>& onNew) override {
+      auto __result = _swiftPart.subscribeNotifications(onNew);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<NotificationList>> getNotifications() override {
+      auto __result = _swiftPart.getNotifications();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> markNotificationsRead() override {
+      auto __result = _swiftPart.markNotificationsRead();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

@@ -23,7 +23,8 @@ enum class AmountRejectReason(@DoNotStrip @Keep val value: Int) {
   TOO_MANY_DECIMALS(4),
   INVALID_FORMAT(5),
   OUT_OF_RANGE(6),
-  BELOW_MINIMUM(7);
+  BELOW_MINIMUM(7),
+  ABOVE_MAXIMUM(8);
 
   companion object
 }

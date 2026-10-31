@@ -104,8 +104,8 @@ function LogoutButton() {
 }
 
 /**
- * Profile: identity, Security (biometric unlock), log out, app version. Settings and My QR arrive with
- * their features. Tapping the version 7× opens the Developer Menu (FR-DEV-01).
+ * Profile: identity, My QR (F8), Security (biometric unlock), log out, app version. Settings
+ * arrive with their feature. Tapping the version 7× opens the Developer Menu (FR-DEV-01).
  */
 export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDevMenu: () => void; lockSkipped?: boolean }) {
   // FR-AUTH-02: the number verified by OTP (ADR-0013).
@@ -115,6 +115,7 @@ export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDe
       core.getAuthState().then((s) => setPhone(s.phone), () => {});
     }, []),
   );
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const taps = useRef<number[]>([]);
   const [hint, setHint] = useState<string | null>(null);
 
@@ -150,7 +151,15 @@ export function ProfileScreen({ onOpenDevMenu, lockSkipped = false }: { onOpenDe
         </View>
         {!lockSkipped && <SecuritySection />}
         {!lockSkipped && <LogoutButton />}
-        <Text style={styles.soon}>Settings and My QR arrive with their features.</Text>
+        <Pressable
+          style={styles.row}
+          onPress={() => navigation.navigate('MyQr')}
+          accessibilityRole="button"
+          testID="profile-my-qr"
+        >
+          <Text style={styles.name}>My QR</Text>
+        </Pressable>
+        <Text style={styles.soon}>Settings arrive with their feature.</Text>
         <Pressable onPress={onVersionPress} style={styles.versionRow} accessibilityRole="text" testID="app-version">
           <Text style={styles.caption}>App version</Text>
           <Text style={styles.caption}>

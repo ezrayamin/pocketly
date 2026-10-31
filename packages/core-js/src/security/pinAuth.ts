@@ -30,7 +30,8 @@ export const SECURE_KEYS = {
   /** ADR-0012: the biometric key's public key (SPKI DER, hex). Present = biometric unlock on. */
   biometricPublicKey: 'biometricPublicKey',
   /**
-   * ADR-0013: `{"phone":"+62…","token":"…","pinCreated":bool}` after OTP. Valid while no PIN has
+   * ADR-0013: `{"phone":"+62…","token":"…","pinCreated":bool,"userId"?:"u-…"}` after OTP (userId:
+   * ADR-0016 §6, the account's id for My QR). Valid while no PIN has
    * been created yet, or while the PIN it created exists: losing the PIN record ends it.
    */
   session: 'session',
@@ -194,12 +195,38 @@ export class PinAuth {
     });
   }
 
-  /** ADR-0013: after VERIFIED, the phone (and the server's session token) belong to this install. */
-  rememberVerifiedPhone(phone: string, token: string): Promise<void> {
+  /**
+   * ADR-0013: after VERIFIED, the phone (and the server's session token, and the account's user id,
+   * ADR-0016 §6) belong to this install.
+   */
+  rememberVerifiedPhone(phone: string, token: string, userId?: string): Promise<void> {
     return this.serial(async () => {
-      await this.store.set(SECURE_KEYS.session, JSON.stringify({ phone, token, pinCreated: false }));
+      const session = { phone, token, pinCreated: false, ...(userId !== undefined ? { userId } : {}) };
+      await this.store.set(SECURE_KEYS.session, JSON.stringify(session));
       this.phone = phone;
     });
+  }
+
+  /**
+   * ADR-0016 §6: the verified account's user id. `fetch` (given the verified phone) runs, and its
+   * answer is kept, only for a session from before verifyOtp returned it. NOT_FOUND without a
+   * verified phone.
+   */
+  async myUserId(fetch: (phone: string) => Promise<string>): Promise<string> {
+    const session = await this.serial(async () => {
+      await this.readRecord();
+      return this.readSession();
+    });
+    if (session === undefined) throw new CoreError('NOT_FOUND', 'No verified phone');
+    if (session.userId !== undefined) return session.userId;
+    const userId = await fetch(session.phone); // outside the queue: the lock screen doesn't wait for the network
+    await this.serial(async () => {
+      const current = await this.readSession();
+      if (current?.phone === session.phone && current.userId === undefined) {
+        await this.store.set(SECURE_KEYS.session, JSON.stringify({ ...current, userId }));
+      }
+    });
+    return userId;
   }
 
   /**
@@ -221,10 +248,12 @@ export class PinAuth {
    * is gone (a lost PIN record must not let anyone set a new PIN without an OTP). Call after
    * readRecord in the same queued call, so a corrupt PIN record has been dealt with first.
    */
-  private async readSession(): Promise<{ phone: string; token: string; pinCreated: boolean } | undefined> {
+  private async readSession(): Promise<
+    { phone: string; token: string; pinCreated: boolean; userId?: string } | undefined
+  > {
     const encoded = await this.store.get(SECURE_KEYS.session);
     if (encoded === undefined) return undefined;
-    let session: { phone?: unknown; token?: unknown; pinCreated?: unknown };
+    let session: { phone?: unknown; token?: unknown; pinCreated?: unknown; userId?: unknown };
     try {
       session = JSON.parse(encoded);
     } catch {
@@ -236,7 +265,12 @@ export class PinAuth {
       await this.store.delete(SECURE_KEYS.session);
       return undefined;
     }
-    return { phone: session.phone, token: session.token, pinCreated };
+    return {
+      phone: session.phone,
+      token: session.token,
+      pinCreated,
+      ...(typeof session.userId === 'string' ? { userId: session.userId } : {}),
+    };
   }
 
   /** Biometrics (biometricAuth.ts): `work` on the guarded store, in this queue, bound to this install. */

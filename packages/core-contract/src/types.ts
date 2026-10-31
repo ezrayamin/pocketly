@@ -52,9 +52,11 @@ export type Category =
   | 'TOP_UP';
 
 /**
- * requirements §4.3, plus contract-level codes: NOT_FOUND, INVALID_ARGUMENT, and
+ * requirements §4.3, plus contract-level codes: NOT_FOUND, INVALID_ARGUMENT,
  * SECURE_STORAGE_UNAVAILABLE (ADR-0010: secure storage can't be used right now, e.g. the device
- * is locked; nothing was wiped, stay locked and retry).
+ * is locked; nothing was wiped, stay locked and retry), and PAYMENT_DECLINED (ADR-0015: the
+ * payment method refused a top-up; a recorded FAILED transaction, not retryable), and QR_EXPIRED /
+ * QR_ALREADY_PAID (ADR-0016 §4: a dynamic code's payment request expired, or was paid already).
  */
 export type ErrorCode =
   | 'INSUFFICIENT_FUNDS'
@@ -67,7 +69,10 @@ export type ErrorCode =
   | 'IDEMPOTENCY_CONFLICT'
   | 'NOT_FOUND'
   | 'INVALID_ARGUMENT'
-  | 'SECURE_STORAGE_UNAVAILABLE';
+  | 'SECURE_STORAGE_UNAVAILABLE'
+  | 'PAYMENT_DECLINED'
+  | 'QR_EXPIRED'
+  | 'QR_ALREADY_PAID';
 
 export type CounterpartyKind = 'USER' | 'MERCHANT' | 'PAYMENT_METHOD';
 
@@ -238,6 +243,13 @@ export interface NetworkSimulation {
   writeTimeoutMs?: number;
   /** Seed for the latency/failure draws, so both cores produce the same sequence. Default 1. */
   seed?: number;
+  /** FR-DEV, ADR-0015 §4: the payment method declines every top-up (FAILED, PAYMENT_DECLINED). Default false. */
+  declineTopUps?: boolean;
+  /**
+   * ADR-0015 §4: how long the server processes a top-up, 0–60000, instead of the seeded draw
+   * (TOP_UP_PROCESSING_MIN_MS..MAX_MS). Absent: the draw. Tests use 0.
+   */
+  topUpProcessingMs?: number;
 }
 
 /** The generated part of a dataset. Split out so core-kmp can bridge it on its own. */
@@ -442,9 +454,10 @@ export interface TransferDraft {
 }
 
 /**
- * checkTransferAmount. The money parse errors (MoneyParseError's names, spelled out: Nitro needs
- * one flat union), then for a parsed amount BELOW_MINIMUM, INSUFFICIENT_FUNDS,
- * DAILY_LIMIT_EXCEEDED, checked in that order.
+ * checkTransferAmount / checkTopUpAmount. The money parse errors (MoneyParseError's names, spelled
+ * out: Nitro needs one flat union), then for a parsed amount: a transfer's BELOW_MINIMUM,
+ * INSUFFICIENT_FUNDS, DAILY_LIMIT_EXCEEDED, or a top-up's BELOW_MINIMUM, ABOVE_MAXIMUM, checked in
+ * that order.
  */
 export type AmountRejectReason =
   | 'EMPTY'
@@ -453,6 +466,7 @@ export type AmountRejectReason =
   | 'INVALID_FORMAT'
   | 'OUT_OF_RANGE'
   | 'BELOW_MINIMUM'
+  | 'ABOVE_MAXIMUM'
   | 'INSUFFICIENT_FUNDS'
   | 'DAILY_LIMIT_EXCEEDED';
 
@@ -467,7 +481,7 @@ export interface AmountCheck {
    * keystroke. EMPTY and the limit reasons keep the text and show a message.
    */
   acceptInput: boolean;
-  /** balance − minor, when the text parses: the live "remaining balance". */
+  /** balance − minor, when the text parses: the live "remaining balance". Transfers only. */
   remainingBalance?: MinorUnits;
 }
 
@@ -516,12 +530,12 @@ export type TransferAuthOutcome =
   | 'UNAVAILABLE';
 
 /**
- * confirmTransfer / getTransferStatus. `state` follows requirements §3.2:
+ * confirmTransfer / getTransferStatus, for any kind of attempt: transfer, top-up or QR payment. `state` follows requirements §3.2:
  * - DRAFT: not authorized (see `auth`); nothing was sent.
  * - SUCCESS: `transaction` is the server's.
  * - FAILED: `failureReason` and `retryable` (FR-TRF-08); the balance is as before.
  * - PENDING: no answer within writeTimeoutMs (FR-TRF-09). `transaction` is the pending row
- *   History shows; getTransferStatus resolves it.
+ *   History shows; getTransferStatus resolves it. A pending top-up isn't in `balance` yet.
  */
 export interface TransferResult {
   id: string;
@@ -537,4 +551,113 @@ export interface TransferResult {
   lockedUntil?: EpochMillis;
   /** The wallet balance the result implies (SUCCESS, FAILED, PENDING). */
   balance?: MinorUnits;
+}
+
+// ── Top-up (F6, FR-TOP-01..03; ADR-0015) ────────────────────────────────
+
+/** FR-TOP-02: the mocked payment methods ("Bank transfer", "Card"). */
+export type TopUpMethod = 'BANK_TRANSFER' | 'CARD';
+
+/**
+ * reviewTopUp (FR-TOP-01/02): what the user confirms. The idempotency key exists from here on;
+ * confirmTransfer(id) sends it, with no `auth` (ADR-0015 §2).
+ */
+export interface TopUpReview {
+  /** The attempt's id (one attempt, one key). Pass it to confirmTransfer. */
+  id: string;
+  idempotencyKey: string;
+  method: TopUpMethod;
+  amount: MinorUnits;
+  /** TOP_UP_FEE_MINOR: always 0 for now. */
+  fee: MinorUnits;
+  /** balance + amount, the balance once the top-up succeeds. */
+  balanceAfter: MinorUnits;
+}
+
+// ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────────
+
+/** What a scanned code is for: paying a merchant (F7), or sending to a Pocketly user (My QR, F8). */
+export type QrKind = 'MERCHANT' | 'USER';
+
+/**
+ * parseQr's refusals. TOO_LONG: over QR_MAX_LENGTH. UNSUPPORTED_VERSION: a Pocketly code of a
+ * version this app doesn't read. UNKNOWN_KIND: a Pocketly code that is neither `pay` nor `user`.
+ * MALFORMED: anything else (another app's code, bad or missing or extra parameters).
+ */
+export type QrRejectReason = 'TOO_LONG' | 'MALFORMED' | 'UNSUPPORTED_VERSION' | 'UNKNOWN_KIND';
+
+/**
+ * parseQr (FR-QR-02): what a code says, IDs only (ADR-0016 §3). Names and amounts come from the
+ * server (startQrPayment, startTransfer), never from the code.
+ */
+export interface QrCode {
+  ok: boolean;
+  /** Set when `ok` is false. */
+  reason?: QrRejectReason;
+  kind?: QrKind;
+  /** MERCHANT only. */
+  merchantId?: string;
+  /** MERCHANT, dynamic code only: the server's payment request (it holds the amount). */
+  requestId?: string;
+  /** USER only: pass it to startTransfer. */
+  userId?: string;
+}
+
+/** startQrPayment: the merchant and the limits the amount step needs, all fresh from the server. */
+export interface QrPaymentDraft {
+  /** The server's merchant (kind MERCHANT): its name is what the user sees. */
+  merchant: Counterparty;
+  /** Dynamic code only. */
+  requestId?: string;
+  /** Dynamic code only: the request's amount, locked (FR-QR-03). Static: the user types it. */
+  amount?: MinorUnits;
+  /** Dynamic code only: when the request stops being payable (server clock). */
+  expiresAt?: EpochMillis;
+  balance: MinorUnits;
+  /** dailyLimit − usedToday, never negative: QR payments count toward the daily limit. */
+  dailyRemaining: MinorUnits;
+  /** TRANSFER_MIN_MINOR. */
+  minAmount: MinorUnits;
+  /** min(balance, dailyRemaining). */
+  maxAmount: MinorUnits;
+}
+
+/** reviewQrPayment: what the user confirms. The idempotency key exists from here on. */
+export interface QrPaymentReview {
+  /** The attempt's id. Pass it to confirmTransfer, with auth (as a transfer). */
+  id: string;
+  idempotencyKey: string;
+  merchant: Counterparty;
+  requestId?: string;
+  amount: MinorUnits;
+  /** TRANSFER_FEE_MINOR: always 0 for now. */
+  fee: MinorUnits;
+  balanceAfter: MinorUnits;
+}
+
+// ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ───────────────────────
+
+/**
+ * MONEY_RECEIVED: an incoming transfer (FR-NOTIF-01). TRANSACTION_SETTLED: a transfer, top-up or QR
+ * payment this install saw PENDING settled SUCCESS or FAILED (FR-NOTIF-02).
+ */
+export type NotificationKind = 'MONEY_RECEIVED' | 'TRANSACTION_SETTLED';
+
+/** One in-app notification. The words are the app's; this carries what they're about. */
+export interface AppNotification {
+  /** The server event's id (`evt-<n>`): unique, so an event delivered twice is one notification. */
+  id: string;
+  kind: NotificationKind;
+  /** The transaction as the event left it (TRANSACTION_SETTLED: SUCCESS or FAILED). */
+  transaction: Transaction;
+  /** When the server logged the event. */
+  createdAt: EpochMillis;
+  read: boolean;
+}
+
+/** getNotifications (FR-NOTIF-03): from the replica, so it works offline. */
+export interface NotificationList {
+  /** At most NOTIFICATIONS_KEPT, newest first. */
+  items: AppNotification[];
+  unreadCount: number;
 }

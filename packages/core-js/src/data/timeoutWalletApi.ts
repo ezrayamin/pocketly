@@ -1,8 +1,17 @@
 import { CoreError } from '@pocketly/core-contract';
 import type { Contact, OtpSendResult, Transaction, Wallet } from '@pocketly/core-contract';
-import type { ChangesPage, ServerOtpVerify, TransferRequest, WalletApi } from './walletApi';
+import type {
+  ChangesPage,
+  EventsPage,
+  PaymentTarget,
+  QrPaymentRequest,
+  ServerOtpVerify,
+  TopUpRequest,
+  TransferRequest,
+  WalletApi,
+} from './walletApi';
 
-/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+/** Reads give up after readTimeoutMs; a transfer or top-up submission after writeTimeoutMs (FR-TRF-09). */
 export type CallKind = 'read' | 'write';
 
 /**
@@ -53,8 +62,35 @@ export class TimeoutWalletApi implements WalletApi {
     return this.withTimeout(() => this.inner.transfer(request, idempotencyKey), 'write');
   }
 
+  /** As transfer: a timeout leaves the top-up PENDING (ADR-0015 §4). */
+  topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction> {
+    return this.withTimeout(() => this.inner.topUp(request, idempotencyKey), 'write');
+  }
+
+  getPaymentTarget(merchantId: string, requestId?: string): Promise<PaymentTarget> {
+    return this.withTimeout(() => this.inner.getPaymentTarget(merchantId, requestId));
+  }
+
+  /** As transfer: a timeout leaves the payment PENDING. */
+  payMerchant(request: QrPaymentRequest, idempotencyKey: string): Promise<Transaction> {
+    return this.withTimeout(() => this.inner.payMerchant(request, idempotencyKey), 'write');
+  }
+
+  getAccountUserId(phone: string): Promise<string> {
+    return this.withTimeout(() => this.inner.getAccountUserId(phone));
+  }
+
   getTransferByKey(idempotencyKey: string): Promise<Transaction> {
     return this.withTimeout(() => this.inner.getTransferByKey(idempotencyKey));
+  }
+
+  getEvents(afterSeq: number, limit: number): Promise<EventsPage> {
+    return this.withTimeout(() => this.inner.getEvents(afterSeq, limit));
+  }
+
+  /** Signals only: nothing to time out. */
+  incomingEvents(listener: () => void): () => void {
+    return this.inner.incomingEvents(listener);
   }
 
   private withTimeout<T>(call: () => Promise<T>, kind: CallKind = 'read'): Promise<T> {

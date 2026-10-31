@@ -11,6 +11,7 @@ import com.pocketly.shared.data.currentTimeMillis
 import com.pocketly.shared.data.db.DatabaseDrivers
 import com.pocketly.shared.data.fake.FakeWalletApi
 import com.pocketly.shared.domain.AmountCheck
+import com.pocketly.shared.domain.AppNotification
 import com.pocketly.shared.domain.AuthState
 import com.pocketly.shared.domain.BiometricEnableResult
 import com.pocketly.shared.domain.BiometricPromptText
@@ -25,6 +26,7 @@ import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.MoneyFormatter
 import com.pocketly.shared.domain.MoneyParseResult
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.NotificationList
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyOutcome
 import com.pocketly.shared.domain.OtpVerifyResult
@@ -36,6 +38,13 @@ import com.pocketly.shared.domain.SpendingSummary
 import com.pocketly.shared.domain.StaleInfo
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionPage
+import com.pocketly.shared.domain.QrCode
+import com.pocketly.shared.domain.QrPaymentDraft
+import com.pocketly.shared.domain.QrPaymentReview
+import com.pocketly.shared.domain.QrPolicy
+import com.pocketly.shared.domain.TopUpMethod
+import com.pocketly.shared.domain.TopUpPolicy
+import com.pocketly.shared.domain.TopUpReview
 import com.pocketly.shared.domain.TransferAuth
 import com.pocketly.shared.domain.TransferDraft
 import com.pocketly.shared.domain.TransferResult
@@ -53,18 +62,21 @@ import com.pocketly.shared.security.PinCrypto
 import com.pocketly.shared.security.PinPolicy
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.security.platformPinCrypto
+import com.pocketly.shared.sync.EventSync
 import com.pocketly.shared.sync.LedgerSync
 import com.pocketly.shared.sync.PriceFeed
-import com.pocketly.shared.sync.TransferFlow
+import com.pocketly.shared.sync.PaymentFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.dsl.koinApplication
 import kotlin.concurrent.Volatile
@@ -110,7 +122,16 @@ class PocketlyCore internal constructor(
 
     private val biometric = biometric(this.pin)
 
-    private val transfers = TransferFlow(api, cache, this.pin, this.biometric, ::fetchWallet, randomBytes, clock)
+    private val payments = PaymentFlow(api, cache, this.pin, this.biometric, ::fetchWallet, randomBytes, clock)
+
+    private val events = EventSync(api, cache, payments::applySettled)
+
+    init {
+        // ADR-0017 §2: catch up after each "new events" signal (failures wait for the next one). Nothing at start:
+        // the first history refresh (Home's first load) catches up, so startup reads the log once.
+        // Undispatched, so the signal subscription exists before this constructor returns.
+        streamScope.launch(start = CoroutineStart.UNDISPATCHED) { api.incomingEvents().collect { catchUpQuietly() } }
+    }
 
     @Volatile
     internal var computeMs = 0.0
@@ -125,7 +146,7 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun resetData(config: DatasetConfig) = onDb {
         controls.reset(config)
-        transfers.reset()
+        payments.reset()
         cache.clear()
         try {
             ledgerSync.sync()
@@ -160,7 +181,11 @@ class PocketlyCore internal constructor(
             var stale: StaleInfo? = null
             if (cursor == null) {
                 try {
-                    ledgerSync.sync() // the first page is a refresh
+                    // The first page is a refresh: the event log first, so a settlement there notifies before
+                    // the change feed brings its row (ADR-0017 §2).
+                    val generation = cache.generation
+                    events.catchUp()
+                    ledgerSync.sync(generation)
                 } catch (e: CoreException) {
                     val cachedAt = if (e.code in STALEABLE) cache.lastSyncedAt() else null
                     stale = StaleInfo(e.code, cachedAt ?: throw e)
@@ -236,7 +261,7 @@ class PocketlyCore internal constructor(
     @Throws(CoreException::class, CancellationException::class)
     suspend fun logout() {
         onDb {
-            transfers.reset()
+            payments.reset()
             cache.clear()
         }
         biometric.reset()
@@ -265,7 +290,7 @@ class PocketlyCore internal constructor(
         if (!PhonePolicy.isOtpCode(code)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "the code has ${PhonePolicy.OTP_LENGTH} digits")
         val answer = onDb { api.verifyOtp(phone, code) }
         if (answer.result.outcome == OtpVerifyOutcome.VERIFIED && answer.sessionToken != null) {
-            this.pin.rememberVerifiedPhone(phone, answer.sessionToken)
+            this.pin.rememberVerifiedPhone(phone, answer.sessionToken, answer.userId)
         }
         return answer.result
     }
@@ -289,30 +314,88 @@ class PocketlyCore internal constructor(
     // biometric prompt, PIN hashing) suspend and don't hold it.
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun searchContacts(query: String): ContactSearchResult = onDb { transfers.searchContacts(query) }
+    suspend fun searchContacts(query: String): ContactSearchResult = onDb { payments.searchContacts(query) }
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun startTransfer(recipientId: String): TransferDraft = onDb { transfers.startTransfer(recipientId) }
+    suspend fun startTransfer(recipientId: String): TransferDraft = onDb { payments.startTransfer(recipientId) }
 
     /** FR-TRF-02, synchronous: reads only the draft in memory. */
     @Throws(CoreException::class)
-    fun checkTransferAmount(text: String): AmountCheck = transfers.checkTransferAmount(text)
+    fun checkTransferAmount(text: String): AmountCheck = payments.checkTransferAmount(text)
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun reviewTransfer(amount: Money, note: String?): TransferReview = onDb { transfers.reviewTransfer(amount, note) }
+    suspend fun reviewTransfer(amount: Money, note: String?): TransferReview = onDb { payments.reviewTransfer(amount, note) }
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun confirmTransfer(id: String, auth: TransferAuth?): TransferResult = onDb { transfers.confirmTransfer(id, auth) }
+    suspend fun confirmTransfer(id: String, auth: TransferAuth?): TransferResult = onDb { payments.confirmTransfer(id, auth) }
 
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun getTransferStatus(id: String): TransferResult = onDb { transfers.getTransferStatus(id) }
+    suspend fun getTransferStatus(id: String): TransferResult = onDb { payments.getTransferStatus(id) }
 
-    /** Tests only: moves the fake server's frozen clock forward (held transfers settle by it). */
+    // ── Top-up (F6, FR-TOP-01..03; ADR-0015) ───────────────────────────────
+    // checkTopUpAmount → reviewTopUp → confirmTransfer(id, auth = null) → getTransferStatus(id).
+
+    /** FR-TOP-01, synchronous, needs no draft and no server. */
+    @Throws(CoreException::class)
+    fun checkTopUpAmount(text: String): AmountCheck = TopUpPolicy.checkAmount(text)
+
+    /** FR-TOP-01/02: fresh wallet (offline: NETWORK_*), then the attempt and its key. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun reviewTopUp(amount: Money, method: TopUpMethod): TopUpReview = onDb { payments.reviewTopUp(amount, method) }
+
+    // ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ────────────────────
+    // parseQr → MERCHANT: startQrPayment → (static) checkTransferAmount → reviewQrPayment →
+    // confirmTransfer(id, auth) → getTransferStatus. USER: startTransfer(userId).
+
+    /** FR-QR-02, synchronous, no server, never throws. */
+    fun parseQr(text: String): QrCode = QrPolicy.parse(text)
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun startQrPayment(merchantId: String, requestId: String?): QrPaymentDraft = onDb { payments.startQrPayment(merchantId, requestId) }
+
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun reviewQrPayment(amount: Money): QrPaymentReview = onDb { payments.reviewQrPayment(amount) }
+
+    /** F8: this account's code; the user id comes from the server once (ADR-0016 §6). */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getMyQr(): String = QrPolicy.userPayload(pin.myUserId { phone -> onDb { api.getAccountUserId(phone) } })
+
+    /** Tests only: the PIN and session store (an old install's session, ADR-0016 §6). */
+    internal fun pinForTests(): PinAuthenticator = pin
+
+    /** Tests only: moves the fake server's frozen clock forward (held transfers and top-ups settle by it). */
     internal fun advanceServerClock(ms: Long) = backend.advanceClock(ms)
+
+    /** Tests only: [log] is told the name of each read the client makes (getWallet, getChanges, getEvents). */
+    internal fun onServerCallForTests(log: (String) -> Unit) {
+        backend.onCall = log
+    }
 
     /** FR-TRF-10, developer menu. */
     @Throws(CoreException::class, CancellationException::class)
     suspend fun setDailyLimit(minor: Money) = onDb { controls.setDailyLimit(minor) }
+
+    // ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ──────────────────────
+
+    /**
+     * FR-NOTIF-01/02: [onNew] gets the notifications each catch-up added, newest first, while subscribed.
+     * Cancelling stops delivery, not the catching up.
+     */
+    fun subscribeNotifications(onNew: (List<AppNotification>) -> Unit): Cancellable {
+        // Undispatched: subscribed before this returns, so nothing added after it is missed.
+        val job = streamScope.launch(start = CoroutineStart.UNDISPATCHED) { events.added.collect { onNew(it) } }
+        return Cancellable { job.cancel() }
+    }
+
+    /** FR-NOTIF-03: from the replica, never the server. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun getNotifications(): NotificationList = onDb {
+        NotificationList(cache.notifications(AppNotification.KEPT), cache.unreadCount())
+    }
+
+    /** FR-NOTIF-03: every notification read; the badge clears. */
+    @Throws(CoreException::class, CancellationException::class)
+    suspend fun markNotificationsRead() = onDb { cache.markNotificationsRead() }
 
     // ── Tiny synchronous calls (BM-06) ────────────────────────────────────
 
@@ -343,6 +426,16 @@ class PocketlyCore internal constructor(
     }
 
     // ── Internals ──────────────────────────────────────────────────────────
+
+    private suspend fun catchUpQuietly() {
+        try {
+            onDb { events.catchUp() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Offline or failing: the next signal, start or refresh catches up.
+        }
+    }
 
     private suspend fun <T> onDb(block: suspend () -> T): T = withContext(db) {
         ready.await()

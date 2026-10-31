@@ -7,6 +7,7 @@ import {
 } from '@pocketly/core-contract';
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -17,14 +18,20 @@ import type {
   DatasetConfig,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   Subscription,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -37,7 +44,7 @@ import type {
 } from '@pocketly/core-contract';
 import type { PocketlyCore } from './specs/PocketlyCore.nitro';
 
-export type { PocketlyCore, PriceSubscription } from './specs/PocketlyCore.nitro';
+export type { NotificationSubscription, PocketlyCore, PriceSubscription } from './specs/PocketlyCore.nitro';
 
 /**
  * Adapts the Nitro hybrid object to the `Core` contract. Deliberately thin: argument
@@ -192,6 +199,52 @@ export class KmpCore implements Core {
 
   setDailyLimit(minor: number): Promise<void> {
     return this.native.setDailyLimit(minor).catch(rethrow);
+  }
+
+  parseQr(text: string): QrCode {
+    const c = this.native.parseQr(text);
+    return withoutUndefined({
+      ok: c.ok,
+      reason: c.reason,
+      kind: c.kind,
+      merchantId: c.merchantId,
+      requestId: c.requestId,
+      userId: c.userId,
+    });
+  }
+
+  async startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft> {
+    return withoutUndefined(await this.native.startQrPayment(merchantId, requestId).catch(rethrow));
+  }
+
+  async reviewQrPayment(amount: number): Promise<QrPaymentReview> {
+    return withoutUndefined(await this.native.reviewQrPayment(amount).catch(rethrow));
+  }
+
+  getMyQr(): Promise<string> {
+    return this.native.getMyQr().catch(rethrow);
+  }
+
+  checkTopUpAmount(text: string): AmountCheck {
+    const c = this.native.checkTopUpAmount(text);
+    return withoutUndefined({ ok: c.ok, minor: c.minor, reason: c.reason, acceptInput: c.acceptInput });
+  }
+
+  reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
+    return this.native.reviewTopUp(amount, method).catch(rethrow);
+  }
+
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): Subscription {
+    const sub = this.native.subscribeNotifications(onNew);
+    return { unsubscribe: () => sub.unsubscribe() };
+  }
+
+  getNotifications(): Promise<NotificationList> {
+    return this.native.getNotifications().catch(rethrow);
+  }
+
+  markNotificationsRead(): Promise<void> {
+    return this.native.markNotificationsRead().catch(rethrow);
   }
 
   formatMoney(minor: number): string {

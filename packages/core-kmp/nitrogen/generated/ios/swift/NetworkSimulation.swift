@@ -18,7 +18,7 @@ public extension NetworkSimulation {
   /**
    * Create a new instance of `NetworkSimulation`.
    */
-  init(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?) {
+  init(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?, declineTopUps: Bool?, topUpProcessingMs: Double?) {
     self.init(mode, failureRatePercent, { () -> bridge.std__optional_double_ in
       if let __unwrappedValue = normalLatencyMs {
         return bridge.create_std__optional_double_(__unwrappedValue)
@@ -39,6 +39,18 @@ public extension NetworkSimulation {
       }
     }(), { () -> bridge.std__optional_double_ in
       if let __unwrappedValue = seed {
+        return bridge.create_std__optional_double_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_bool_ in
+      if let __unwrappedValue = declineTopUps {
+        return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_double_ in
+      if let __unwrappedValue = topUpProcessingMs {
         return bridge.create_std__optional_double_(__unwrappedValue)
       } else {
         return .init()
@@ -97,6 +109,30 @@ public extension NetworkSimulation {
     return { () -> Double? in
       if bridge.has_value_std__optional_double_(self.__seed) {
         let __unwrapped = bridge.get_std__optional_double_(self.__seed)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var declineTopUps: Bool? {
+    return { () -> Bool? in
+      if bridge.has_value_std__optional_bool_(self.__declineTopUps) {
+        let __unwrapped = bridge.get_std__optional_bool_(self.__declineTopUps)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var topUpProcessingMs: Double? {
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__topUpProcessingMs) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__topUpProcessingMs)
         return __unwrapped
       } else {
         return nil

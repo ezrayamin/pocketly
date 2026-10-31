@@ -5,14 +5,14 @@ import { DEFAULT_DATASET, NETWORK_NORMAL } from '@pocketly/core-contract';
 import type { Core } from '@pocketly/core-contract';
 import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
 import transfer from '@pocketly/core-contract/fixtures/transfer.json';
-import { transferMessage } from '../src/security/biometricMessages';
-import { uuidV4 } from '../src/sync/transferFlow';
+import { qrPaymentMessage, transferMessage } from '../src/security/biometricMessages';
+import { uuidV4 } from '../src/sync/paymentFlow';
 import { MemorySecureStore } from '../src/security/secureStore';
 import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { testCore } from '../testing/testCore';
 
 /**
- * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING): the parts the
+ * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING, transfers and top-ups): the parts the
  * contract suite can't script. Same cases as shared/src/jvmTest/.../contract/TransferFlowTest.kt.
  */
 const PIN = '482915';
@@ -52,6 +52,16 @@ describe('biometric confirmation (FR-TRF-04, ADR-0012)', () => {
     expect(result).toMatchObject({ state: 'SUCCESS', auth: 'OK' });
     expect(signer.messages.at(-1)).toBe(transferMessage({ amount: 15_000, recipientId: 'u-01', idempotencyKey: r.idempotencyKey }));
     expect(signer.prompts.at(-1)).toEqual(PROMPT);
+  });
+
+  it("a QR payment signs its own message, not a transfer's (ADR-0016 §2)", async () => {
+    await core.startQrPayment('m-01', 'pr-0001');
+    const r = await core.reviewQrPayment(1_250);
+    const result = await core.confirmTransfer(r.id, BIOMETRIC);
+    expect(result).toMatchObject({ state: 'SUCCESS', auth: 'OK', transaction: { id: 'qrp-1', type: 'QR_PAYMENT' } });
+    expect(signer.messages.at(-1)).toBe(
+      qrPaymentMessage({ amount: 1_250, merchantId: 'm-01', requestId: 'pr-0001', idempotencyKey: r.idempotencyKey }),
+    );
   });
 
   it('cancel returns to review with nothing sent; the PIN still works after', async () => {
@@ -100,7 +110,13 @@ describe('biometric confirmation (FR-TRF-04, ADR-0012)', () => {
 
 describe('restart while PENDING (NFR-REL-03)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'pocketly-'));
-  const files = { serverPath: join(dir, 'server.db'), cachePath: join(dir, 'cache.db') };
+  // Each test its own files: a core left from the test before still catches up in the background.
+  let files: { serverPath: string; cachePath: string };
+  let n = 0;
+  beforeEach(() => {
+    n++;
+    files = { serverPath: join(dir, `server-${n}.db`), cachePath: join(dir, `cache-${n}.db`) };
+  });
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   it('the pending row is still there, and its key settles it after the restart', async () => {
@@ -123,6 +139,23 @@ describe('restart while PENDING (NFR-REL-03)', () => {
     (second as unknown as { backend: { advanceClock(ms: number): void } }).backend.advanceClock(20_000);
     const settled = await second.getTransferStatus(r.id);
     expect(settled).toMatchObject({ state: 'SUCCESS', transaction: { id: 'trf-1' } });
+  });
+
+  it('a pending top-up is rebuilt from the replica too, and adds to the balance only once settled (ADR-0015)', async () => {
+    const first = testCore({ ...files, dataset: DEFAULT_DATASET, pinIterations: 1000 });
+    await first.resetData(DEFAULT_DATASET);
+    const start = (await first.getWallet()).balance;
+    const r = await first.reviewTopUp(5_000, 'CARD');
+    first.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+    expect(await first.confirmTransfer(r.id)).toMatchObject({ state: 'PENDING', balance: start });
+
+    const second = testCore({ ...files, dataset: DEFAULT_DATASET, pinIterations: 1000 });
+    second.setNetworkSimulation(NETWORK_NORMAL);
+    expect(await second.getTransferStatus(r.id)).toMatchObject({ state: 'PENDING', transaction: { id: 'tup-1', type: 'TOP_UP' } });
+    expect((await second.getWallet()).balance).toBe(start);
+    (second as unknown as { backend: { advanceClock(ms: number): void } }).backend.advanceClock(20_000);
+    expect(await second.getTransferStatus(r.id)).toMatchObject({ state: 'SUCCESS', balance: start + 5_000 });
+    expect((await second.getWallet()).balance).toBe(start + 5_000);
   });
 });
 

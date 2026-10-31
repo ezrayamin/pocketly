@@ -45,13 +45,19 @@ namespace margelo::nitro::pocketly {
       jni::local_ref<jni::JDouble> writeTimeoutMs = this->getFieldValue(fieldWriteTimeoutMs);
       static const auto fieldSeed = clazz->getField<jni::JDouble>("seed");
       jni::local_ref<jni::JDouble> seed = this->getFieldValue(fieldSeed);
+      static const auto fieldDeclineTopUps = clazz->getField<jni::JBoolean>("declineTopUps");
+      jni::local_ref<jni::JBoolean> declineTopUps = this->getFieldValue(fieldDeclineTopUps);
+      static const auto fieldTopUpProcessingMs = clazz->getField<jni::JDouble>("topUpProcessingMs");
+      jni::local_ref<jni::JDouble> topUpProcessingMs = this->getFieldValue(fieldTopUpProcessingMs);
       return NetworkSimulation(
         mode->toCpp(),
         failureRatePercent,
         normalLatencyMs != nullptr ? std::make_optional(normalLatencyMs->value()) : std::nullopt,
         readTimeoutMs != nullptr ? std::make_optional(readTimeoutMs->value()) : std::nullopt,
         writeTimeoutMs != nullptr ? std::make_optional(writeTimeoutMs->value()) : std::nullopt,
-        seed != nullptr ? std::make_optional(seed->value()) : std::nullopt
+        seed != nullptr ? std::make_optional(seed->value()) : std::nullopt,
+        declineTopUps != nullptr ? std::make_optional(static_cast<bool>(declineTopUps->value())) : std::nullopt,
+        topUpProcessingMs != nullptr ? std::make_optional(topUpProcessingMs->value()) : std::nullopt
       );
     }
 
@@ -61,7 +67,7 @@ namespace margelo::nitro::pocketly {
      */
     [[maybe_unused]]
     static jni::local_ref<JNetworkSimulation::javaobject> fromCpp(const NetworkSimulation& value) {
-      using JSignature = JNetworkSimulation(jni::alias_ref<JNetworkMode>, double, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>);
+      using JSignature = JNetworkSimulation(jni::alias_ref<JNetworkMode>, double, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JDouble>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -71,7 +77,9 @@ namespace margelo::nitro::pocketly {
         value.normalLatencyMs.has_value() ? jni::JDouble::valueOf(value.normalLatencyMs.value()) : nullptr,
         value.readTimeoutMs.has_value() ? jni::JDouble::valueOf(value.readTimeoutMs.value()) : nullptr,
         value.writeTimeoutMs.has_value() ? jni::JDouble::valueOf(value.writeTimeoutMs.value()) : nullptr,
-        value.seed.has_value() ? jni::JDouble::valueOf(value.seed.value()) : nullptr
+        value.seed.has_value() ? jni::JDouble::valueOf(value.seed.value()) : nullptr,
+        value.declineTopUps.has_value() ? jni::JBoolean::valueOf(value.declineTopUps.value()) : nullptr,
+        value.topUpProcessingMs.has_value() ? jni::JDouble::valueOf(value.topUpProcessingMs.value()) : nullptr
       );
     }
   };

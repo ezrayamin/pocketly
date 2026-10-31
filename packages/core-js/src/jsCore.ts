@@ -4,11 +4,13 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_PRICE_INTERVAL_MS,
   MAX_PAGE_SIZE,
+  NOTIFICATIONS_KEPT,
   OTP_LENGTH,
   toCoreError,
 } from '@pocketly/core-contract';
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -20,17 +22,23 @@ import type {
   ErrorCode,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   StaleInfo,
   Subscription,
   Transaction,
   TransactionPage,
+  TopUpMethod,
+  TopUpReview,
   TransferAuth,
   TransferDraft,
   TransferResult,
@@ -46,6 +54,8 @@ import { ServerStore } from './data/fake/serverStore';
 import { TimeoutWalletApi } from './data/timeoutWalletApi';
 import { UserTimeZone } from './data/timeZone';
 import { formatMoney, parseMoney } from './domain/money';
+import { parseQr, userQrPayload } from './domain/qrPolicy';
+import { checkTopUpAmount } from './domain/topUpPolicy';
 import { BiometricAuth } from './security/biometricAuth';
 import type { BiometricSigner } from './security/biometricSigner';
 import { PinAuth } from './security/pinAuth';
@@ -54,9 +64,10 @@ import type { PinCrypto } from './security/pinCrypto';
 import { checkPin } from './security/pinPolicy';
 import type { SecureStore } from './security/secureStore';
 import { computeSpendingSummary } from './domain/spendingSummary';
+import { EventSync } from './sync/eventSync';
 import { LedgerSync } from './sync/ledgerSync';
 import { PriceFeed } from './sync/priceFeed';
-import { TransferFlow } from './sync/transferFlow';
+import { PaymentFlow } from './sync/paymentFlow';
 
 const now: () => number =
   typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -106,10 +117,16 @@ export class JsCore implements Core {
   storageMs = 0;
   private readonly pin: PinAuth;
   private readonly biometric: BiometricAuth;
-  private readonly transfers: TransferFlow;
+  private readonly payments: PaymentFlow;
+  private readonly events: EventSync;
 
   constructor(options: JsCoreOptions) {
-    const backend = new FakeWalletApi(new ServerStore(options.server), () => this.zone, options.clock ?? Date.now);
+    const backend = new FakeWalletApi(
+      new ServerStore(options.server),
+      () => this.zone,
+      options.clock ?? Date.now,
+      (size) => options.crypto.randomBytes(size),
+    );
     const cache = new CacheStore(options.cache);
     this.backend = backend;
     this.api = new TimeoutWalletApi(backend, (kind) => {
@@ -139,7 +156,7 @@ export class JsCore implements Core {
       iterations: options.pinIterations,
     });
     this.biometric = new BiometricAuth(this.pin, options.biometrics, options.crypto, options.clock);
-    this.transfers = new TransferFlow({
+    this.payments = new PaymentFlow({
       api: this.api,
       cache,
       pin: this.pin,
@@ -148,6 +165,14 @@ export class JsCore implements Core {
       randomBytes: (size) => options.crypto.randomBytes(size),
       clock: options.clock ?? Date.now,
     });
+    // ADR-0017 §2: catch up after each "new events" signal (failures wait for the next one). Nothing at
+    // start: the first history refresh (Home's first load) catches up, so startup reads the log once.
+    this.events = new EventSync(this.api, cache, (tx) => this.payments.applySettled(tx));
+    const catchUp = () => void this.events.catchUp().catch(() => undefined);
+    this.ready.then(
+      () => this.api.incomingEvents(catchUp),
+      () => undefined,
+    );
   }
 
   resetData(config: DatasetConfig = DEFAULT_DATASET): Promise<void> {
@@ -158,7 +183,7 @@ export class JsCore implements Core {
   private async reset(config: ServerDataset): Promise<void> {
     await this.ready;
     await this.backend.reset(config);
-    this.transfers.reset();
+    this.payments.reset();
     await this.cache.clear();
     try {
       await this.ledgerSync.sync();
@@ -200,7 +225,11 @@ export class JsCore implements Core {
     let stale: StaleInfo | undefined;
     if (cursor === undefined) {
       try {
-        await this.ledgerSync.sync(); // the first page is a refresh
+        // The first page is a refresh: the event log first, so a settlement there notifies before the
+        // change feed brings its row (ADR-0017 §2).
+        const generation = this.cache.generation;
+        await this.events.catchUp();
+        await this.ledgerSync.sync(generation);
       } catch (e) {
         const error = toCoreError(e);
         const cachedAt = STALEABLE.has(error.code) ? await this.cache.lastSyncedAt() : undefined;
@@ -269,7 +298,7 @@ export class JsCore implements Core {
   async logout(): Promise<void> {
     // The replica first: if the secrets then fail to go, nothing of the history is left behind.
     await this.ready;
-    this.transfers.reset();
+    this.payments.reset();
     await this.cache.clear();
     await this.biometric.reset();
   }
@@ -288,8 +317,10 @@ export class JsCore implements Core {
     if (!isValidE164(phone)) throw new CoreError('INVALID_ARGUMENT', 'not a valid +62 mobile number');
     if (!new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(code)) throw new CoreError('INVALID_ARGUMENT', `the code has ${OTP_LENGTH} digits`);
     await this.ready;
-    const { sessionToken, ...result } = await this.api.verifyOtp(phone, code);
-    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) await this.pin.rememberVerifiedPhone(phone, sessionToken);
+    const { sessionToken, userId, ...result } = await this.api.verifyOtp(phone, code);
+    if (result.outcome === 'VERIFIED' && sessionToken !== undefined) {
+      await this.pin.rememberVerifiedPhone(phone, sessionToken, userId);
+    }
     return result;
   }
 
@@ -319,36 +350,78 @@ export class JsCore implements Core {
 
   async searchContacts(query: string): Promise<ContactSearch> {
     await this.ready;
-    return this.transfers.searchContacts(query);
+    return this.payments.searchContacts(query);
   }
 
   async startTransfer(recipientId: string): Promise<TransferDraft> {
     await this.ready;
-    return this.transfers.startTransfer(recipientId);
+    return this.payments.startTransfer(recipientId);
   }
 
   checkTransferAmount(text: string): AmountCheck {
-    return this.transfers.checkTransferAmount(text);
+    return this.payments.checkTransferAmount(text);
   }
 
   async reviewTransfer(amount: number, note?: string): Promise<TransferReview> {
     await this.ready;
-    return this.transfers.reviewTransfer(amount, note);
+    return this.payments.reviewTransfer(amount, note);
   }
 
   async confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult> {
     await this.ready;
-    return this.transfers.confirmTransfer(id, auth);
+    return this.payments.confirmTransfer(id, auth);
   }
 
   async getTransferStatus(id: string): Promise<TransferResult> {
     await this.ready;
-    return this.transfers.getTransferStatus(id);
+    return this.payments.getTransferStatus(id);
+  }
+
+  checkTopUpAmount(text: string): AmountCheck {
+    return checkTopUpAmount(text);
+  }
+
+  async reviewTopUp(amount: number, method: TopUpMethod): Promise<TopUpReview> {
+    await this.ready;
+    return this.payments.reviewTopUp(amount, method);
+  }
+
+  parseQr(text: string): QrCode {
+    return parseQr(text);
+  }
+
+  async startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft> {
+    await this.ready;
+    return this.payments.startQrPayment(merchantId, requestId);
+  }
+
+  async reviewQrPayment(amount: number): Promise<QrPaymentReview> {
+    await this.ready;
+    return this.payments.reviewQrPayment(amount);
+  }
+
+  async getMyQr(): Promise<string> {
+    await this.ready;
+    return userQrPayload(await this.pin.myUserId((phone) => this.api.getAccountUserId(phone)));
   }
 
   async setDailyLimit(minor: number): Promise<void> {
     await this.ready;
     await this.backend.setDailyLimit(minor);
+  }
+
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): Subscription {
+    return this.events.subscribe(onNew);
+  }
+
+  async getNotifications(): Promise<NotificationList> {
+    await this.ready;
+    return { items: await this.cache.notifications(NOTIFICATIONS_KEPT), unreadCount: await this.cache.unreadCount() };
+  }
+
+  async markNotificationsRead(): Promise<void> {
+    await this.ready;
+    await this.cache.markNotificationsRead();
   }
 
   formatMoney(minor: number): string {

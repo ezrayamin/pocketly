@@ -1,0 +1,41 @@
+{
+  "_comment": "Hand-written (F9, ADR-0017). Both cores test against this file: Jest (core-js) and JUnit (shared/src/jvmTest).",
+  "params": {
+    "kept": 50,
+    "idPattern": "^evt-[1-9][0-9]*$"
+  },
+  "server": {
+    "_comment": "The fake server's event log, step by step on DEFAULT_DATASET (frozen clock). The server logs an event in the same database transaction as the change: MONEY_RECEIVED for simulateIncomingTransfer, TRANSACTION_SETTLED whenever a held or processing transaction settles (a TIMEOUT-mode hold, a top-up's processing; whether or not the client is waiting for it). A transaction answered at once (a NORMAL transfer) logs nothing. seq counts from 1; the event's id is evt-<seq>; createdAt is the server clock. resetData empties the log and restarts seq. Steps: action, then expect.events = what the log gained (in order).",
+    "steps": [
+      { "action": "incoming", "expect": { "events": [{ "id": "evt-1", "kind": "MONEY_RECEIVED", "transactionId": "sim-000001", "status": "SUCCESS" }] } },
+      { "action": "incoming", "expect": { "events": [{ "id": "evt-2", "kind": "MONEY_RECEIVED", "transactionId": "sim-000002", "status": "SUCCESS" }] } },
+      { "action": "transfer", "simulation": { "mode": "TIMEOUT", "failureRatePercent": 0, "seed": 1 }, "key": "held-1", "request": { "recipientId": "u-02", "amount": 1000 }, "expect": { "events": [] }, "_note": "held PENDING (trf-1), never answered" },
+      { "action": "advanceClock", "ms": 20000, "expect": { "events": [{ "id": "evt-3", "kind": "TRANSACTION_SETTLED", "transactionId": "trf-1", "status": "SUCCESS" }] }, "_note": "the timer settles it; a status check isn't needed" },
+      { "action": "topUp", "simulation": { "mode": "NORMAL", "failureRatePercent": 0, "topUpProcessingMs": 0 }, "key": "t-1", "request": { "method": "BANK_TRANSFER", "amount": 5000 }, "expect": { "events": [{ "id": "evt-4", "kind": "TRANSACTION_SETTLED", "transactionId": "tup-1", "status": "SUCCESS" }] } },
+      { "action": "topUp", "simulation": { "mode": "NORMAL", "failureRatePercent": 0, "topUpProcessingMs": 0, "declineTopUps": true }, "key": "t-2", "request": { "method": "CARD", "amount": 2500 }, "expect": { "events": [{ "id": "evt-5", "kind": "TRANSACTION_SETTLED", "transactionId": "tup-2", "status": "FAILED", "failureReason": "PAYMENT_DECLINED" }] } },
+      { "action": "transfer", "simulation": { "mode": "NORMAL", "failureRatePercent": 0 }, "key": "k-2", "request": { "recipientId": "u-03", "amount": 1000 }, "expect": { "events": [] }, "_note": "answered at once (trf-2): nothing to log" }
+    ],
+    "paging": {
+      "_comment": "After the steps: getEvents(afterSeq, limit), oldest first; hasMore when more follow.",
+      "cases": [
+        { "afterSeq": 0, "limit": 2, "ids": ["evt-1", "evt-2"], "hasMore": true },
+        { "afterSeq": 2, "limit": 10, "ids": ["evt-3", "evt-4", "evt-5"], "hasMore": false },
+        { "afterSeq": 5, "limit": 10, "ids": [], "hasMore": false }
+      ]
+    },
+    "afterReset": {
+      "_comment": "resetData empties the log; the next incoming transfer is evt-1 again.",
+      "events": [{ "id": "evt-1", "kind": "MONEY_RECEIVED", "transactionId": "sim-000001", "status": "SUCCESS" }]
+    }
+  },
+  "client": {
+    "_comment": "Which events become notifications (ADR-0017 §2). MONEY_RECEIVED always. TRANSACTION_SETTLED only when this install's replica had that transaction (or its pending row, by idempotency key) as PENDING when the event was applied: a top-up or transfer that was answered at once doesn't notify again. Every event is applied to the replica either way (history and balance), once: an event id seen before is skipped. The replica keeps the newest `kept` notifications.",
+    "cases": [
+      { "kind": "MONEY_RECEIVED", "replicaStatusBefore": null, "notifies": true },
+      { "kind": "TRANSACTION_SETTLED", "replicaStatusBefore": "PENDING", "notifies": true },
+      { "kind": "TRANSACTION_SETTLED", "replicaStatusBefore": "SUCCESS", "notifies": false },
+      { "kind": "TRANSACTION_SETTLED", "replicaStatusBefore": "FAILED", "notifies": false },
+      { "kind": "TRANSACTION_SETTLED", "replicaStatusBefore": null, "notifies": false }
+    ]
+  }
+}

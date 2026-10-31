@@ -65,7 +65,11 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       normalLatencyMs: try convert.toIntExact(value: simulation.normalLatencyMs ?? 0, field: "normalLatencyMs"),
       readTimeoutMs: try convert.toIntExact(value: simulation.readTimeoutMs ?? 10_000, field: "readTimeoutMs"),
       seed: try convert.toIntExact(value: simulation.seed ?? 1, field: "seed"),
-      writeTimeoutMs: try convert.toIntExact(value: simulation.writeTimeoutMs ?? 15_000, field: "writeTimeoutMs")
+      writeTimeoutMs: try convert.toIntExact(value: simulation.writeTimeoutMs ?? 15_000, field: "writeTimeoutMs"),
+      declineTopUps: simulation.declineTopUps ?? false,
+      topUpProcessingMs: try simulation.topUpProcessingMs.map {
+        KotlinInt(int: try convert.toIntExact(value: $0, field: "topUpProcessingMs"))
+      }
     ))
   }
 
@@ -77,7 +81,9 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
       normalLatencyMs: Double(s.normalLatencyMs),
       readTimeoutMs: Double(s.readTimeoutMs),
       writeTimeoutMs: Double(s.writeTimeoutMs),
-      seed: Double(s.seed)
+      seed: Double(s.seed),
+      declineTopUps: s.declineTopUps,
+      topUpProcessingMs: s.topUpProcessingMs.map { Double($0.int32Value) }
     )
   }
 
@@ -281,6 +287,99 @@ final class HybridPocketlyCore: HybridPocketlyCoreSpec {
     }
   }
 
+  func checkTopUpAmount(text: String) throws -> AmountCheck {
+    let c = try core.checkTopUpAmount(text: text)
+    return AmountCheck(
+      ok: c.ok,
+      minor: c.minorUnits.map { Double($0.int64Value) },
+      reason: c.reason.map { AmountRejectReason(fromString: $0.name)! },
+      acceptInput: c.acceptInput,
+      remainingBalance: nil
+    )
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func reviewTopUp(amount: Double, paymentMethod: TopUpMethod) throws -> Promise<TopUpReview> {
+    let kMethod = PocketlyShared.TopUpMethod.entries.first { $0.name == paymentMethod.stringValue }!
+    return Promise.async { [core, convert] in
+      let r = try await core.reviewTopUp(amount: try convert.toLongExact(value: amount, field: "amount"), method: kMethod)
+      return TopUpReview(
+        id: r.id,
+        idempotencyKey: r.idempotencyKey,
+        method: TopUpMethod(fromString: r.method.name)!,
+        amount: Double(r.amount),
+        fee: Double(r.fee),
+        balanceAfter: Double(r.balanceAfter)
+      )
+    }
+  }
+
+  func parseQr(text: String) throws -> QrCode {
+    let c = core.parseQr(text: text)
+    return QrCode(
+      ok: c.ok,
+      reason: c.reason.map { QrRejectReason(fromString: $0.name)! },
+      kind: c.kind.map { QrKind(fromString: $0.name)! },
+      merchantId: c.merchantId,
+      requestId: c.requestId,
+      userId: c.userId
+    )
+  }
+
+  func startQrPayment(merchantId: String, requestId: String?) throws -> Promise<QrPaymentDraft> {
+    return Promise.async { [core] in
+      let d = try await core.startQrPayment(merchantId: merchantId, requestId: requestId)
+      return QrPaymentDraft(
+        merchant: d.merchant.toNitro(),
+        requestId: d.requestId,
+        amount: d.amountMinor.map { Double($0.int64Value) },
+        expiresAt: d.expiresAt.map { Double($0.int64Value) },
+        balance: Double(d.balance),
+        dailyRemaining: Double(d.dailyRemaining),
+        minAmount: Double(d.minAmount),
+        maxAmount: Double(d.maxAmount)
+      )
+    }
+  }
+
+  // Converted inside the promise: a bad value rejects (INVALID_ARGUMENT), as in jsCore.
+  func reviewQrPayment(amount: Double) throws -> Promise<QrPaymentReview> {
+    return Promise.async { [core, convert] in
+      let r = try await core.reviewQrPayment(amount: try convert.toLongExact(value: amount, field: "amount"))
+      return QrPaymentReview(
+        id: r.id,
+        idempotencyKey: r.idempotencyKey,
+        merchant: r.merchant.toNitro(),
+        requestId: r.requestId,
+        amount: Double(r.amount),
+        fee: Double(r.fee),
+        balanceAfter: Double(r.balanceAfter)
+      )
+    }
+  }
+
+  func getMyQr() throws -> Promise<String> {
+    return Promise.async { [core] in try await core.getMyQr() }
+  }
+
+  func subscribeNotifications(
+    onNew: @escaping (_ notifications: [AppNotification]) -> Void
+  ) throws -> (any HybridNotificationSubscriptionSpec) {
+    let cancellable = core.subscribeNotifications(onNew: { added in onNew(added.map { $0.toNitro() }) })
+    return HybridNotificationSubscription(cancellable: cancellable)
+  }
+
+  func getNotifications() throws -> Promise<NotificationList> {
+    return Promise.async { [core] in
+      let list = try await core.getNotifications()
+      return NotificationList(items: list.items.map { $0.toNitro() }, unreadCount: Double(list.unreadCount))
+    }
+  }
+
+  func markNotificationsRead() throws -> Promise<Void> {
+    return Promise.async { [core] in try await core.markNotificationsRead() }
+  }
+
   func parseMoney(input: String) throws -> MoneyParseResult {
     let r = core.parseMoney(input: input)
     return MoneyParseResult(
@@ -319,7 +418,31 @@ final class HybridPriceSubscription: HybridPriceSubscriptionSpec {
   }
 }
 
+final class HybridNotificationSubscription: HybridNotificationSubscriptionSpec {
+  private let cancellable: PocketlyShared.Cancellable
+
+  init(cancellable: PocketlyShared.Cancellable) {
+    self.cancellable = cancellable
+  }
+
+  func unsubscribe() throws {
+    cancellable.cancel()
+  }
+}
+
 // MARK: - Kotlin domain → Nitro structs
+
+private extension PocketlyShared.AppNotification {
+  func toNitro() -> AppNotification {
+    AppNotification(
+      id: id,
+      kind: NotificationKind(fromString: kind.name)!,
+      transaction: transaction.toNitro(),
+      createdAt: Double(createdAt),
+      read: read
+    )
+  }
+}
 
 private extension PocketlyShared.StaleInfo {
   func toNitro() -> StaleInfo {
@@ -348,15 +471,19 @@ private extension PocketlyShared.Transaction {
       type: TransactionType(fromString: type.name)!,
       category: Category(fromString: category.name)!,
       amount: Double(amount),
-      counterparty: counterparty.map { c in
-        Counterparty(kind: CounterpartyKind(fromString: c.kind.name)!, id: c.id, name: c.name, phone: c.phone)
-      },
+      counterparty: counterparty.map { $0.toNitro() },
       note: note,
       status: TransactionStatus(fromString: status.name)!,
       failureReason: failureReason.map { ErrorCode(fromString: $0.name)! },
       createdAt: Double(createdAt),
       updatedAt: Double(updatedAt)
     )
+  }
+}
+
+private extension PocketlyShared.Counterparty {
+  func toNitro() -> Counterparty {
+    Counterparty(kind: CounterpartyKind(fromString: kind.name)!, id: id, name: name, phone: phone)
   }
 }
 

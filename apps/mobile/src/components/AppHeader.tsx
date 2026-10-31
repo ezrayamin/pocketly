@@ -1,14 +1,22 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { badgeLabel } from '../features/notifications/notificationCopy';
+import { useNotifications } from '../features/notifications/NotificationsProvider';
+import type { RootStackParamList } from '../navigation';
 import { colors, radius, type } from '../theme/tokens';
 import { Avatar } from './Avatar';
 import { Bell, Wallet } from './icons';
 
 /**
- * Top bar of the tab screens: brand, the screen's name, notifications, avatar.
- * Notifications (F9) and Profile are not built yet: bell and avatar are static placeholders.
+ * Top bar of the tab screens: brand, the screen's name, notifications, avatar. The bell carries the
+ * unread badge and opens the Notifications screen (FR-NOTIF-03). The avatar is a static placeholder.
  */
 export function AppHeader({ subtitle }: { subtitle: string }) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { unreadCount } = useNotifications();
+  const badge = badgeLabel(unreadCount);
   return (
     <View style={styles.row}>
       <View style={styles.brand}>
@@ -23,9 +31,21 @@ export function AppHeader({ subtitle }: { subtitle: string }) {
         </View>
       </View>
       <View style={styles.actions}>
-        <Pressable style={styles.iconButton} accessibilityRole="button" accessibilityLabel="Notifications" accessibilityHint="Coming soon">
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => navigation.navigate('Notifications')}
+          accessibilityRole="button"
+          accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          testID="header-bell"
+        >
           <Bell color={colors.textPrimary} size={20} />
-          <View style={styles.dot} />
+          {badge && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText} testID="header-bell-badge">
+                {badge}
+              </Text>
+            </View>
+          )}
         </Pressable>
         <Avatar id="me" name="Rina Wijaya" size={36} />
       </View>
@@ -48,15 +68,19 @@ const styles = StyleSheet.create({
   subtitle: { ...type.caption, color: colors.textSecondary, marginTop: -2 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  dot: {
+  badge: {
     position: 'absolute',
-    top: 9,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 4,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.primary,
     borderWidth: 1.5,
     borderColor: colors.background,
   },
+  badgeText: { color: colors.onPrimary, fontSize: 10, fontWeight: '800' },
 });

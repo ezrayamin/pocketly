@@ -1,0 +1,34 @@
+# NFR-TEST-04: an incoming transfer notifies (F9, ADR-0017). Debug or perf build of either core.
+#   maestro test -e APP_ID=com.pocketly.kmp apps/mobile/e2e/notification-incoming.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks are run with adb input. This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+- assertVisible:
+    id: "balance"
+- openLink: "pocketly://dev/incoming"
+- extendedWaitUntil:
+    visible:
+      id: "notification-banner"
+    timeout: 5000
+- assertVisible: "Money received"
+- tapOn:
+    id: "notification-banner-dismiss"
+- assertVisible:
+    id: "header-bell-badge"
+- tapOn:
+    id: "header-bell"
+- assertVisible:
+    id: "notifications-screen"
+- assertVisible: "Money received"
+- tapOn:
+    id: "notifications-back"
+- assertNotVisible:
+    id: "header-bell-badge"

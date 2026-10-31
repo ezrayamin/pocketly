@@ -36,7 +36,7 @@ internal fun coreModule(
 ) = module {
     single { TimeZoneHolder() }
     // ADR-0009: two databases, two files. Only the fake backend touches the server's.
-    single { FakeWalletApi(ServerStore(drivers.server()), get(), clock, serverDispatcher = db) }
+    single { FakeWalletApi(ServerStore(drivers.server()), get(), clock, serverDispatcher = db, randomBytes = randomBytes) }
     single { CacheStore(drivers.cache()) }
     // NFR-REL-01: the core only talks to the backend through a timeout.
     single<WalletApi> {

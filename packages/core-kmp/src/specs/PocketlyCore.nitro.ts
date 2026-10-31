@@ -3,6 +3,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
 // the contract package, so core-contract/src/types.ts stays the single source of truth.
 import type {
   AmountCheck,
+  AppNotification,
   AuthState,
   BiometricEnableResult,
   BiometricPromptText,
@@ -12,12 +13,18 @@ import type {
   DatasetSeed,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
   PinCheck,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -33,6 +40,11 @@ type Platforms = { ios: 'swift'; android: 'kotlin' };
 
 /** A live price stream. Dropping it (or calling unsubscribe) cancels the Kotlin Flow. */
 export interface PriceSubscription extends HybridObject<Platforms> {
+  unsubscribe(): void;
+}
+
+/** F9 (ADR-0017): new notifications. Unsubscribing stops delivery, not the core's catching up. */
+export interface NotificationSubscription extends HybridObject<Platforms> {
   unsubscribe(): void;
 }
 
@@ -81,6 +93,22 @@ export interface PocketlyCore extends HybridObject<Platforms> {
   confirmTransfer(id: string, auth: TransferAuth | undefined): Promise<TransferResult>;
   getTransferStatus(id: string): Promise<TransferResult>;
   setDailyLimit(minor: number): Promise<void>;
+
+  // F6 (ADR-0015). Two methods; confirming and checking reuse confirmTransfer / getTransferStatus.
+  // Not `method`: Nitro's generated JNI code has a local of that name.
+  checkTopUpAmount(text: string): AmountCheck;
+  reviewTopUp(amount: number, paymentMethod: TopUpMethod): Promise<TopUpReview>;
+
+  // F7, F8 (ADR-0016). Four methods; confirming and checking reuse confirmTransfer / getTransferStatus.
+  parseQr(text: string): QrCode;
+  startQrPayment(merchantId: string, requestId: string | undefined): Promise<QrPaymentDraft>;
+  reviewQrPayment(amount: number): Promise<QrPaymentReview>;
+  getMyQr(): Promise<string>;
+
+  // F9 (ADR-0017). Three methods: a stream (a callback plus a subscription, as subscribePrices), the list, read.
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): NotificationSubscription;
+  getNotifications(): Promise<NotificationList>;
+  markNotificationsRead(): Promise<void>;
 
   formatMoney(minor: number): string;
   parseMoney(input: string): MoneyParseResult;

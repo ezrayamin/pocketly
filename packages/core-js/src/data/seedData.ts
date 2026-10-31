@@ -39,7 +39,8 @@ export const CONTACTS: readonly Counterparty[] = (
   ] as const
 ).map(([name, phone], i) => ({ kind: 'USER', id: `u-${String(i + 1).padStart(2, '0')}`, name, phone }));
 
-const MERCHANTS: readonly { counterparty: Counterparty; category: Category }[] = (
+/** The seed's merchants; also the fake server's merchant directory (ADR-0016 §4). */
+export const MERCHANTS: readonly { counterparty: Counterparty; category: Category }[] = (
   [
     ['Corner Coffee', 'FOOD'],
     ['Noodle House', 'FOOD'],
@@ -56,6 +57,22 @@ const MERCHANTS: readonly { counterparty: Counterparty; category: Category }[] =
   counterparty: { kind: 'MERCHANT', id: `m-${String(i + 1).padStart(2, '0')}`, name },
   category,
 }));
+
+/**
+ * ADR-0016 §4: the fake server's seeded payment requests (dynamic QR codes), relative to the seed
+ * clock: open, expired, already paid, and more than the opening balance (fixtures/qr.json).
+ */
+export function seedPaymentRequests(
+  now: number,
+): { id: string; merchantId: string; amount: number; expiresAt: number; paidBy?: string }[] {
+  const YEAR = 365 * 24 * 60 * 60_000;
+  return [
+    { id: 'pr-0001', merchantId: 'm-01', amount: 1_250, expiresAt: now + YEAR },
+    { id: 'pr-0002', merchantId: 'm-02', amount: 4_500, expiresAt: now - 60 * 60_000 },
+    { id: 'pr-0003', merchantId: 'm-02', amount: 3_000, expiresAt: now + YEAR, paidBy: 'external' },
+    { id: 'pr-0004', merchantId: 'm-05', amount: 2_000_000, expiresAt: now + YEAR },
+  ];
+}
 
 const PAYMENT_METHODS: readonly Counterparty[] = [
   { kind: 'PAYMENT_METHOD', id: 'pm-bank', name: 'Bank transfer' },

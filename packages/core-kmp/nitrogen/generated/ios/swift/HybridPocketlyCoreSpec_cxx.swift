@@ -684,6 +684,177 @@ open class HybridPocketlyCoreSpec_cxx {
   }
   
   @inline(__always)
+  public final func checkTopUpAmount(text: std.string) -> bridge.Result_AmountCheck_ {
+    do {
+      let __result = try self.__implementation.checkTopUpAmount(text: String(text))
+      let __resultCpp = __result
+      return bridge.create_Result_AmountCheck_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_AmountCheck_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func reviewTopUp(amount: Double, paymentMethod: Int32) -> bridge.Result_std__shared_ptr_Promise_TopUpReview___ {
+    do {
+      let __result = try self.__implementation.reviewTopUp(amount: amount, paymentMethod: margelo.nitro.pocketly.TopUpMethod(rawValue: paymentMethod)!)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_TopUpReview__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_TopUpReview__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_TopUpReview__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_TopUpReview___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_TopUpReview___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func parseQr(text: std.string) -> bridge.Result_QrCode_ {
+    do {
+      let __result = try self.__implementation.parseQr(text: String(text))
+      let __resultCpp = __result
+      return bridge.create_Result_QrCode_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_QrCode_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func startQrPayment(merchantId: std.string, requestId: bridge.std__optional_std__string_) -> bridge.Result_std__shared_ptr_Promise_QrPaymentDraft___ {
+    do {
+      let __result = try self.__implementation.startQrPayment(merchantId: String(merchantId), requestId: { () -> String? in
+        if bridge.has_value_std__optional_std__string_(requestId) {
+          let __unwrapped = bridge.get_std__optional_std__string_(requestId)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }())
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_QrPaymentDraft__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_QrPaymentDraft__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_QrPaymentDraft__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_QrPaymentDraft___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_QrPaymentDraft___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func reviewQrPayment(amount: Double) -> bridge.Result_std__shared_ptr_Promise_QrPaymentReview___ {
+    do {
+      let __result = try self.__implementation.reviewQrPayment(amount: amount)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_QrPaymentReview__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_QrPaymentReview__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_QrPaymentReview__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_QrPaymentReview___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_QrPaymentReview___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getMyQr() -> bridge.Result_std__shared_ptr_Promise_std__string___ {
+    do {
+      let __result = try self.__implementation.getMyQr()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__string__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_std__string__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_std__string__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(std.string(__result)) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_std__string___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func subscribeNotifications(onNew: bridge.Func_void_std__vector_AppNotification_) -> bridge.Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ {
+    do {
+      let __result = try self.__implementation.subscribeNotifications(onNew: { () -> ([AppNotification]) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__vector_AppNotification_(onNew)
+        return { (__notifications: [AppNotification]) -> Void in
+          __wrappedFunction.call({ () -> bridge.std__vector_AppNotification_ in
+            var __vector = bridge.create_std__vector_AppNotification_(__notifications.count)
+            for __item in __notifications {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
+        }
+      }())
+      let __resultCpp = { () -> bridge.std__shared_ptr_HybridNotificationSubscriptionSpec_ in
+        let __cxxWrapped = __result.getCxxWrapper()
+        return __cxxWrapped.getCxxPart()
+      }()
+      return bridge.create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func getNotifications() -> bridge.Result_std__shared_ptr_Promise_NotificationList___ {
+    do {
+      let __result = try self.__implementation.getNotifications()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_NotificationList__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_NotificationList__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_NotificationList__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_NotificationList___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_NotificationList___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func markNotificationsRead() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.markNotificationsRead()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func formatMoney(minor: Double) -> bridge.Result_std__string_ {
     do {
       let __result = try self.__implementation.formatMoney(minor: minor)

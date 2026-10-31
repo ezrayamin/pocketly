@@ -34,6 +34,9 @@ on a FAILED attempt whose error is retryable it needs none and answers `auth: NO
 That keeps one method for "send this attempt" and matches requirements §3.2, where
 FAILED → RETRY → SUBMITTING skips authorization.
 
+Since ADR-0015, `confirmTransfer` and `getTransferStatus` also take a top-up's attempt
+(`reviewTopUp`); a top-up's first confirm takes no `auth` and answers `auth: NOT_REQUIRED`.
+
 ### 2. Idempotency (FR-TRF-05, FR-FAKE-02/03)
 
 - **The key is created at review**, a random UUID v4 from the platform's secure random. Going

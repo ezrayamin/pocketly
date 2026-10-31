@@ -10,7 +10,9 @@ import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkMode
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.TopUpMethod
 import com.pocketly.shared.domain.TransactionStatus
+import com.pocketly.shared.domain.TransactionType
 import com.pocketly.shared.domain.TransferAuth
 import com.pocketly.shared.domain.TransferAuthMethod
 import com.pocketly.shared.domain.TransferAuthOutcome
@@ -23,7 +25,7 @@ import com.pocketly.shared.security.FakeBiometricSigner.Scan
 import com.pocketly.shared.security.MemorySecureStore
 import com.pocketly.shared.security.SecureStore
 import com.pocketly.shared.domain.PhoneLookup
-import com.pocketly.shared.sync.TransferFlow
+import com.pocketly.shared.sync.PaymentFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -36,7 +38,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING): the parts the
+ * ADR-0014 §3 (biometric confirmation) and NFR-REL-03 (restart while PENDING, transfers and top-ups): the parts the
  * contract suite can't script. Same cases as packages/core-js/__tests__/transferFlow.test.ts.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -62,8 +64,17 @@ class TransferFlowTest {
 
     @Test
     fun idempotencyKeysAreVersion4() {
-        assertEquals("ffffffff-ffff-4fff-bfff-ffffffffffff", TransferFlow.uuidV4(ByteArray(16) { -1 }))
-        assertEquals("00000000-0000-4000-8000-000000000000", TransferFlow.uuidV4(ByteArray(16)))
+        assertEquals("ffffffff-ffff-4fff-bfff-ffffffffffff", PaymentFlow.uuidV4(ByteArray(16) { -1 }))
+        assertEquals("00000000-0000-4000-8000-000000000000", PaymentFlow.uuidV4(ByteArray(16)))
+    }
+
+    @Test
+    fun aQrPaymentSignsItsOwnMessageNotATransfers() = runBlocking {
+        core.startQrPayment("m-01", "pr-0001")
+        val r = core.reviewQrPayment(Money(1_250))
+        val result = core.confirmTransfer(r.id, biometric)
+        assertEquals(Triple(TransferState.SUCCESS, TransferAuthOutcome.OK, "qrp-1"), Triple(result.state, result.auth, result.transaction?.id))
+        assertEquals(BiometricMessages.qrPayment(1_250, "m-01", "pr-0001", r.idempotencyKey), signer.messages.last())
     }
 
     @Test
@@ -147,6 +158,30 @@ class TransferFlowTest {
         second.advanceServerClock(20_000)
         val settled = second.getTransferStatus(r.id)
         assertEquals(TransferState.SUCCESS to "trf-1", settled.state to settled.transaction?.id)
+    }
+
+    @Test
+    fun aPendingTopUpIsRebuiltFromTheReplicaTooAndAddsToTheBalanceOnlyOnceSettled() = runBlocking {
+        val dir = Files.createTempDirectory("pocketly-").toFile().apply { deleteOnExit() }
+        val drivers = { JvmDatabaseDrivers(dir.resolve("server.db").path, dir.resolve("cache.db").path) }
+        val store = MemorySecureStore()
+        val first = PocketlyCore.create(drivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), store, pinIterations = 1000)
+        first.resetData(DatasetConfig.DEFAULT)
+        val start = first.getWallet().balance.minor
+        val r = first.reviewTopUp(Money(5_000), TopUpMethod.CARD)
+        first.setNetworkSimulation(NetworkSimulation(NetworkMode.TIMEOUT, 0, writeTimeoutMs = 100))
+        val pending = first.confirmTransfer(r.id, null)
+        assertEquals(TransferState.PENDING to start, pending.state to pending.balance?.minor)
+
+        val second = PocketlyCore.create(drivers(), DatasetConfig.DEFAULT, Dispatchers.Default.limitedParallelism(1), store, pinIterations = 1000)
+        second.setNetworkSimulation(NetworkSimulation.NORMAL)
+        val held = second.getTransferStatus(r.id)
+        assertEquals(Triple(TransferState.PENDING, "tup-1", TransactionType.TOP_UP), Triple(held.state, held.transaction?.id, held.transaction?.type))
+        assertEquals(start, second.getWallet().balance.minor)
+        second.advanceServerClock(20_000)
+        val settled = second.getTransferStatus(r.id)
+        assertEquals(TransferState.SUCCESS to start + 5_000, settled.state to settled.balance?.minor)
+        assertEquals(start + 5_000, second.getWallet().balance.minor)
     }
 
     // ── the verified phone stays in memory (ADR-0014 §6, BM-07 follow-up) ──

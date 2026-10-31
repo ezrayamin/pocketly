@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -84,11 +85,31 @@ class BiometricTest {
         assertEquals(bio["params"]!!.jsonObject["challengeTtlMs"]!!.jsonPrimitive.long, BiometricMessages.CHALLENGE_TTL_MS)
     }
 
+    /** ADR-0016 §2: QR payments sign their own message; a static code's request is "-". */
+    @Test
+    fun qrPaymentMessagesByteForByte() {
+        fun JsonObject.opt(key: String) = this[key]?.jsonPrimitive?.takeIf { it.isString }?.content
+        for (name in listOf("qrpay", "qrpayStatic")) {
+            val q = bio[name]!!.jsonObject
+            assertEquals(
+                q["message"]!!.jsonPrimitive.content,
+                BiometricMessages.qrPayment(q["amount"]!!.jsonPrimitive.long, q.opt("merchantId")!!, q.opt("requestId"), q.opt("idempotencyKey")!!),
+                name,
+            )
+        }
+        for (bad in bio["invalidQrPayments"]!!.jsonArray.map { it.jsonObject }) {
+            val e = assertFailsWith<CoreException>(bad["why"]!!.jsonPrimitive.content) {
+                BiometricMessages.qrPayment(bad["amount"]!!.jsonPrimitive.long, bad.opt("merchantId")!!, bad.opt("requestId"), bad.opt("idempotencyKey")!!)
+            }
+            assertEquals(ErrorCode.INVALID_ARGUMENT, e.code)
+        }
+    }
+
     @Test
     fun fixtureSignatures() {
         val crypto = platformPinCrypto()
         val key = bio["publicKeyHex"]!!.jsonPrimitive.content.hex()
-        for (name in listOf("unlock", "transfer")) {
+        for (name in listOf("unlock", "transfer", "qrpay", "qrpayStatic")) {
             val v = bio[name]!!.jsonObject
             assertTrue(crypto.verifyP256(key, v["message"]!!.jsonPrimitive.content.encodeToByteArray(), v["signatureHex"]!!.jsonPrimitive.content.hex()), name)
         }

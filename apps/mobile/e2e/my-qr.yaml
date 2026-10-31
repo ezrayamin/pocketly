@@ -1,0 +1,20 @@
+# NFR-TEST-04: My QR (FR-QR-05): Receive shows this account's code.
+#   maestro test -e APP_ID=com.pocketly.kmp apps/mobile/e2e/my-qr.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks are run with adb input. This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+- tapOn:
+    id: "quick-receive"
+- assertVisible:
+    id: "my-qr-code"
+- assertVisible: "Scan to pay me"
+- tapOn:
+    id: "my-qr-done"
+- assertVisible:
+    id: "balance"

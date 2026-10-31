@@ -7,7 +7,14 @@ import type {
   TransferAuthOutcome,
 } from '@pocketly/core-contract';
 import type { BiometricSigner, SignResult } from './biometricSigner';
-import { type TransferApproval, transferMessage, unlockMessage, utf8 } from './biometricMessages';
+import {
+  type QrPaymentApproval,
+  type TransferApproval,
+  qrPaymentMessage,
+  transferMessage,
+  unlockMessage,
+  utf8,
+} from './biometricMessages';
 import { SECURE_KEYS, type PinAuth } from './pinAuth';
 import type { PinCrypto } from './pinCrypto';
 import { toHex } from './pinPolicy';
@@ -120,9 +127,19 @@ export class BiometricAuth {
    * unlock(): KEY_INVALIDATED and FAILED turn biometrics off; temporary ones change nothing.
    */
   async approveTransfer(approval: TransferApproval, prompt: BiometricPromptText): Promise<TransferAuthOutcome> {
+    return this.approve(transferMessage(approval), prompt);
+  }
+
+  /** ADR-0016 §2: as approveTransfer, for a QR payment's own message. */
+  async approveQrPayment(approval: QrPaymentApproval, prompt: BiometricPromptText): Promise<TransferAuthOutcome> {
+    return this.approve(qrPaymentMessage(approval), prompt);
+  }
+
+  /** One scan signs `message`; the stored public key must verify it. */
+  private async approve(message: string, prompt: BiometricPromptText): Promise<TransferAuthOutcome> {
     const stored = await this.pin.withStore((store) => store.get(SECURE_KEYS.biometricPublicKey));
     if (stored === undefined) throw new CoreError('NOT_FOUND', 'biometrics are not enabled');
-    const bytes = utf8(transferMessage(approval));
+    const bytes = utf8(message);
     let result: SignResult;
     try {
       result = await this.signer.sign(bytes, prompt);

@@ -18,6 +18,8 @@ jest.mock('@pocketly/native-preferences', () => {
 });
 // FLAG_SECURE / capture cover (NFR-SEC-03): tests can read which screens asked for it.
 jest.mock('@pocketly/native-secure-screen', () => ({ useSecureScreen: jest.fn() }));
+jest.mock('@pocketly/native-screen-brightness', () => ({ useMaxBrightness: jest.fn() }));
+jest.mock('react-native-data-scanner', () => ({ DataScanner: { scanBarcode: jest.fn() } }));
 // Developer tools are on in every build this project produces (ADR-0008).
 jest.mock('@pocketly/native-build-info', () => ({ buildInfo: { devToolsEnabled: true } }));
 // op-sqlite (jsCore's storage, ADR-0009) on Node's built-in SQLite. Only what

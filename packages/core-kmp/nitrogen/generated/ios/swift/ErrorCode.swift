@@ -39,6 +39,12 @@ public extension ErrorCode {
         self = .invalidArgument
       case "SECURE_STORAGE_UNAVAILABLE":
         self = .secureStorageUnavailable
+      case "PAYMENT_DECLINED":
+        self = .paymentDeclined
+      case "QR_EXPIRED":
+        self = .qrExpired
+      case "QR_ALREADY_PAID":
+        self = .qrAlreadyPaid
       default:
         return nil
     }
@@ -71,6 +77,12 @@ public extension ErrorCode {
         return "INVALID_ARGUMENT"
       case .secureStorageUnavailable:
         return "SECURE_STORAGE_UNAVAILABLE"
+      case .paymentDeclined:
+        return "PAYMENT_DECLINED"
+      case .qrExpired:
+        return "QR_EXPIRED"
+      case .qrAlreadyPaid:
+        return "QR_ALREADY_PAID"
     }
   }
 }

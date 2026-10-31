@@ -8,16 +8,23 @@ import type {
   ContactSearch,
   DatasetConfig,
   MinorUnits,
+  AppNotification,
   MoneyParseResult,
   NetworkSimulation,
+  NotificationList,
   OtpSendResult,
   OtpVerifyResult,
   PhoneCheck,
   PinCheck,
   PriceStreamOptions,
   PriceTick,
+  QrCode,
+  QrPaymentDraft,
+  QrPaymentReview,
   SpendingSummary,
   Subscription,
+  TopUpMethod,
+  TopUpReview,
   Transaction,
   TransactionPage,
   TransferAuth,
@@ -168,7 +175,10 @@ export interface Core {
    * Replaces any draft; attempts already sent keep going.
    */
   startTransfer(recipientId: string): Promise<TransferDraft>;
-  /** FR-TRF-02, synchronous, against the current draft. NOT_FOUND without one. */
+  /**
+   * FR-TRF-02, synchronous, against the current draft: a transfer's (startTransfer) or a QR
+   * payment's (startQrPayment), whichever was started last. NOT_FOUND without one.
+   */
   checkTransferAmount(text: string): AmountCheck;
   /**
    * FR-TRF-03/05: creates the attempt and its idempotency key (UUID v4). The amount must pass
@@ -178,22 +188,88 @@ export interface Core {
    */
   reviewTransfer(amount: MinorUnits, note?: string): Promise<TransferReview>;
   /**
-   * FR-TRF-04..09. A DRAFT attempt needs `auth`: biometrics sign the transfer message
-   * (ADR-0012), or the PIN is checked like verifyPin. Then it's sent with the attempt's key and
+   * FR-TRF-04..09, FR-TOP-03, FR-QR-04. Takes any kind of attempt: a transfer's (reviewTransfer),
+   * a top-up's (reviewTopUp) or a QR payment's (reviewQrPayment). A DRAFT transfer or QR payment
+   * needs `auth`: biometrics sign its kind's message (ADR-0012, ADR-0016 §2), or the PIN is
+   * checked like verifyPin. A DRAFT top-up takes no `auth` and answers `auth: NOT_REQUIRED`
+   * (ADR-0015 §2). Then it's sent with the attempt's key and
    * waits up to writeTimeoutMs. A FAILED attempt whose `retryable` is true is sent again with the
    * same key and no new `auth`. A call while one is running gets that call's result (double
    * tap). SUCCESS / PENDING / non-retryable FAILED attempts just return their result.
-   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT without `auth`.
+   * NOT_FOUND for an unknown id; INVALID_ARGUMENT for a DRAFT transfer or QR payment without
+   * `auth`, or a top-up with one.
    */
   confirmTransfer(id: string, auth?: TransferAuth): Promise<TransferResult>;
   /**
-   * FR-TRF-09: asks the server about a PENDING attempt (also one restored from the replica
-   * after a restart, NFR-REL-03). Other states return their result. Rejects with the network
-   * error when the server can't be reached (the attempt stays PENDING).
+   * FR-TRF-09, FR-TOP-03: asks the server about a PENDING attempt of either kind (also one
+   * restored from the replica after a restart, NFR-REL-03). Other states return their result.
+   * Rejects with the network error when the server can't be reached (the attempt stays PENDING).
    */
   getTransferStatus(id: string): Promise<TransferResult>;
   /** FR-TRF-10, developer menu: the fake server's daily limit, 0..MAX_AMOUNT_MINOR; resetData restores the default. */
   setDailyLimit(minor: MinorUnits): Promise<void>;
+
+  // ── Top-up (F6, FR-TOP-01..03; ADR-0015) ──────────────────────────────
+  // checkTopUpAmount (per keystroke) → reviewTopUp (creates the attempt and its key) →
+  // confirmTransfer(id) with no auth → (if PENDING) getTransferStatus(id). SUCCESS adds the
+  // amount to the balance; PENDING doesn't until the server settles it (ADR-0015 §3).
+  /**
+   * FR-TOP-01, synchronous, needs no draft and no server: the keypad rules of
+   * checkTransferAmount, then BELOW_MINIMUM (< TOP_UP_MIN_MINOR) and ABOVE_MAXIMUM
+   * (> TOP_UP_MAX_MINOR). `remainingBalance` is never set.
+   */
+  checkTopUpAmount(text: string): AmountCheck;
+  /**
+   * FR-TOP-01/02: reads the wallet fresh from the server (never cached data, so offline rejects
+   * with NETWORK_*), then creates the attempt and its idempotency key (UUID v4). The amount must
+   * pass checkTopUpAmount's limits, else INVALID_ARGUMENT. Reviewing again makes a new attempt
+   * (nothing was sent); a transfer's draft is left alone.
+   */
+  reviewTopUp(amount: MinorUnits, method: TopUpMethod): Promise<TopUpReview>;
+
+  // ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────
+  // parseQr (the scanned text) → MERCHANT: startQrPayment → (static code) checkTransferAmount per
+  // keystroke → reviewQrPayment → confirmTransfer(id, auth) → (if PENDING) getTransferStatus.
+  // USER: startTransfer(userId) and the Send flow.
+  /**
+   * FR-QR-02, synchronous, no server, never throws: strict parsing of ADR-0016 §3's payload
+   * (fixtures/qr.json). The code carries IDs only.
+   */
+  parseQr(text: string): QrCode;
+  /**
+   * The merchant (and, for a dynamic code, its payment request) and a fresh wallet from the
+   * server; becomes the current draft (replacing a transfer's). INVALID_QR for an unknown merchant
+   * or a request of another merchant, QR_EXPIRED, QR_ALREADY_PAID, NETWORK_* offline.
+   */
+  startQrPayment(merchantId: string, requestId?: string): Promise<QrPaymentDraft>;
+  /**
+   * Creates the attempt and its idempotency key (UUID v4). The amount must pass
+   * checkTransferAmount's limits (INVALID_ARGUMENT, INSUFFICIENT_FUNDS, DAILY_LIMIT_EXCEEDED) and,
+   * for a dynamic code, equal the request's (INVALID_ARGUMENT). NOT_FOUND without a QR draft.
+   */
+  reviewQrPayment(amount: MinorUnits): Promise<QrPaymentReview>;
+  /**
+   * F8: this account's code, `pocketly://user/v1?u=<userId>`. The user ID comes from the server
+   * once and is kept with the verified phone (ADR-0016 §6). NOT_FOUND before a phone is verified;
+   * NETWORK_* the first time if offline.
+   */
+  getMyQr(): Promise<string>;
+
+  // ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ────────────────────
+  // The core reads the server's event log after each "new events" signal and on each first-page refresh
+  // (getTransactions; Home's first load is the start, so a cold start reads the log once and nothing runs
+  // before it), applies each event once (history and balance update, and a notification), and keeps the
+  // newest NOTIFICATIONS_KEPT in the replica. It does this whether or not anything is subscribed: what
+  // arrives before subscribing is in getNotifications. logout and resetData clear them.
+  /**
+   * FR-NOTIF-01/02: `onNew` gets the notifications each catch-up added, newest first, while
+   * subscribed. Unsubscribing stops delivery, not the catching up.
+   */
+  subscribeNotifications(onNew: (notifications: AppNotification[]) => void): Subscription;
+  /** FR-NOTIF-03: from the replica, never the server. */
+  getNotifications(): Promise<NotificationList>;
+  /** FR-NOTIF-03: every notification read; the badge clears. */
+  markNotificationsRead(): Promise<void>;
 
   // ── Money (NFR-MONEY-02; BM-06 times formatMoney) ────────────────────
   formatMoney(minor: MinorUnits): string;

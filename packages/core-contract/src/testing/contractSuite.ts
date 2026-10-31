@@ -34,19 +34,39 @@ import {
   PIN_PBKDF2_ITERATIONS,
   PIN_RECORD_VERSION,
   PIN_SALT_BYTES,
+  NOTIFICATIONS_KEPT,
+  QR_MAX_LENGTH,
+  TOP_UP_FEE_MINOR,
+  TOP_UP_MAX_MINOR,
+  TOP_UP_MIN_MINOR,
+  TOP_UP_PRESETS_MINOR,
+  TOP_UP_PROCESSING_MAX_MS,
+  TOP_UP_PROCESSING_MIN_MS,
 } from '../constants';
 import type { BenchCore } from '../bench';
 import type { Core } from '../core';
 import { CoreError } from '../errors';
-import type { Contact, DatasetConfig, NetworkSimulation, PriceTick, Transaction, TransferResult, Wallet } from '../types';
+import type {
+  AppNotification,
+  Contact,
+  DatasetConfig,
+  NetworkSimulation,
+  PriceTick,
+  Transaction,
+  TransferResult,
+  Wallet,
+} from '../types';
 import golden from '../../fixtures/golden.json';
+import eventsFixture from '../../fixtures/events.json';
 import ingest from '../../fixtures/ingest.json';
 import money from '../../fixtures/money.json';
 import network from '../../fixtures/network.json';
 import phoneFixture from '../../fixtures/phone.json';
 import pin from '../../fixtures/pin.json';
+import qrFixture from '../../fixtures/qr.json';
 import { TEST_PHONE, verifyTestPhone } from './onboarding';
 import timeZones from '../../fixtures/time-zones.json';
+import topUpFixture from '../../fixtures/topup.json';
 import transferFixture from '../../fixtures/transfer.json';
 
 /** A core plus its benchmark-only entry points (perf builds; tests always have both). */
@@ -57,6 +77,8 @@ export interface CoreUnderTest {
   resetDataWithExtras(config: DatasetConfig, extraTransactions: Transaction[]): Promise<void>;
   /** Test-only: moves the fake server's frozen clock forward (held transfers settle by it). */
   advanceServerClock(ms: number): void;
+  /** Test-only: the reads the core has made of the fake server since it was created (getWallet, getChanges, getEvents). */
+  serverCalls(): readonly string[];
 }
 
 type CoreFactory = () => CoreUnderTest | Promise<CoreUnderTest>;
@@ -302,8 +324,8 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
 
       it('the replica is separate from the server: offline shows what was synced, not live data', async () => {
         await core.getTransactions(); // synced
-        await core.simulateIncomingTransfer(); // server-side change
         core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+        await core.simulateIncomingTransfer(); // server-side change; its event can't reach the core offline
         expect((await core.getTransactions()).items.map((t) => t.id)).not.toContain('sim-000001');
         core.setNetworkSimulation(NETWORK_NORMAL);
         expect((await core.getTransactions()).items[0].id).toBe('sim-000001'); // the next refresh brings it
@@ -859,6 +881,560 @@ export function runContractSuite(name: string, createCore: CoreFactory): void {
         await core.logout();
         await expectCoreError(core.confirmTransfer(review.id, pinAuth), 'NOT_FOUND');
         expectCoreErrorSync(() => core.checkTransferAmount('10'), 'NOT_FOUND');
+      });
+    });
+
+    describe('Top-up (F6, FR-TOP-01..03, ADR-0015)', () => {
+      const PIN = '482915';
+      const START = golden.defaultDataset.wallet; // balance 1459085, usedToday 1578
+      const KEY = new RegExp(topUpFixture.params.idempotencyKeyPattern);
+      const BANK = topUpFixture.methods.BANK_TRANSFER;
+      const CARD = topUpFixture.methods.CARD;
+      /** No processing wait: tests that need one set topUpProcessingMs themselves. */
+      const INSTANT: NetworkSimulation = { ...NETWORK_NORMAL, topUpProcessingMs: 0 };
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const wallet = () => core.getWallet();
+      const balance = async () => (await core.getWallet()).balance;
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+        core.setNetworkSimulation(INSTANT);
+      });
+
+      describe('amount (FR-TOP-01)', () => {
+        it('the limits and presets are the fixture\'s', () => {
+          const { params } = topUpFixture;
+          expect([TOP_UP_MIN_MINOR, TOP_UP_MAX_MINOR, TOP_UP_FEE_MINOR]).toEqual([params.minAmount, params.maxAmount, params.fee]);
+          expect([...TOP_UP_PRESETS_MINOR]).toEqual(params.presets);
+          expect([TOP_UP_PROCESSING_MIN_MS, TOP_UP_PROCESSING_MAX_MS]).toEqual([params.processingMinMs, params.processingMaxMs]);
+        });
+
+        it.each(topUpFixture.amountCheck.cases)('checkTopUpAmount($input)', ({ input, expected }) => {
+          expect(core.checkTopUpAmount(input)).toEqual(expected);
+        });
+
+        it('needs no draft and no server: works offline, and leaves a transfer\'s draft alone', async () => {
+          core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+          expect(core.checkTopUpAmount('25')).toEqual({ ok: true, minor: 2_500, acceptInput: true });
+          expectCoreErrorSync(() => core.checkTransferAmount('25'), 'NOT_FOUND');
+        });
+
+        it('every preset is a valid amount', () => {
+          for (const preset of TOP_UP_PRESETS_MINOR) {
+            expect(core.checkTopUpAmount(String(preset / 100))).toMatchObject({ ok: true, minor: preset });
+          }
+        });
+      });
+
+      describe('review (FR-TOP-01/02)', () => {
+        it('creates the attempt and its key; reviewing again makes a new one', async () => {
+          const first = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+          expect(first).toEqual({
+            id: first.idempotencyKey,
+            idempotencyKey: first.idempotencyKey,
+            method: 'BANK_TRANSFER',
+            amount: 5_000,
+            fee: 0,
+            balanceAfter: START.balance + 5_000,
+          });
+          expect(first.idempotencyKey).toMatch(KEY);
+          const second = await core.reviewTopUp(5_000, 'CARD');
+          expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
+          expect(second.method).toBe('CARD');
+          expect(await balance()).toBe(START.balance); // nothing sent
+        });
+
+        it('refuses what the amount step refuses', async () => {
+          await expectCoreError(core.reviewTopUp(TOP_UP_MIN_MINOR - 1, 'BANK_TRANSFER'), 'INVALID_ARGUMENT');
+          await expectCoreError(core.reviewTopUp(TOP_UP_MAX_MINOR + 1, 'CARD'), 'INVALID_ARGUMENT');
+          await expectCoreError(core.reviewTopUp(1_000.5, 'CARD'), 'INVALID_ARGUMENT');
+          await expect(core.reviewTopUp(TOP_UP_MIN_MINOR, 'CARD')).resolves.toBeDefined();
+          await expect(core.reviewTopUp(TOP_UP_MAX_MINOR, 'CARD')).resolves.toBeDefined();
+        });
+
+        it('has no daily limit and no balance cap (ADR-0015 §3)', async () => {
+          await core.setDailyLimit(0);
+          const review = await core.reviewTopUp(TOP_UP_MAX_MINOR, 'BANK_TRANSFER');
+          expect((await core.confirmTransfer(review.id)).state).toBe('SUCCESS');
+        });
+
+        it('offline, top-ups can\'t start: the wallet is never read from the cache (FR-TRF-11)', async () => {
+          await core.getWallet(); // cached
+          core.setNetworkSimulation({ mode: 'OFFLINE', failureRatePercent: 0 });
+          await expectCoreError(core.reviewTopUp(5_000, 'BANK_TRANSFER'), 'NETWORK_UNAVAILABLE');
+        });
+      });
+
+      describe('confirm (FR-TOP-03, ADR-0015 §2)', () => {
+        it('needs no auth: adds the money once, to the balance and to history', async () => {
+          const before = await wallet();
+          const review = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+          const done = await core.confirmTransfer(review.id);
+          expect(done).toMatchObject({ id: review.id, state: 'SUCCESS', auth: 'NOT_REQUIRED', balance: START.balance + 5_000 });
+          expect(done.transaction).toMatchObject({
+            id: 'tup-1',
+            idempotencyKey: review.idempotencyKey,
+            type: 'TOP_UP',
+            category: 'TOP_UP',
+            amount: 5_000,
+            counterparty: BANK,
+            status: 'SUCCESS',
+          });
+          expect(done.transaction!.note).toBeUndefined();
+          const after = await wallet();
+          expect(after.balance).toBe(START.balance + 5_000);
+          expect(after.usedToday).toBe(before.usedToday); // the daily limit counts money leaving only
+          expect((await core.getTransactions()).items[0]).toEqual(done.transaction);
+          // Asking again changes nothing.
+          expect(await core.confirmTransfer(review.id)).toEqual({ ...done, balance: undefined });
+          expect(await balance()).toBe(START.balance + 5_000);
+        });
+
+        it('a card top-up has the card as its counterparty', async () => {
+          const review = await core.reviewTopUp(2_500, 'CARD');
+          expect((await core.confirmTransfer(review.id)).transaction).toMatchObject({ id: 'tup-1', counterparty: CARD });
+        });
+
+        it('passing auth is INVALID_ARGUMENT, and sends nothing', async () => {
+          const review = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+          await expectCoreError(core.confirmTransfer(review.id, { method: 'PIN', pin: PIN }), 'INVALID_ARGUMENT');
+          expect(await balance()).toBe(START.balance);
+          expect((await core.getAuthState()).failedAttempts).toBe(0);
+        });
+
+        it('a double tap gets one top-up', async () => {
+          const review = await core.reviewTopUp(2_000, 'CARD');
+          core.setNetworkSimulation({ ...INSTANT, normalLatencyMs: 50 });
+          const [a, b] = await Promise.all([core.confirmTransfer(review.id), core.confirmTransfer(review.id)]);
+          expect(a).toEqual(b);
+          expect(a.state).toBe('SUCCESS');
+          expect(await balance()).toBe(START.balance + 2_000);
+        });
+
+        it('declined (developer menu): FAILED with PAYMENT_DECLINED, not retryable, in history', async () => {
+          const review = await core.reviewTopUp(2_500, 'CARD');
+          core.setNetworkSimulation({ ...INSTANT, declineTopUps: true });
+          const declined = await core.confirmTransfer(review.id);
+          expect(declined).toMatchObject({ state: 'FAILED', auth: 'NOT_REQUIRED', failureReason: 'PAYMENT_DECLINED', retryable: false, balance: START.balance });
+          expect(declined.transaction).toMatchObject({ id: 'tup-1', status: 'FAILED', failureReason: 'PAYMENT_DECLINED' });
+          core.setNetworkSimulation(INSTANT);
+          expect(await core.confirmTransfer(review.id)).toMatchObject({ state: 'FAILED', failureReason: 'PAYMENT_DECLINED', retryable: false });
+          expect(await balance()).toBe(START.balance);
+          expect((await core.getTransactions()).items[0]).toMatchObject({ id: 'tup-1', status: 'FAILED' });
+        });
+
+        it('Retry after a server error reuses the key and applies once', async () => {
+          const review = await core.reviewTopUp(3_000, 'BANK_TRANSFER');
+          core.setNetworkSimulation({ mode: 'ALWAYS_FAIL', failureRatePercent: 0 });
+          const failed = await core.confirmTransfer(review.id);
+          expect(failed).toMatchObject({ state: 'FAILED', auth: 'NOT_REQUIRED', failureReason: 'SERVER_ERROR', retryable: true });
+          core.setNetworkSimulation(INSTANT);
+          expect(await balance()).toBe(START.balance);
+          const retried = await core.confirmTransfer(review.id);
+          expect(retried).toMatchObject({ state: 'SUCCESS', auth: 'NOT_REQUIRED' });
+          expect(retried.transaction!.idempotencyKey).toBe(review.idempotencyKey);
+          expect(await balance()).toBe(START.balance + 3_000);
+        });
+
+        it('top-ups and transfers are numbered separately, and a transfer still needs its PIN', async () => {
+          const topUp = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+          expect((await core.confirmTransfer(topUp.id)).transaction!.id).toBe('tup-1');
+          await core.startTransfer('u-01');
+          const transfer = await core.reviewTransfer(1_000);
+          await expectCoreError(core.confirmTransfer(transfer.id), 'INVALID_ARGUMENT');
+          expect((await core.confirmTransfer(transfer.id, { method: 'PIN', pin: PIN })).transaction!.id).toBe('trf-1');
+          expect(await balance()).toBe(START.balance + 5_000 - 1_000);
+        });
+      });
+
+      describe('processing and timeouts (FR-TOP-02/03, ADR-0015 §4)', () => {
+        it('processing outlasts writeTimeoutMs: PENDING, not in the balance until the server settles it', async () => {
+          const review = await core.reviewTopUp(4_000, 'CARD');
+          await core.getWallet();
+          core.setNetworkSimulation({ ...NETWORK_NORMAL, topUpProcessingMs: 300, writeTimeoutMs: 100 });
+          const pending = await core.confirmTransfer(review.id);
+          expect(pending).toMatchObject({ state: 'PENDING', auth: 'NOT_REQUIRED', balance: START.balance });
+          expect(pending.transaction).toMatchObject({ id: `local-${review.idempotencyKey}`, status: 'PENDING', type: 'TOP_UP', amount: 4_000 });
+
+          // Still processing: the server has it as PENDING, so the check doesn't start a second charge.
+          const processing = await core.getTransferStatus(review.id);
+          expect(processing.state).toBe('PENDING');
+          expect(processing.transaction).toMatchObject({ id: 'tup-1', status: 'PENDING' });
+          expect(await balance()).toBe(START.balance);
+
+          await wait(350);
+          const settled = await core.getTransferStatus(review.id);
+          expect(settled).toMatchObject({ state: 'SUCCESS', auth: 'NOT_REQUIRED', balance: START.balance + 4_000 });
+          expect(settled.transaction!.id).toBe('tup-1');
+          const all = await readAllTransactions(core, 100);
+          expect(all.filter((t) => t.idempotencyKey === review.idempotencyKey).map((t) => t.id)).toEqual(['tup-1']);
+          expect(await balance()).toBe(START.balance + 4_000);
+        });
+
+        it('TIMEOUT mode: held by the server, settled later (FR-FAKE-05)', async () => {
+          const review = await core.reviewTopUp(6_000, 'BANK_TRANSFER');
+          core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100, readTimeoutMs: 100 });
+          expect((await core.confirmTransfer(review.id)).state).toBe('PENDING');
+          await expectCoreError(core.getTransferStatus(review.id), 'NETWORK_TIMEOUT');
+          core.setNetworkSimulation(INSTANT);
+          const held = await core.getTransferStatus(review.id);
+          expect(held.state).toBe('PENDING');
+          expect(held.transaction).toMatchObject({ id: 'tup-1', status: 'PENDING' });
+          advanceServerClock(PENDING_RESOLVE_MAX_MS);
+          expect((await core.getTransferStatus(review.id)).state).toBe('SUCCESS');
+          expect(await balance()).toBe(START.balance + 6_000);
+        });
+
+        it('a held top-up keeps the decline it arrived with', async () => {
+          const review = await core.reviewTopUp(6_000, 'CARD');
+          core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100, declineTopUps: true });
+          expect((await core.confirmTransfer(review.id)).state).toBe('PENDING');
+          core.setNetworkSimulation(INSTANT); // decline off again: the held row already carries it
+          advanceServerClock(PENDING_RESOLVE_MAX_MS);
+          const failed = await core.getTransferStatus(review.id);
+          expect(failed).toMatchObject({ state: 'FAILED', failureReason: 'PAYMENT_DECLINED', retryable: false, balance: START.balance });
+          expect(await balance()).toBe(START.balance);
+        });
+
+        it('a held top-up that fails settles FAILED with SERVER_ERROR, not retryable', async () => {
+          const review = await core.reviewTopUp(6_000, 'BANK_TRANSFER');
+          core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 100, writeTimeoutMs: 100 });
+          expect((await core.confirmTransfer(review.id)).state).toBe('PENDING');
+          core.setNetworkSimulation(INSTANT);
+          advanceServerClock(PENDING_RESOLVE_MAX_MS);
+          expect(await core.getTransferStatus(review.id)).toMatchObject({ state: 'FAILED', failureReason: 'SERVER_ERROR', retryable: false, balance: START.balance });
+        });
+      });
+
+      it('logout forgets every attempt', async () => {
+        const review = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+        await core.logout();
+        await expectCoreError(core.confirmTransfer(review.id), 'NOT_FOUND');
+      });
+    });
+
+    describe('QR Pay & My QR (F7, F8, FR-QR-01..05, ADR-0016)', () => {
+      const PIN = '482915';
+      const START = golden.defaultDataset.wallet; // balance 1459085, usedToday 1578
+      const KEY = new RegExp(qrFixture.params.idempotencyKeyPattern);
+      const CORNER_COFFEE = { kind: 'MERCHANT' as const, id: 'm-01', name: 'Corner Coffee' };
+      const pinAuth = { method: 'PIN' as const, pin: PIN };
+      const wallet = () => core.getWallet();
+      const balance = async () => (await core.getWallet()).balance;
+      const now = DEFAULT_DATASET.nowMillis!;
+      const OFFLINE: NetworkSimulation = { mode: 'OFFLINE', failureRatePercent: 0 };
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+      });
+
+      describe('parseQr (FR-QR-02)', () => {
+        it.each(qrFixture.parse.cases)('parseQr($input)', ({ input, expected }) => {
+          expect(core.parseQr(input)).toEqual(expected);
+        });
+
+        it.each(qrFixture.parse.tooLong.cases)('a $length-unit code is $reason', ({ length, reason }) => {
+          const { prefix } = qrFixture.parse.tooLong;
+          expect(core.parseQr(prefix + 'x'.repeat(length - prefix.length))).toEqual({ ok: false, reason });
+        });
+
+        it('needs no server, and the limit is the fixture\'s', () => {
+          expect(QR_MAX_LENGTH).toBe(qrFixture.params.maxLength);
+          core.setNetworkSimulation(OFFLINE);
+          expect(core.parseQr('pocketly://pay/v1?m=m-01').ok).toBe(true);
+        });
+      });
+
+      describe('paying a merchant (FR-QR-03/04)', () => {
+        it('static code: the server names the merchant, the user types the amount, the PIN approves it', async () => {
+          const before = await wallet();
+          const draft = await core.startQrPayment('m-01');
+          const remaining = DEFAULT_DAILY_LIMIT_MINOR - START.usedToday;
+          expect(draft).toEqual({
+            merchant: CORNER_COFFEE,
+            balance: START.balance,
+            dailyRemaining: remaining,
+            minAmount: TRANSFER_MIN_MINOR,
+            maxAmount: remaining,
+          });
+          expect(core.checkTransferAmount('12.5')).toMatchObject({ ok: true, minor: 1_250 });
+          const review = await core.reviewQrPayment(1_250);
+          expect(review).toEqual({
+            id: review.idempotencyKey,
+            idempotencyKey: review.idempotencyKey,
+            merchant: CORNER_COFFEE,
+            amount: 1_250,
+            fee: 0,
+            balanceAfter: START.balance - 1_250,
+          });
+          expect(review.idempotencyKey).toMatch(KEY);
+          await expectCoreError(core.confirmTransfer(review.id), 'INVALID_ARGUMENT'); // money leaves: approval needed
+
+          const paid = await core.confirmTransfer(review.id, pinAuth);
+          expect(paid).toMatchObject({ state: 'SUCCESS', auth: 'OK', balance: START.balance - 1_250 });
+          expect(paid.transaction).toMatchObject({
+            id: 'qrp-1',
+            idempotencyKey: review.idempotencyKey,
+            type: 'QR_PAYMENT',
+            category: 'FOOD',
+            amount: 1_250,
+            counterparty: CORNER_COFFEE,
+            status: 'SUCCESS',
+          });
+          const after = await wallet();
+          expect([after.balance, after.usedToday]).toEqual([before.balance - 1_250, before.usedToday + 1_250]);
+          expect((await core.getTransactions()).items[0]).toEqual(paid.transaction);
+        });
+
+        it('dynamic code: the amount is the request\'s, locked, and the code pays once', async () => {
+          const draft = await core.startQrPayment('m-01', 'pr-0001');
+          expect(draft).toMatchObject({ merchant: CORNER_COFFEE, requestId: 'pr-0001', amount: 1_250, expiresAt: now + 31_536_000_000 });
+          await expectCoreError(core.reviewQrPayment(1_000), 'INVALID_ARGUMENT');
+          const review = await core.reviewQrPayment(1_250);
+          expect(review.requestId).toBe('pr-0001');
+          expect((await core.confirmTransfer(review.id, pinAuth)).state).toBe('SUCCESS');
+          await expectCoreError(core.startQrPayment('m-01', 'pr-0001'), 'QR_ALREADY_PAID');
+        });
+
+        it('a refusal doesn\'t use up a dynamic code', async () => {
+          const draft = await core.startQrPayment('m-05', 'pr-0004');
+          expect(draft.amount).toBe(2_000_000);
+          expect(draft.maxAmount).toBeLessThan(2_000_000);
+          await expectCoreError(core.reviewQrPayment(2_000_000), 'INSUFFICIENT_FUNDS');
+          await expect(core.startQrPayment('m-05', 'pr-0004')).resolves.toMatchObject({ requestId: 'pr-0004' });
+        });
+
+        it.each(qrFixture.lookup.cases.filter((c) => 'error' in c.expect))(
+          'startQrPayment($merchantId, $requestId) is $expect.error',
+          async ({ merchantId, requestId, expect: e }) => {
+            await expectCoreError(core.startQrPayment(merchantId, requestId), (e as { error: CoreError['code'] }).error);
+          },
+        );
+
+        it('offline, QR payments can\'t start (as FR-TRF-11)', async () => {
+          await core.getWallet();
+          core.setNetworkSimulation(OFFLINE);
+          await expectCoreError(core.startQrPayment('m-01'), 'NETWORK_UNAVAILABLE');
+        });
+
+        it('one draft at a time: a QR payment replaces a transfer\'s, and the other way round', async () => {
+          await core.startTransfer('u-01');
+          await core.startQrPayment('m-03');
+          await expectCoreError(core.reviewTransfer(1_000), 'NOT_FOUND');
+          await core.startTransfer('u-01');
+          await expectCoreError(core.reviewQrPayment(1_000), 'NOT_FOUND');
+        });
+
+        it('QR payments, transfers and top-ups are numbered separately', async () => {
+          await core.startTransfer('u-01');
+          const transfer = await core.reviewTransfer(1_000);
+          expect((await core.confirmTransfer(transfer.id, pinAuth)).transaction!.id).toBe('trf-1');
+          await core.startQrPayment('m-03');
+          const qr = await core.reviewQrPayment(500);
+          expect((await core.confirmTransfer(qr.id, pinAuth)).transaction!.id).toBe('qrp-1');
+        });
+
+        it('a held payment keeps the code paid; it settles like a transfer', async () => {
+          await core.startQrPayment('m-01', 'pr-0001');
+          const review = await core.reviewQrPayment(1_250);
+          core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+          const pending = await core.confirmTransfer(review.id, pinAuth);
+          expect(pending).toMatchObject({ state: 'PENDING', balance: START.balance - 1_250 });
+          core.setNetworkSimulation(NETWORK_NORMAL);
+          await expectCoreError(core.startQrPayment('m-01', 'pr-0001'), 'QR_ALREADY_PAID');
+          advanceServerClock(PENDING_RESOLVE_MAX_MS);
+          expect((await core.getTransferStatus(review.id)).state).toBe('SUCCESS');
+          expect(await balance()).toBe(START.balance - 1_250);
+        });
+
+        it('logout forgets every attempt and the draft', async () => {
+          await core.startQrPayment('m-03');
+          const review = await core.reviewQrPayment(500);
+          await core.logout();
+          await expectCoreError(core.confirmTransfer(review.id, pinAuth), 'NOT_FOUND');
+          await expectCoreError(core.reviewQrPayment(500), 'NOT_FOUND');
+        });
+      });
+
+      describe('My QR (FR-QR-05)', () => {
+        const { payloadPrefix } = qrFixture.myQr;
+        const USER_ID = new RegExp(qrFixture.myQr.userIdPattern);
+
+        it('is this account\'s random user id, IDs only; scanning it is refused as yourself', async () => {
+          const payload = await core.getMyQr();
+          expect(payload.startsWith(payloadPrefix)).toBe(true);
+          const userId = payload.slice(payloadPrefix.length);
+          expect(userId).toMatch(USER_ID);
+          expect(core.parseQr(payload)).toEqual({ ok: true, kind: 'USER', userId });
+          await expectCoreError(core.startTransfer(userId), 'INVALID_ARGUMENT');
+          await expect(core.startTransfer('u-01')).resolves.toBeDefined(); // another user's code: the Send flow
+        });
+
+        it('stays the same offline and after resetData; resetAuth forgets it', async () => {
+          const payload = await core.getMyQr();
+          core.setNetworkSimulation(OFFLINE);
+          expect(await core.getMyQr()).toBe(payload);
+          core.setNetworkSimulation(NETWORK_NORMAL);
+          await core.resetData(DEFAULT_DATASET);
+          expect(await core.getMyQr()).toBe(payload);
+          await core.resetAuth();
+          await expectCoreError(core.getMyQr(), 'NOT_FOUND'); // the same phone verified again keeps it: qrServer tests
+        });
+      });
+    });
+
+    describe('Notifications (F9, FR-NOTIF-01..03, ADR-0017)', () => {
+      const PIN = '482915';
+      const START = golden.defaultDataset.wallet; // balance 1459085
+      const ID = new RegExp(eventsFixture.params.idPattern);
+      const pinAuth = { method: 'PIN' as const, pin: PIN };
+      const INSTANT: NetworkSimulation = { ...NETWORK_NORMAL, topUpProcessingMs: 0 };
+      const OFFLINE: NetworkSimulation = { mode: 'OFFLINE', failureRatePercent: 0 };
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      /** Delivery is asynchronous: polls until `check` holds (at most 3 s). */
+      async function until(check: () => boolean | Promise<boolean>) {
+        const end = Date.now() + 3_000;
+        while (!(await check())) {
+          if (Date.now() > end) throw new Error('timed out waiting for notifications');
+          await wait(10);
+        }
+      }
+
+      function subscribe() {
+        const got: AppNotification[] = [];
+        const sub = core.subscribeNotifications((n) => got.push(...n));
+        return { got, sub };
+      }
+
+      beforeEach(async () => {
+        await core.resetAuth();
+        await verifyTestPhone(core);
+        await core.setPin(PIN);
+        core.setNetworkSimulation(INSTANT);
+      });
+
+      it('starts empty', async () => {
+        expect(NOTIFICATIONS_KEPT).toBe(eventsFixture.params.kept);
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
+      });
+
+      it('an incoming transfer notifies once, updates history, and reading clears the badge (FR-NOTIF-01/03)', async () => {
+        const { got, sub } = subscribe();
+        const tx = await core.simulateIncomingTransfer();
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({ kind: 'MONEY_RECEIVED', read: false, transaction: { id: tx.id, status: 'SUCCESS' } });
+        expect(got[0].id).toMatch(ID);
+        expect(await core.getNotifications()).toEqual({ items: [got[0]], unreadCount: 1 });
+        core.setNetworkSimulation(OFFLINE); // the replica has it already
+        expect((await core.getTransactions(undefined, 1)).items[0].id).toBe(tx.id);
+        core.setNetworkSimulation(INSTANT);
+
+        await core.markNotificationsRead();
+        expect(await core.getNotifications()).toEqual({ items: [{ ...got[0], read: true }], unreadCount: 0 });
+        await core.getTransactions(); // another catch-up: nothing new
+        await wait(50);
+        expect(got).toHaveLength(1);
+        sub.unsubscribe();
+      });
+
+      it('a held transfer that settles notifies, and its attempt agrees without asking (FR-NOTIF-02)', async () => {
+        await core.startTransfer('u-02');
+        const review = await core.reviewTransfer(1_000);
+        core.setNetworkSimulation({ mode: 'TIMEOUT', failureRatePercent: 0, writeTimeoutMs: 100 });
+        expect((await core.confirmTransfer(review.id, pinAuth)).state).toBe('PENDING');
+        core.setNetworkSimulation(INSTANT);
+        const { got, sub } = subscribe();
+        advanceServerClock(PENDING_RESOLVE_MAX_MS); // the server's timer settles it
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({
+          kind: 'TRANSACTION_SETTLED',
+          transaction: { id: 'trf-1', idempotencyKey: review.idempotencyKey, status: 'SUCCESS' },
+        });
+        core.setNetworkSimulation(OFFLINE); // no status check needed: the event moved the attempt
+        expect(await core.getTransferStatus(review.id)).toMatchObject({ state: 'SUCCESS' });
+        core.setNetworkSimulation(INSTANT);
+        expect((await core.getWallet()).balance).toBe(START.balance - 1_000);
+        sub.unsubscribe();
+      });
+
+      it('a top-up answered at once does not notify; one left pending does', async () => {
+        const { got, sub } = subscribe();
+        const quick = await core.reviewTopUp(5_000, 'BANK_TRANSFER');
+        expect((await core.confirmTransfer(quick.id)).state).toBe('SUCCESS');
+        await core.getTransactions(); // a catch-up that applies its settled event
+        await wait(100);
+        expect(got).toHaveLength(0);
+
+        const slow = await core.reviewTopUp(2_500, 'CARD');
+        core.setNetworkSimulation({ ...NETWORK_NORMAL, topUpProcessingMs: 300, writeTimeoutMs: 100 });
+        expect((await core.confirmTransfer(slow.id)).state).toBe('PENDING');
+        await until(() => got.length === 1);
+        expect(got[0]).toMatchObject({ kind: 'TRANSACTION_SETTLED', transaction: { id: 'tup-2', status: 'SUCCESS' } });
+        core.setNetworkSimulation(INSTANT);
+        expect((await core.getWallet()).balance).toBe(START.balance + 5_000 + 2_500);
+        sub.unsubscribe();
+      });
+
+      it('nothing is lost before subscribing: earlier events are in the list and the unread count', async () => {
+        await core.simulateIncomingTransfer();
+        await core.simulateIncomingTransfer();
+        await core.getTransactions(); // a catch-up (Home's first load), with no one subscribed
+        const list = await core.getNotifications();
+        expect(list.unreadCount).toBe(2);
+        expect(list.items.map((n) => n.transaction.id)).toEqual(['sim-000002', 'sim-000001']);
+        const { got, sub } = subscribe();
+        await core.getTransactions();
+        await wait(50);
+        expect(got).toHaveLength(0); // already in the list: not delivered again
+        sub.unsubscribe();
+      });
+
+      it("a cold start reads nothing by itself; loading Home reads the event log once (ADR-0017 §2)", async () => {
+        const fresh = await createCore(); // a cold start
+        await fresh.core.getNotifications(); // local only: the databases are open
+        await wait(50); // anything started in the background has had its chance
+        expect(fresh.serverCalls()).toEqual([]); // nothing reads the server by itself at startup
+        await Promise.all([fresh.core.getWallet(), fresh.core.getTransactions(undefined, 5)]);
+        await wait(50);
+        const calls = fresh.serverCalls();
+        expect(calls.filter((c) => c === 'getEvents')).toHaveLength(1);
+        expect(calls.filter((c) => c === 'getChanges')).toHaveLength(1);
+      });
+
+      it('keeps the newest 50 (FR-NOTIF-03)', async () => {
+        for (let i = 0; i < NOTIFICATIONS_KEPT + 1; i++) await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).items[0]?.transaction.id === 'sim-000051');
+        const list = await core.getNotifications();
+        expect(list.items).toHaveLength(NOTIFICATIONS_KEPT);
+        expect(list.unreadCount).toBe(NOTIFICATIONS_KEPT);
+        expect(list.items[NOTIFICATIONS_KEPT - 1].transaction.id).toBe('sim-000002'); // sim-000001 dropped
+      });
+
+      it('unsubscribing stops delivery, not the catching up', async () => {
+        const { got, sub } = subscribe();
+        sub.unsubscribe();
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        expect(got).toHaveLength(0);
+      });
+
+      it('works offline; resetData and logout clear them', async () => {
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        core.setNetworkSimulation(OFFLINE);
+        expect((await core.getNotifications()).items).toHaveLength(1);
+        core.setNetworkSimulation(INSTANT);
+        await core.resetData(DEFAULT_DATASET);
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
+        await core.simulateIncomingTransfer();
+        await until(async () => (await core.getNotifications()).unreadCount === 1);
+        await core.logout();
+        expect(await core.getNotifications()).toEqual({ items: [], unreadCount: 0 });
       });
     });
 

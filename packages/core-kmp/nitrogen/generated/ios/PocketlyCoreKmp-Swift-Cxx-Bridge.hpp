@@ -12,6 +12,8 @@
 namespace margelo::nitro::pocketly { struct AmountCheck; }
 // Forward declaration of `AmountRejectReason` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
@@ -48,6 +50,8 @@ namespace margelo::nitro::pocketly { struct Counterparty; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
 // Forward declaration of `HybridPocketlyCoreSpec` to properly resolve imports.
 namespace margelo::nitro::pocketly { class HybridPocketlyCoreSpec; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -58,6 +62,10 @@ namespace margelo::nitro::pocketly { enum class MoneyParseError; }
 namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `OtpSendOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
 // Forward declaration of `OtpSendResult` to properly resolve imports.
@@ -78,10 +86,24 @@ namespace margelo::nitro::pocketly { struct PinCheck; }
 namespace margelo::nitro::pocketly { enum class PinRejectReason; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `StaleInfo` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -114,6 +136,8 @@ namespace margelo::nitro::pocketly { struct UnlockResult; }
 namespace margelo::nitro::pocketly { struct Wallet; }
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridNotificationSubscriptionSpec_cxx` to properly resolve imports.
+namespace PocketlyCoreKmp { class HybridNotificationSubscriptionSpec_cxx; }
 // Forward declaration of `HybridPocketlyCoreSpec_cxx` to properly resolve imports.
 namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 // Forward declaration of `HybridPriceSubscriptionSpec_cxx` to properly resolve imports.
@@ -122,6 +146,7 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 // Include C++ defined types
 #include "AmountCheck.hpp"
 #include "AmountRejectReason.hpp"
+#include "AppNotification.hpp"
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
 #include "BiometricEnableOutcome.hpp"
@@ -140,11 +165,14 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "CounterpartyKind.hpp"
 #include "DayTotal.hpp"
 #include "ErrorCode.hpp"
+#include "HybridNotificationSubscriptionSpec.hpp"
 #include "HybridPocketlyCoreSpec.hpp"
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
 #include "NetworkSimulation.hpp"
+#include "NotificationKind.hpp"
+#include "NotificationList.hpp"
 #include "OtpSendOutcome.hpp"
 #include "OtpSendResult.hpp"
 #include "OtpVerifyOutcome.hpp"
@@ -155,8 +183,15 @@ namespace PocketlyCoreKmp { class HybridPriceSubscriptionSpec_cxx; }
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
 #include "PriceTick.hpp"
+#include "QrCode.hpp"
+#include "QrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
+#include "QrRejectReason.hpp"
 #include "SpendingSummary.hpp"
 #include "StaleInfo.hpp"
+#include "TopUpMethod.hpp"
+#include "TopUpReview.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"
@@ -208,6 +243,18 @@ namespace margelo::nitro::pocketly::bridge::swift {
   inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
     return Result<void>::withError(error);
   }
+  
+  // pragma MARK: std::shared_ptr<HybridNotificationSubscriptionSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridNotificationSubscriptionSpec>`.
+   */
+  using std__shared_ptr_HybridNotificationSubscriptionSpec_ = std::shared_ptr<HybridNotificationSubscriptionSpec>;
+  std::shared_ptr<HybridNotificationSubscriptionSpec> create_std__shared_ptr_HybridNotificationSubscriptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridNotificationSubscriptionSpec_(std__shared_ptr_HybridNotificationSubscriptionSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridNotificationSubscriptionSpec>
+  using std__weak_ptr_HybridNotificationSubscriptionSpec_ = std::weak_ptr<HybridNotificationSubscriptionSpec>;
+  inline std__weak_ptr_HybridNotificationSubscriptionSpec_ weakify_std__shared_ptr_HybridNotificationSubscriptionSpec_(const std::shared_ptr<HybridNotificationSubscriptionSpec>& strong) noexcept { return strong; }
   
   // pragma MARK: std::shared_ptr<Promise<void>>
   /**
@@ -518,6 +565,21 @@ namespace margelo::nitro::pocketly::bridge::swift {
   Func_void_Transaction create_Func_void_Transaction(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_Transaction_Wrapper wrap_Func_void_Transaction(Func_void_Transaction value) noexcept {
     return Func_void_Transaction_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<bool>
+  /**
+   * Specialized version of `std::optional<bool>`.
+   */
+  using std__optional_bool_ = std::optional<bool>;
+  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
+    return std::optional<bool>(value);
+  }
+  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
   }
   
   // pragma MARK: std::vector<CategoryTotal>
@@ -1066,21 +1128,6 @@ namespace margelo::nitro::pocketly::bridge::swift {
     return optional.value();
   }
   
-  // pragma MARK: std::optional<bool>
-  /**
-   * Specialized version of `std::optional<bool>`.
-   */
-  using std__optional_bool_ = std::optional<bool>;
-  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
-    return std::optional<bool>(value);
-  }
-  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
-    return optional.value();
-  }
-  
   // pragma MARK: std::shared_ptr<Promise<TransferResult>>
   /**
    * Specialized version of `std::shared_ptr<Promise<TransferResult>>`.
@@ -1143,6 +1190,239 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline TransferAuth get_std__optional_TransferAuth_(const std::optional<TransferAuth>& optional) noexcept {
     return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<TopUpReview>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<TopUpReview>>`.
+   */
+  using std__shared_ptr_Promise_TopUpReview__ = std::shared_ptr<Promise<TopUpReview>>;
+  inline std::shared_ptr<Promise<TopUpReview>> create_std__shared_ptr_Promise_TopUpReview__() noexcept {
+    return Promise<TopUpReview>::create();
+  }
+  inline PromiseHolder<TopUpReview> wrap_std__shared_ptr_Promise_TopUpReview__(std::shared_ptr<Promise<TopUpReview>> promise) noexcept {
+    return PromiseHolder<TopUpReview>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const TopUpReview& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const TopUpReview&)>`.
+   */
+  using Func_void_TopUpReview = std::function<void(const TopUpReview& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const TopUpReview& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_TopUpReview_Wrapper final {
+  public:
+    explicit Func_void_TopUpReview_Wrapper(std::function<void(const TopUpReview& /* result */)>&& func): _function(std::make_unique<std::function<void(const TopUpReview& /* result */)>>(std::move(func))) {}
+    inline void call(TopUpReview result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const TopUpReview& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_TopUpReview create_Func_void_TopUpReview(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_TopUpReview_Wrapper wrap_Func_void_TopUpReview(Func_void_TopUpReview value) noexcept {
+    return Func_void_TopUpReview_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<QrRejectReason>
+  /**
+   * Specialized version of `std::optional<QrRejectReason>`.
+   */
+  using std__optional_QrRejectReason_ = std::optional<QrRejectReason>;
+  inline std::optional<QrRejectReason> create_std__optional_QrRejectReason_(const QrRejectReason& value) noexcept {
+    return std::optional<QrRejectReason>(value);
+  }
+  inline bool has_value_std__optional_QrRejectReason_(const std::optional<QrRejectReason>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline QrRejectReason get_std__optional_QrRejectReason_(const std::optional<QrRejectReason>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<QrKind>
+  /**
+   * Specialized version of `std::optional<QrKind>`.
+   */
+  using std__optional_QrKind_ = std::optional<QrKind>;
+  inline std::optional<QrKind> create_std__optional_QrKind_(const QrKind& value) noexcept {
+    return std::optional<QrKind>(value);
+  }
+  inline bool has_value_std__optional_QrKind_(const std::optional<QrKind>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline QrKind get_std__optional_QrKind_(const std::optional<QrKind>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<QrPaymentDraft>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<QrPaymentDraft>>`.
+   */
+  using std__shared_ptr_Promise_QrPaymentDraft__ = std::shared_ptr<Promise<QrPaymentDraft>>;
+  inline std::shared_ptr<Promise<QrPaymentDraft>> create_std__shared_ptr_Promise_QrPaymentDraft__() noexcept {
+    return Promise<QrPaymentDraft>::create();
+  }
+  inline PromiseHolder<QrPaymentDraft> wrap_std__shared_ptr_Promise_QrPaymentDraft__(std::shared_ptr<Promise<QrPaymentDraft>> promise) noexcept {
+    return PromiseHolder<QrPaymentDraft>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const QrPaymentDraft& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const QrPaymentDraft&)>`.
+   */
+  using Func_void_QrPaymentDraft = std::function<void(const QrPaymentDraft& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const QrPaymentDraft& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_QrPaymentDraft_Wrapper final {
+  public:
+    explicit Func_void_QrPaymentDraft_Wrapper(std::function<void(const QrPaymentDraft& /* result */)>&& func): _function(std::make_unique<std::function<void(const QrPaymentDraft& /* result */)>>(std::move(func))) {}
+    inline void call(QrPaymentDraft result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const QrPaymentDraft& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_QrPaymentDraft create_Func_void_QrPaymentDraft(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_QrPaymentDraft_Wrapper wrap_Func_void_QrPaymentDraft(Func_void_QrPaymentDraft value) noexcept {
+    return Func_void_QrPaymentDraft_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<QrPaymentReview>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<QrPaymentReview>>`.
+   */
+  using std__shared_ptr_Promise_QrPaymentReview__ = std::shared_ptr<Promise<QrPaymentReview>>;
+  inline std::shared_ptr<Promise<QrPaymentReview>> create_std__shared_ptr_Promise_QrPaymentReview__() noexcept {
+    return Promise<QrPaymentReview>::create();
+  }
+  inline PromiseHolder<QrPaymentReview> wrap_std__shared_ptr_Promise_QrPaymentReview__(std::shared_ptr<Promise<QrPaymentReview>> promise) noexcept {
+    return PromiseHolder<QrPaymentReview>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const QrPaymentReview& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const QrPaymentReview&)>`.
+   */
+  using Func_void_QrPaymentReview = std::function<void(const QrPaymentReview& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const QrPaymentReview& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_QrPaymentReview_Wrapper final {
+  public:
+    explicit Func_void_QrPaymentReview_Wrapper(std::function<void(const QrPaymentReview& /* result */)>&& func): _function(std::make_unique<std::function<void(const QrPaymentReview& /* result */)>>(std::move(func))) {}
+    inline void call(QrPaymentReview result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const QrPaymentReview& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_QrPaymentReview create_Func_void_QrPaymentReview(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_QrPaymentReview_Wrapper wrap_Func_void_QrPaymentReview(Func_void_QrPaymentReview value) noexcept {
+    return Func_void_QrPaymentReview_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<std::string>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<std::string>>`.
+   */
+  using std__shared_ptr_Promise_std__string__ = std::shared_ptr<Promise<std::string>>;
+  inline std::shared_ptr<Promise<std::string>> create_std__shared_ptr_Promise_std__string__() noexcept {
+    return Promise<std::string>::create();
+  }
+  inline PromiseHolder<std::string> wrap_std__shared_ptr_Promise_std__string__(std::shared_ptr<Promise<std::string>> promise) noexcept {
+    return PromiseHolder<std::string>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* result */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* result */)>>(std::move(func))) {}
+    inline void call(std::string result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::vector<AppNotification>
+  /**
+   * Specialized version of `std::vector<AppNotification>`.
+   */
+  using std__vector_AppNotification_ = std::vector<AppNotification>;
+  inline std::vector<AppNotification> create_std__vector_AppNotification_(size_t size) noexcept {
+    std::vector<AppNotification> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::function<void(const std::vector<AppNotification>& /* notifications */)>
+  /**
+   * Specialized version of `std::function<void(const std::vector<AppNotification>&)>`.
+   */
+  using Func_void_std__vector_AppNotification_ = std::function<void(const std::vector<AppNotification>& /* notifications */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::vector<AppNotification>& / * notifications * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__vector_AppNotification__Wrapper final {
+  public:
+    explicit Func_void_std__vector_AppNotification__Wrapper(std::function<void(const std::vector<AppNotification>& /* notifications */)>&& func): _function(std::make_unique<std::function<void(const std::vector<AppNotification>& /* notifications */)>>(std::move(func))) {}
+    inline void call(std::vector<AppNotification> notifications) const noexcept {
+      _function->operator()(notifications);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::vector<AppNotification>& /* notifications */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__vector_AppNotification_ create_Func_void_std__vector_AppNotification_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__vector_AppNotification__Wrapper wrap_Func_void_std__vector_AppNotification_(Func_void_std__vector_AppNotification_ value) noexcept {
+    return Func_void_std__vector_AppNotification__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<NotificationList>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<NotificationList>>`.
+   */
+  using std__shared_ptr_Promise_NotificationList__ = std::shared_ptr<Promise<NotificationList>>;
+  inline std::shared_ptr<Promise<NotificationList>> create_std__shared_ptr_Promise_NotificationList__() noexcept {
+    return Promise<NotificationList>::create();
+  }
+  inline PromiseHolder<NotificationList> wrap_std__shared_ptr_Promise_NotificationList__(std::shared_ptr<Promise<NotificationList>> promise) noexcept {
+    return PromiseHolder<NotificationList>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const NotificationList& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const NotificationList&)>`.
+   */
+  using Func_void_NotificationList = std::function<void(const NotificationList& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const NotificationList& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_NotificationList_Wrapper final {
+  public:
+    explicit Func_void_NotificationList_Wrapper(std::function<void(const NotificationList& /* result */)>&& func): _function(std::make_unique<std::function<void(const NotificationList& /* result */)>>(std::move(func))) {}
+    inline void call(NotificationList result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const NotificationList& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_NotificationList create_Func_void_NotificationList(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_NotificationList_Wrapper wrap_Func_void_NotificationList(Func_void_NotificationList value) noexcept {
+    return Func_void_NotificationList_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::optional<MoneyParseError>
@@ -1403,6 +1683,69 @@ namespace margelo::nitro::pocketly::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_TransferResult___ create_Result_std__shared_ptr_Promise_TransferResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<TransferResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<TopUpReview>>>
+  using Result_std__shared_ptr_Promise_TopUpReview___ = Result<std::shared_ptr<Promise<TopUpReview>>>;
+  inline Result_std__shared_ptr_Promise_TopUpReview___ create_Result_std__shared_ptr_Promise_TopUpReview___(const std::shared_ptr<Promise<TopUpReview>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<TopUpReview>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_TopUpReview___ create_Result_std__shared_ptr_Promise_TopUpReview___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<TopUpReview>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<QrCode>
+  using Result_QrCode_ = Result<QrCode>;
+  inline Result_QrCode_ create_Result_QrCode_(const QrCode& value) noexcept {
+    return Result<QrCode>::withValue(value);
+  }
+  inline Result_QrCode_ create_Result_QrCode_(const std::exception_ptr& error) noexcept {
+    return Result<QrCode>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<QrPaymentDraft>>>
+  using Result_std__shared_ptr_Promise_QrPaymentDraft___ = Result<std::shared_ptr<Promise<QrPaymentDraft>>>;
+  inline Result_std__shared_ptr_Promise_QrPaymentDraft___ create_Result_std__shared_ptr_Promise_QrPaymentDraft___(const std::shared_ptr<Promise<QrPaymentDraft>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentDraft>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_QrPaymentDraft___ create_Result_std__shared_ptr_Promise_QrPaymentDraft___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentDraft>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<QrPaymentReview>>>
+  using Result_std__shared_ptr_Promise_QrPaymentReview___ = Result<std::shared_ptr<Promise<QrPaymentReview>>>;
+  inline Result_std__shared_ptr_Promise_QrPaymentReview___ create_Result_std__shared_ptr_Promise_QrPaymentReview___(const std::shared_ptr<Promise<QrPaymentReview>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentReview>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_QrPaymentReview___ create_Result_std__shared_ptr_Promise_QrPaymentReview___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<QrPaymentReview>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<std::string>>>
+  using Result_std__shared_ptr_Promise_std__string___ = Result<std::shared_ptr<Promise<std::string>>>;
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::shared_ptr<Promise<std::string>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>
+  using Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ = Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>;
+  inline Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(const std::shared_ptr<HybridNotificationSubscriptionSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridNotificationSubscriptionSpec__ create_Result_std__shared_ptr_HybridNotificationSubscriptionSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridNotificationSubscriptionSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<NotificationList>>>
+  using Result_std__shared_ptr_Promise_NotificationList___ = Result<std::shared_ptr<Promise<NotificationList>>>;
+  inline Result_std__shared_ptr_Promise_NotificationList___ create_Result_std__shared_ptr_Promise_NotificationList___(const std::shared_ptr<Promise<NotificationList>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<NotificationList>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_NotificationList___ create_Result_std__shared_ptr_Promise_NotificationList___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<NotificationList>>>::withError(error);
   }
   
   // pragma MARK: Result<std::string>

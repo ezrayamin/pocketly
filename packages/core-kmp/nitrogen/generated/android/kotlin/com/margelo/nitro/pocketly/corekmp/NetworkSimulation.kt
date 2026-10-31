@@ -35,7 +35,13 @@ data class NetworkSimulation(
   val writeTimeoutMs: Double?,
   @DoNotStrip
   @Keep
-  val seed: Double?
+  val seed: Double?,
+  @DoNotStrip
+  @Keep
+  val declineTopUps: Boolean?,
+  @DoNotStrip
+  @Keep
+  val topUpProcessingMs: Double?
 ) {
   /* primary constructor */
 
@@ -48,6 +54,8 @@ data class NetworkSimulation(
       && Objects.deepEquals(this.readTimeoutMs, other.readTimeoutMs)
       && Objects.deepEquals(this.writeTimeoutMs, other.writeTimeoutMs)
       && Objects.deepEquals(this.seed, other.seed)
+      && Objects.deepEquals(this.declineTopUps, other.declineTopUps)
+      && Objects.deepEquals(this.topUpProcessingMs, other.topUpProcessingMs)
   }
 
   override fun hashCode(): Int {
@@ -57,7 +65,9 @@ data class NetworkSimulation(
       normalLatencyMs,
       readTimeoutMs,
       writeTimeoutMs,
-      seed
+      seed,
+      declineTopUps,
+      topUpProcessingMs
     ).contentDeepHashCode()
   }
 
@@ -69,8 +79,8 @@ data class NetworkSimulation(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?): NetworkSimulation {
-      return NetworkSimulation(mode, failureRatePercent, normalLatencyMs, readTimeoutMs, writeTimeoutMs, seed)
+    private fun fromCpp(mode: NetworkMode, failureRatePercent: Double, normalLatencyMs: Double?, readTimeoutMs: Double?, writeTimeoutMs: Double?, seed: Double?, declineTopUps: Boolean?, topUpProcessingMs: Double?): NetworkSimulation {
+      return NetworkSimulation(mode, failureRatePercent, normalLatencyMs, readTimeoutMs, writeTimeoutMs, seed, declineTopUps, topUpProcessingMs)
     }
   }
 }

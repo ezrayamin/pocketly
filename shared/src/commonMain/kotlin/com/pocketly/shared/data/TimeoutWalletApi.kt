@@ -16,7 +16,7 @@ import kotlinx.coroutines.withTimeout
  * regardless (M3 transfers) runs in the backend's own scope, not inside this call.
  * Retries with backoff come with the real backend. Mirrors packages/core-js/src/data/timeoutWalletApi.ts.
  */
-/** Reads give up after readTimeoutMs; a transfer submission after writeTimeoutMs (FR-TRF-09). */
+/** Reads give up after readTimeoutMs; a transfer or top-up submission after writeTimeoutMs (FR-TRF-09). */
 internal enum class CallKind { READ, WRITE }
 
 internal class TimeoutWalletApi(
@@ -42,8 +42,26 @@ internal class TimeoutWalletApi(
     override suspend fun transfer(request: TransferRequest, idempotencyKey: String): Transaction =
         withTimeoutOf(CallKind.WRITE) { inner.transfer(request, idempotencyKey) }
 
+    /** As [transfer]: a timeout leaves the top-up PENDING (ADR-0015 §4). */
+    override suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction =
+        withTimeoutOf(CallKind.WRITE) { inner.topUp(request, idempotencyKey) }
+
+    override suspend fun getPaymentTarget(merchantId: String, requestId: String?): PaymentTarget =
+        withTimeoutOf { inner.getPaymentTarget(merchantId, requestId) }
+
+    /** As [transfer]: a timeout leaves the payment PENDING. */
+    override suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction =
+        withTimeoutOf(CallKind.WRITE) { inner.payMerchant(request, idempotencyKey) }
+
+    override suspend fun getAccountUserId(phone: String): String = withTimeoutOf { inner.getAccountUserId(phone) }
+
     override suspend fun getTransferByKey(idempotencyKey: String): Transaction =
         withTimeoutOf { inner.getTransferByKey(idempotencyKey) }
+
+    override suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage = withTimeoutOf { inner.getEvents(afterSeq, limit) }
+
+    /** Signals only: nothing to time out. */
+    override fun incomingEvents() = inner.incomingEvents()
 
     private suspend fun <T> withTimeoutOf(kind: CallKind = CallKind.READ, call: suspend () -> T): T {
         val timeout = timeoutMs(kind)

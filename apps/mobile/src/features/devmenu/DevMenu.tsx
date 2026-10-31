@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DEFAULT_DAILY_LIMIT_MINOR, LIVE_DATASET } from '@pocketly/core-contract';
 import type { NetworkMode } from '@pocketly/core-contract';
@@ -12,7 +12,8 @@ import { toUserError } from '../errors';
 
 /**
  * F11 Developer Menu (when DEV_TOOLS_ENABLED, ADR-0008): drive the fake backend so
- * reviewers can see slow, failing, timing-out and offline states (FR-DEV-02…05).
+ * reviewers can see slow, failing, timing-out and offline states (FR-DEV-02…05), and a
+ * declined top-up (ADR-0015 §4).
  * Settings live in the core for this app session; they reset when the app restarts.
  * Scriptable equivalents: pocketly://dev/... links (devLinks.ts).
  */
@@ -164,6 +165,26 @@ export function DevMenu({ visible, onClose, lockSkipped }: { visible: boolean; o
             ))}
           </View>
           <Text style={styles.optionHint}>The server's limit; Reset data brings back {core.formatMoney(DEFAULT_DAILY_LIMIT_MINOR)}.</Text>
+
+          <Text style={styles.section}>TOP-UPS (FR-TOP-03)</Text>
+          <View style={styles.card}>
+            <View style={styles.rateRow}>
+              <View style={styles.optionText}>
+                <Text style={styles.optionLabel} nativeID="decline-topups-label">
+                  Decline top-ups
+                </Text>
+                <Text style={styles.optionHint}>The payment method refuses every top-up (Payment declined).</Text>
+              </View>
+              <Switch
+                value={sim.declineTopUps === true}
+                onValueChange={(declineTopUps) => apply({ declineTopUps })}
+                trackColor={{ true: colors.primary, false: colors.surfaceRaised }}
+                accessibilityLabel="Decline top-ups"
+                accessibilityLabelledBy="decline-topups-label"
+                testID="devmenu-decline-topups"
+              />
+            </View>
+          </View>
 
           <Text style={styles.section}>DATA</Text>
           <View style={styles.actions}>

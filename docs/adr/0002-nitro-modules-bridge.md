@@ -48,6 +48,18 @@ Two measurements point the same way:
   its contract methods are plain JS. **Slice 6** (transfers, `2026-10-17_mid-06`): 7 methods with
   12 new structs and enums added 351 KB (1,318 → 1,668 KB), ~50 KB per method or ~18 KB per
   bridged method-or-type: new types cost about as much as new methods, so reuse structs too.
+  **Slice 7** (top-up, `2026-10-30_mid-01`): 2 methods and 2 new types added 74 KB (1,668 →
+  1,742 KB), the same ~18 KB each; reusing the transfer methods (ADR-0015 §1) kept it at that.
+  **QR Pay and My QR** (`2026-10-30_mid-02`): 4 methods and 5 types added 211 KB (1,742 → 1,953 KB),
+  ~23 KB each; big structs cost more (QrPaymentDraft has 8 fields).
+  **Notifications** (`2026-11-01_mid-01`): 3 methods, 3 types, a second subscription HybridObject and its
+  callback added 170 KB (1,953 → 2,123 KB), ~21 KB per item; a stream costs two items more than a
+  request/response method, so share one subscription type across streams.
+  **Hidden symbols** (`2026-11-01_mid-02`): the figures above included every generated C++ symbol's exported name
+  (~30% of the library). Built with `-fvisibility=hidden` (only `JNI_OnLoad` exported) the library is 2,123 →
+  1,395 KB, and rebuilt at each spec version the steps above cost ~12, ~12, ~16 and ~13 KB per item.
+  **Estimation rule: ~13 KB of arm64 APK (~3 KB of download) per bridged method or type**, more for big structs;
+  count a stream's subscription object and callback as two items.
 - **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
   batched call (BM-06).
 

@@ -34,9 +34,11 @@ target_sources(
   ../nitrogen/generated/android/PocketlyCoreKmpOnLoad.cpp
   # Shared Nitrogen C++ sources
   ../nitrogen/generated/shared/c++/HybridPriceSubscriptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNotificationSubscriptionSpec.cpp
   ../nitrogen/generated/shared/c++/HybridPocketlyCoreSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridPriceSubscriptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridNotificationSubscriptionSpec.cpp
   ../nitrogen/generated/android/c++/JHybridPocketlyCoreSpec.cpp
 )
 

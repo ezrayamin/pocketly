@@ -145,10 +145,23 @@ class BiometricAuthenticator(
      * [unlock]: KEY_INVALIDATED and FAILED turn biometrics off; temporary ones change nothing.
      */
     @Throws(CoreException::class, CancellationException::class)
-    suspend fun approveTransfer(amount: Long, recipientId: String, idempotencyKey: String, prompt: BiometricPromptText): TransferAuthOutcome {
+    suspend fun approveTransfer(amount: Long, recipientId: String, idempotencyKey: String, prompt: BiometricPromptText): TransferAuthOutcome =
+        approve(BiometricMessages.transfer(amount, recipientId, idempotencyKey), prompt)
+
+    /** ADR-0016 §2: as [approveTransfer], for a QR payment's own message. */
+    suspend fun approveQrPayment(
+        amount: Long,
+        merchantId: String,
+        requestId: String?,
+        idempotencyKey: String,
+        prompt: BiometricPromptText,
+    ): TransferAuthOutcome = approve(BiometricMessages.qrPayment(amount, merchantId, requestId, idempotencyKey), prompt)
+
+    /** One scan signs [message]; the stored public key must verify it. */
+    private suspend fun approve(message: String, prompt: BiometricPromptText): TransferAuthOutcome {
         val stored = pin.withStore { it.get(PinAuthenticator.KEY_BIOMETRIC_PUBLIC_KEY) }
             ?: throw CoreException(ErrorCode.NOT_FOUND, "biometrics are not enabled")
-        val bytes = BiometricMessages.transfer(amount, recipientId, idempotencyKey).encodeToByteArray()
+        val bytes = message.encodeToByteArray()
         val result = try {
             signer.sign(bytes, prompt)
         } catch (e: CancellationException) {

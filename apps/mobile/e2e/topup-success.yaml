@@ -1,0 +1,42 @@
+# NFR-TEST-04: top-up success (F6, ADR-0015). Debug or perf build of either core; no PIN is
+# asked for. The server's real 2–5 s processing runs (FR-TOP-02).
+#   maestro test -e APP_ID=com.pocketly.kmp apps/mobile/e2e/topup-success.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks are run with adb input. This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+      pocketly.network.declineTopUps: false
+- assertVisible:
+    id: "balance"
+- tapOn:
+    id: "quick-topup"
+- tapOn:
+    id: "topup-preset-5000"
+- assertVisible: "Continue with $50.00"
+- tapOn:
+    id: "topup-amount-continue"
+- tapOn:
+    id: "topup-method-CARD"
+- tapOn:
+    id: "topup-method-continue"
+- assertVisible: "Top up $50.00"
+- tapOn:
+    id: "topup-review-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "topup-result-success"
+    timeout: 15000
+- assertVisible: "Money added"
+- tapOn:
+    id: "topup-result-done"
+- assertVisible:
+    id: "balance"

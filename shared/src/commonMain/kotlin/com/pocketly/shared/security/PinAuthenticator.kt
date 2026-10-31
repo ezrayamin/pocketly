@@ -115,11 +115,34 @@ class PinAuthenticator(
         serial { store.put(KEY_AUTO_LOCK_MS, ms.toString()) }
     }
 
-    /** ADR-0013: after VERIFIED, the phone (and the server's session token) belong to this install. */
+    /**
+     * ADR-0013: after VERIFIED, the phone (and the server's session token, and the account's user
+     * id, ADR-0016 §6) belong to this install.
+     */
     @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
-    suspend fun rememberVerifiedPhone(phone: String, token: String) = serial {
-        store.put(KEY_SESSION, Session(phone, token, pinCreated = false).encode())
+    suspend fun rememberVerifiedPhone(phone: String, token: String, userId: String? = null) = serial {
+        store.put(KEY_SESSION, Session(phone, token, pinCreated = false, userId).encode())
         cachedPhone = phone
+    }
+
+    /**
+     * ADR-0016 §6: the verified account's user id. [fetch] runs (outside the queue, so the lock
+     * screen doesn't wait for the network) and its answer is kept only for a session from before
+     * verifyOtp returned it. NOT_FOUND without a verified phone.
+     */
+    @Throws(CoreException::class, kotlin.coroutines.cancellation.CancellationException::class)
+    suspend fun myUserId(fetch: suspend (phone: String) -> String): String {
+        val session = serial {
+            readRecord()
+            readSession()
+        } ?: throw CoreException(ErrorCode.NOT_FOUND, "No verified phone")
+        session.userId?.let { return it }
+        val userId = fetch(session.phone)
+        serial {
+            val current = readSession()
+            if (current?.phone == session.phone && current.userId == null) store.put(KEY_SESSION, current.copy(userId = userId).encode())
+        }
+        return userId
     }
 
     /**
@@ -256,11 +279,12 @@ class PinAuthenticator(
 }
 
 /** The verified-phone session (ADR-0013). Same JSON as core-js. */
-internal data class Session(val phone: String, val token: String, val pinCreated: Boolean) {
+internal data class Session(val phone: String, val token: String, val pinCreated: Boolean, val userId: String? = null) {
     fun encode(): String = buildJsonObject {
         put("phone", phone)
         put("token", token)
         put("pinCreated", pinCreated)
+        userId?.let { put("userId", it) }
     }.toString()
 
     companion object {
@@ -268,7 +292,8 @@ internal data class Session(val phone: String, val token: String, val pinCreated
             val o = Json.parseToJsonElement(encoded) as? JsonObject ?: return null
             val phone = (o["phone"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
             val token = (o["token"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
-            Session(phone, token, (o["pinCreated"] as? JsonPrimitive)?.booleanOrNull == true)
+            val userId = (o["userId"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            Session(phone, token, (o["pinCreated"] as? JsonPrimitive)?.booleanOrNull == true, userId)
         } catch (_: IllegalArgumentException) {
             null
         }

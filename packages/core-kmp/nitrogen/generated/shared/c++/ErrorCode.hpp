@@ -40,6 +40,9 @@ namespace margelo::nitro::pocketly {
     NOT_FOUND      SWIFT_NAME(notFound) = 8,
     INVALID_ARGUMENT      SWIFT_NAME(invalidArgument) = 9,
     SECURE_STORAGE_UNAVAILABLE      SWIFT_NAME(secureStorageUnavailable) = 10,
+    PAYMENT_DECLINED      SWIFT_NAME(paymentDeclined) = 11,
+    QR_EXPIRED      SWIFT_NAME(qrExpired) = 12,
+    QR_ALREADY_PAID      SWIFT_NAME(qrAlreadyPaid) = 13,
   } CLOSED_ENUM;
 
 } // namespace margelo::nitro::pocketly
@@ -63,6 +66,9 @@ namespace margelo::nitro {
         case hashString("NOT_FOUND"): return margelo::nitro::pocketly::ErrorCode::NOT_FOUND;
         case hashString("INVALID_ARGUMENT"): return margelo::nitro::pocketly::ErrorCode::INVALID_ARGUMENT;
         case hashString("SECURE_STORAGE_UNAVAILABLE"): return margelo::nitro::pocketly::ErrorCode::SECURE_STORAGE_UNAVAILABLE;
+        case hashString("PAYMENT_DECLINED"): return margelo::nitro::pocketly::ErrorCode::PAYMENT_DECLINED;
+        case hashString("QR_EXPIRED"): return margelo::nitro::pocketly::ErrorCode::QR_EXPIRED;
+        case hashString("QR_ALREADY_PAID"): return margelo::nitro::pocketly::ErrorCode::QR_ALREADY_PAID;
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert \"" + unionValue + "\" to enum ErrorCode - invalid value!");
       }
@@ -80,6 +86,9 @@ namespace margelo::nitro {
         case margelo::nitro::pocketly::ErrorCode::NOT_FOUND: return JSIConverter<std::string>::toJSI(runtime, "NOT_FOUND");
         case margelo::nitro::pocketly::ErrorCode::INVALID_ARGUMENT: return JSIConverter<std::string>::toJSI(runtime, "INVALID_ARGUMENT");
         case margelo::nitro::pocketly::ErrorCode::SECURE_STORAGE_UNAVAILABLE: return JSIConverter<std::string>::toJSI(runtime, "SECURE_STORAGE_UNAVAILABLE");
+        case margelo::nitro::pocketly::ErrorCode::PAYMENT_DECLINED: return JSIConverter<std::string>::toJSI(runtime, "PAYMENT_DECLINED");
+        case margelo::nitro::pocketly::ErrorCode::QR_EXPIRED: return JSIConverter<std::string>::toJSI(runtime, "QR_EXPIRED");
+        case margelo::nitro::pocketly::ErrorCode::QR_ALREADY_PAID: return JSIConverter<std::string>::toJSI(runtime, "QR_ALREADY_PAID");
         default: [[unlikely]]
           throw std::invalid_argument("Cannot convert ErrorCode to JS - invalid value: "
                                     + std::to_string(static_cast<int>(arg)) + "!");
@@ -102,6 +111,9 @@ namespace margelo::nitro {
         case hashString("NOT_FOUND"):
         case hashString("INVALID_ARGUMENT"):
         case hashString("SECURE_STORAGE_UNAVAILABLE"):
+        case hashString("PAYMENT_DECLINED"):
+        case hashString("QR_EXPIRED"):
+        case hashString("QR_ALREADY_PAID"):
           return true;
         default:
           return false;

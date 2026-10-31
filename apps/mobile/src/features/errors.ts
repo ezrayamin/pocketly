@@ -14,6 +14,9 @@ const MESSAGES: Record<ErrorCode, string> = {
   NOT_FOUND: "We couldn't find that.",
   INVALID_ARGUMENT: 'Something went wrong. Please try again.',
   SECURE_STORAGE_UNAVAILABLE: 'Unlock your phone, then try again.',
+  PAYMENT_DECLINED: 'Your payment method declined this top-up. Try another method or amount.',
+  QR_EXPIRED: 'This payment code has expired. Ask for a new one.',
+  QR_ALREADY_PAID: 'This payment code has already been paid.',
 };
 
 export interface UserError {

@@ -156,6 +156,47 @@ abstract class HybridPocketlyCoreSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun checkTopUpAmount(text: String): AmountCheck
+  
+  @DoNotStrip
+  @Keep
+  abstract fun reviewTopUp(amount: Double, paymentMethod: TopUpMethod): Promise<TopUpReview>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun parseQr(text: String): QrCode
+  
+  @DoNotStrip
+  @Keep
+  abstract fun startQrPayment(merchantId: String, requestId: String?): Promise<QrPaymentDraft>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun reviewQrPayment(amount: Double): Promise<QrPaymentReview>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getMyQr(): Promise<String>
+  
+  abstract fun subscribeNotifications(onNew: (notifications: Array<AppNotification>) -> Unit): HybridNotificationSubscriptionSpec
+  
+  @DoNotStrip
+  @Keep
+  private fun subscribeNotifications_cxx(onNew: Func_void_std__vector_AppNotification_): HybridNotificationSubscriptionSpec {
+    val __result = subscribeNotifications(onNew)
+    return __result
+  }
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getNotifications(): Promise<NotificationList>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun markNotificationsRead(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun formatMoney(minor: Double): String
   
   @DoNotStrip

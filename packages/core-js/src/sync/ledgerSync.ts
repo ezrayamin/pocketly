@@ -16,8 +16,8 @@ export class LedgerSync {
     private readonly cache: CacheStore,
   ) {}
 
-  async sync(): Promise<void> {
-    const generation = this.cache.generation;
+  /** `generation`: the replica's when the caller's refresh began (it may have done other work first). */
+  async sync(generation = this.cache.generation): Promise<void> {
     // Checked right before each write: a clear() queues its deletes after any write already
     // started, so only writes that begin after it need stopping.
     const cleared = () => this.cache.generation !== generation;

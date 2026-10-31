@@ -2,6 +2,9 @@ package com.pocketly.shared.sync
 
 import com.pocketly.shared.data.CacheStore
 import com.pocketly.shared.data.ContactSearch
+import com.pocketly.shared.data.OpenPaymentRequest
+import com.pocketly.shared.data.QrPaymentRequest
+import com.pocketly.shared.data.TopUpRequest
 import com.pocketly.shared.data.TransferRequest
 import com.pocketly.shared.data.WalletApi
 import com.pocketly.shared.domain.AmountCheck
@@ -15,6 +18,11 @@ import com.pocketly.shared.domain.Counterparty
 import com.pocketly.shared.domain.CounterpartyKind
 import com.pocketly.shared.domain.ErrorCode
 import com.pocketly.shared.domain.Money
+import com.pocketly.shared.domain.QrPaymentDraft
+import com.pocketly.shared.domain.QrPaymentReview
+import com.pocketly.shared.domain.TopUpMethod
+import com.pocketly.shared.domain.TopUpPolicy
+import com.pocketly.shared.domain.TopUpReview
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.TransactionStatus
 import com.pocketly.shared.domain.TransactionType
@@ -40,11 +48,13 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * F5, the client side of a transfer (ADR-0014): draft → review (the key) → confirm (approval,
- * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. Every state change goes
- * through the §3.2 state machine. Callers run it on the core's database thread, so its
- * bookkeeping is single-threaded. Mirrors packages/core-js/src/sync/transferFlow.ts.
+ * submission, 15 s) → SUCCESS / FAILED / PENDING → status check. F6's top-ups (ADR-0015) and F7's
+ * QR payments (ADR-0016) are attempts too, with the same outcomes: a top-up needs no approval, a
+ * QR payment is approved like a transfer. Every state change goes through the §3.2 state machine.
+ * Callers run it on the core's database thread, so its bookkeeping is single-threaded.
+ * Mirrors packages/core-js/src/sync/paymentFlow.ts.
  */
-internal class TransferFlow(
+internal class PaymentFlow(
     /** Behind the timeout (NFR-REL-01): reads after readTimeoutMs, the submission after writeTimeoutMs. */
     private val api: WalletApi,
     private val cache: CacheStore,
@@ -56,8 +66,8 @@ internal class TransferFlow(
     /** Device clock, for the app's own pending rows. */
     private val clock: () -> Long,
 ) {
-    /** One transfer attempt (FR-TRF-05): one key, one approval. Its id is its idempotency key. */
-    private class Attempt(val key: String, val recipient: Contact, val amount: Money, val note: String?, var state: TransferState) {
+    /** One attempt (FR-TRF-05): one key, one approval. Its id is its idempotency key. */
+    private sealed class Attempt(val key: String, val amount: Money, var state: TransferState) {
         var failureReason: ErrorCode? = null
         var retryable: Boolean? = null
         var transaction: Transaction? = null
@@ -66,7 +76,31 @@ internal class TransferFlow(
         var running: CompletableDeferred<TransferResult>? = null
     }
 
-    private class Draft(val recipient: Contact, val limits: AmountLimits)
+    private class TransferAttempt(key: String, val recipient: Contact, amount: Money, val note: String?, state: TransferState) :
+        Attempt(key, amount, state)
+
+    /** ADR-0015: money in from a payment method; no approval in Pocketly (§2). */
+    private class TopUpAttempt(key: String, val method: TopUpMethod, amount: Money, state: TransferState) :
+        Attempt(key, amount, state)
+
+    /** ADR-0016: money out to a merchant, approved like a transfer. [category]: the merchant's, for the pending row. */
+    private class QrAttempt(
+        key: String,
+        val merchant: Counterparty,
+        val category: Category,
+        val requestId: String?,
+        amount: Money,
+        state: TransferState,
+    ) : Attempt(key, amount, state)
+
+    /** The amount step's limits, fresh from the server. One draft at a time: a transfer's or a QR payment's. */
+    private sealed class Draft(val limits: AmountLimits)
+
+    private class TransferDraftState(val recipient: Contact, limits: AmountLimits) : Draft(limits)
+
+    /** [request]: a dynamic code's open request; its amount is the only one allowed. */
+    private class QrDraftState(val merchant: Counterparty, val category: Category, val request: OpenPaymentRequest?, limits: AmountLimits) :
+        Draft(limits)
 
     /** Written on the database thread, read by checkTransferAmount on the caller's (JS) thread. */
     @Volatile
@@ -110,43 +144,115 @@ internal class TransferFlow(
         if (recipient.phone == self.getOrThrow()) throw CoreException(ErrorCode.INVALID_ARGUMENT, "You can't send money to yourself")
         val wallet = fresh.getOrThrow()
         val limits = AmountLimits(wallet.balance, Money(maxOf(0L, wallet.dailyLimit.minor - wallet.usedToday.minor)))
-        draft = Draft(recipient, limits)
+        draft = TransferDraftState(recipient, limits)
         return TransferDraft(recipient, limits.balance, limits.dailyRemaining, Money(TransferPolicy.MIN_AMOUNT), TransferPolicy.maxAmount(limits))
     }
 
     fun checkTransferAmount(text: String): AmountCheck = TransferPolicy.checkAmount(text, currentDraft().limits)
 
     fun reviewTransfer(amount: Money, note: String?): TransferReview {
-        val d = currentDraft()
+        val d = currentDraft() as? TransferDraftState ?: throw CoreException(ErrorCode.NOT_FOUND, "No transfer started")
         if (!TransferPolicy.isValidAmount(amount.minor)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid transfer amount")
         TransferPolicy.exceededLimit(amount.minor, d.limits)?.let {
             throw CoreException(if (it == AmountRejectReason.INSUFFICIENT_FUNDS) ErrorCode.INSUFFICIENT_FUNDS else ErrorCode.DAILY_LIMIT_EXCEEDED, "Amount is over the limit")
         }
         val normalized = TransferPolicy.normalizeNote(note)
-        // Attempts never sent go: a new review is a new attempt (ADR-0014 §2).
-        attempts.entries.removeAll { it.value.state == TransferState.DRAFT && it.value.running == null }
-        val key = uuidV4(randomBytes(16))
-        attempts[key] = Attempt(key, d.recipient, amount, normalized, TransferState.DRAFT)
+        val key = newAttemptKey()
+        attempts[key] = TransferAttempt(key, d.recipient, amount, normalized, TransferState.DRAFT)
         return TransferReview(key, key, d.recipient, amount, Money(TransferPolicy.FEE), normalized, Money(d.limits.balance.minor - amount.minor))
+    }
+
+    /**
+     * FR-QR-03 (ADR-0016 §4): the merchant and its request, and a fresh wallet, in parallel. The
+     * server's answer is reported first, so both cores fail the same way whichever call ends first.
+     */
+    suspend fun startQrPayment(merchantId: String, requestId: String?): QrPaymentDraft {
+        val (target, fresh) = coroutineScope {
+            val target = async { attempt { api.getPaymentTarget(merchantId, requestId) } }
+            val wallet = async { attempt { fetchWallet() } } // as FR-TRF-11: fresh, or no payment
+            target.await() to wallet.await()
+        }
+        val t = target.getOrThrow()
+        val wallet = fresh.getOrThrow()
+        val limits = AmountLimits(wallet.balance, Money(maxOf(0L, wallet.dailyLimit.minor - wallet.usedToday.minor)))
+        draft = QrDraftState(t.merchant, t.category, t.request, limits)
+        return QrPaymentDraft(
+            merchant = t.merchant,
+            requestId = t.request?.id,
+            amount = t.request?.amount,
+            expiresAt = t.request?.expiresAt,
+            balance = limits.balance,
+            dailyRemaining = limits.dailyRemaining,
+            minAmount = Money(TransferPolicy.MIN_AMOUNT),
+            maxAmount = TransferPolicy.maxAmount(limits),
+        )
+    }
+
+    fun reviewQrPayment(amount: Money): QrPaymentReview {
+        val d = currentDraft() as? QrDraftState ?: throw CoreException(ErrorCode.NOT_FOUND, "No QR payment started")
+        if (!TransferPolicy.isValidAmount(amount.minor)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid payment amount")
+        if (d.request != null && d.request.amount != amount) throw CoreException(ErrorCode.INVALID_ARGUMENT, "The amount isn't the code's")
+        TransferPolicy.exceededLimit(amount.minor, d.limits)?.let {
+            throw CoreException(if (it == AmountRejectReason.INSUFFICIENT_FUNDS) ErrorCode.INSUFFICIENT_FUNDS else ErrorCode.DAILY_LIMIT_EXCEEDED, "Amount is over the limit")
+        }
+        val key = newAttemptKey()
+        attempts[key] = QrAttempt(key, d.merchant, d.category, d.request?.id, amount, TransferState.DRAFT)
+        return QrPaymentReview(key, key, d.merchant, d.request?.id, amount, Money(TransferPolicy.FEE), Money(d.limits.balance.minor - amount.minor))
+    }
+
+    /** FR-TOP-01/02: a fresh wallet (FR-TRF-11: no top-up from cached data), then the attempt and its key. */
+    suspend fun reviewTopUp(amount: Money, method: TopUpMethod): TopUpReview {
+        if (!TopUpPolicy.isValidAmount(amount.minor)) throw CoreException(ErrorCode.INVALID_ARGUMENT, "Invalid top-up amount")
+        val wallet = fetchWallet()
+        val key = newAttemptKey()
+        attempts[key] = TopUpAttempt(key, method, amount, TransferState.DRAFT)
+        return TopUpReview(key, key, method, amount, Money(TopUpPolicy.FEE), Money(wallet.balance.minor + amount.minor))
     }
 
     suspend fun confirmTransfer(id: String, auth: TransferAuth?): TransferResult {
         val attempt = attempt(id)
         attempt.running?.let { return it.await() }
-        if (attempt.state == TransferState.DRAFT && auth == null) {
-            throw CoreException(ErrorCode.INVALID_ARGUMENT, "A new transfer needs biometrics or the PIN")
+        if (attempt.state == TransferState.DRAFT && attempt !is TopUpAttempt && auth == null) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "A new payment needs biometrics or the PIN")
+        }
+        if (attempt.state == TransferState.DRAFT && attempt is TopUpAttempt && auth != null) {
+            throw CoreException(ErrorCode.INVALID_ARGUMENT, "A top-up takes no authorization")
         }
         if (attempt.state != TransferState.DRAFT && !(attempt.state == TransferState.FAILED && attempt.retryable == true)) {
             return result(attempt, TransferAuthOutcome.NOT_REQUIRED)
         }
-        return run(attempt) { if (attempt.state == TransferState.DRAFT) authorizeAndSend(attempt, auth!!) else retry(attempt) }
+        return run(attempt) {
+            when {
+                attempt.state != TransferState.DRAFT -> retry(attempt)
+                attempt is TopUpAttempt -> sendTopUp(attempt)
+                else -> authorizeAndSend(attempt, auth!!)
+            }
+        }
     }
 
     suspend fun getTransferStatus(id: String): TransferResult {
         val attempt = attempt(id)
         attempt.running?.let { return it.await() }
-        if (attempt.state != TransferState.PENDING) return result(attempt, TransferAuthOutcome.NOT_REQUIRED)
+        if (attempt.state != TransferState.PENDING) return settledResult(attempt) // settled, maybe by an event
         return run(attempt) { checkStatus(attempt) }
+    }
+
+    /**
+     * ADR-0017 §2: the server's event says a payment this install has PENDING settled. Its attempt (rebuilt
+     * from the replica after a restart) moves as a status check would, and the replica's wallet with it,
+     * so an open result screen and a later status check agree with the notification. Called before the
+     * event's row replaces the pending one. Whichever of this and a status check moves the attempt
+     * first wins; the other finds it settled.
+     */
+    fun applySettled(tx: Transaction) {
+        if (tx.status == TransactionStatus.PENDING) return
+        val attempt = try {
+            attempt(tx.idempotencyKey)
+        } catch (e: CoreException) {
+            return // not a payment of this install's
+        }
+        if (attempt.state != TransferState.PENDING) return
+        adjustWallet(settle(attempt, tx, TransferEvent.STATUS_SUCCESS, TransferEvent.STATUS_FAILED))
     }
 
     // ── steps ────────────────────────────────────────────────────────────
@@ -167,11 +273,24 @@ internal class TransferFlow(
         return submit(attempt, TransferAuthOutcome.OK)
     }
 
+    /** ADR-0015 §2: AUTHORIZING passes at once; the payment method authorizes the charge itself. */
+    private suspend fun sendTopUp(attempt: TopUpAttempt): TransferResult {
+        move(attempt, TransferEvent.CONFIRM)
+        move(attempt, TransferEvent.AUTH_OK)
+        return submit(attempt, TransferAuthOutcome.NOT_REQUIRED)
+    }
+
     /** The outcome, and for a refused PIN the result carrying its attempts / lockout. */
     private suspend fun authorize(attempt: Attempt, auth: TransferAuth): Pair<TransferAuthOutcome, TransferResult?> {
         if (auth.method == TransferAuthMethod.BIOMETRIC) {
             val prompt = auth.prompt ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "BIOMETRIC needs a prompt")
-            return biometric.approveTransfer(attempt.amount.minor, attempt.recipient.userId, attempt.key, prompt) to null
+            // Each kind signs its own message (ADR-0012, ADR-0016 §2).
+            val outcome = when (attempt) {
+                is TransferAttempt -> biometric.approveTransfer(attempt.amount.minor, attempt.recipient.userId, attempt.key, prompt)
+                is QrAttempt -> biometric.approveQrPayment(attempt.amount.minor, attempt.merchant.id, attempt.requestId, attempt.key, prompt)
+                is TopUpAttempt -> throw CoreException(ErrorCode.INVALID_ARGUMENT, "A top-up takes no authorization")
+            }
+            return outcome to null
         }
         val code = auth.pin ?: throw CoreException(ErrorCode.INVALID_ARGUMENT, "PIN needs a pin")
         val check = pin.verifyPin(code)
@@ -194,7 +313,7 @@ internal class TransferFlow(
     /** SUBMITTING → SUCCESS / FAILED / PENDING (ADR-0014 §2, §4). */
     private suspend fun submit(attempt: Attempt, auth: TransferAuthOutcome): TransferResult {
         val tx = try {
-            api.transfer(TransferRequest(attempt.recipient.userId, attempt.amount, attempt.note), attempt.key)
+            send(attempt)
         } catch (e: CoreException) {
             if (e.code == ErrorCode.NETWORK_TIMEOUT) return timedOut(attempt, auth)
             move(attempt, TransferEvent.SUBMIT_ERROR)
@@ -209,23 +328,10 @@ internal class TransferFlow(
     /** FR-TRF-09: no answer in time. The app shows its own pending row until the server's arrives. */
     private fun timedOut(attempt: Attempt, auth: TransferAuthOutcome): TransferResult {
         move(attempt, TransferEvent.TIMEOUT)
-        val now = clock()
-        val placeholder = Transaction(
-            id = CacheStore.PLACEHOLDER_PREFIX + attempt.key,
-            idempotencyKey = attempt.key,
-            type = TransactionType.TRANSFER_OUT,
-            category = Category.TRANSFER,
-            amount = attempt.amount,
-            counterparty = Counterparty(CounterpartyKind.USER, attempt.recipient.userId, attempt.recipient.name, attempt.recipient.phone),
-            note = attempt.note,
-            status = TransactionStatus.PENDING,
-            failureReason = null,
-            createdAt = now,
-            updatedAt = now,
-        )
+        val placeholder = placeholder(attempt)
         if (cache.getByIdempotencyKey(attempt.key) == null) {
             cache.upsert(placeholder)
-            cache.adjustWallet(-attempt.amount.minor, attempt.amount.minor) // the server holds it too
+            adjustWallet(heldDelta(attempt)) // as the server counts it while pending
         }
         attempt.transaction = cache.getByIdempotencyKey(attempt.key) ?: placeholder
         return result(attempt, auth).copy(balance = cachedBalance())
@@ -244,6 +350,7 @@ internal class TransferFlow(
             dropPlaceholder(attempt)
             return result(attempt, TransferAuthOutcome.NOT_REQUIRED).copy(balance = cachedBalance())
         }
+        if (attempt.state != TransferState.PENDING) return settledResult(attempt) // an event settled it meanwhile
         if (tx.status == TransactionStatus.PENDING) {
             cache.upsert(tx)
             attempt.transaction = tx
@@ -254,20 +361,29 @@ internal class TransferFlow(
 
     /** The server's transaction for this key: SUCCESS, FAILED (recorded: never retryable) or PENDING. */
     private fun applyServerAnswer(attempt: Attempt, tx: Transaction, auth: TransferAuthOutcome, ok: TransferEvent, failed: TransferEvent): TransferResult {
-        val wasHeld = attempt.state == TransferState.PENDING
         if (tx.status == TransactionStatus.PENDING) return timedOut(attempt, auth) // a replay of a held transfer
+        val delta = settle(attempt, tx, ok, failed)
         cache.upsert(tx) // history row (and the placeholder goes)
+        adjustWallet(delta)
+        return result(attempt, auth).copy(balance = cachedBalance())
+    }
+
+    /**
+     * Moves the attempt to the server's outcome and returns what that changes in the replica's wallet
+     * (ADR-0014 §5, ADR-0015 §3): what the outcome adds to what's held.
+     */
+    private fun settle(attempt: Attempt, tx: Transaction, ok: TransferEvent, failed: TransferEvent): Pair<Long, Long> {
+        val held = if (attempt.state == TransferState.PENDING) heldDelta(attempt) else NO_CHANGE
         attempt.transaction = tx
         if (tx.status == TransactionStatus.SUCCESS) {
             move(attempt, ok)
-            if (!wasHeld) cache.adjustWallet(-attempt.amount.minor, attempt.amount.minor)
-        } else {
-            move(attempt, failed)
-            attempt.failureReason = tx.failureReason ?: ErrorCode.SERVER_ERROR
-            attempt.retryable = false // the server recorded it: the same key returns this again
-            if (wasHeld) cache.adjustWallet(attempt.amount.minor, -attempt.amount.minor) // released
+            val settled = settledDelta(attempt)
+            return settled.first - held.first to settled.second - held.second
         }
-        return result(attempt, auth).copy(balance = cachedBalance())
+        move(attempt, failed)
+        attempt.failureReason = tx.failureReason ?: ErrorCode.SERVER_ERROR
+        attempt.retryable = false // the server recorded it: the same key returns this again
+        return -held.first to -held.second // released
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
@@ -281,18 +397,74 @@ internal class TransferFlow(
 
     private fun currentDraft(): Draft = draft ?: throw CoreException(ErrorCode.NOT_FOUND, "No transfer started")
 
+    /** Attempts never sent go: a new review is a new attempt (ADR-0014 §2). */
+    private fun newAttemptKey(): String {
+        attempts.entries.removeAll { it.value.state == TransferState.DRAFT && it.value.running == null }
+        return uuidV4(randomBytes(16))
+    }
+
+    private suspend fun send(attempt: Attempt): Transaction = when (attempt) {
+        is TopUpAttempt -> api.topUp(TopUpRequest(attempt.method, attempt.amount), attempt.key)
+        is TransferAttempt -> api.transfer(TransferRequest(attempt.recipient.userId, attempt.amount, attempt.note), attempt.key)
+        is QrAttempt -> api.payMerchant(QrPaymentRequest(attempt.merchant.id, attempt.requestId, attempt.amount), attempt.key)
+    }
+
+    /** FR-TRF-09: the app's own pending row, until the server's arrives. */
+    private fun placeholder(attempt: Attempt): Transaction {
+        val now = clock()
+        val (type, category, counterparty, note) = when (attempt) {
+            is TopUpAttempt ->
+                PlaceholderKind(TransactionType.TOP_UP, Category.TOP_UP, TopUpPolicy.counterparty(attempt.method), null)
+            is QrAttempt -> PlaceholderKind(TransactionType.QR_PAYMENT, attempt.category, attempt.merchant, null)
+            is TransferAttempt -> PlaceholderKind(
+                TransactionType.TRANSFER_OUT,
+                Category.TRANSFER,
+                Counterparty(CounterpartyKind.USER, attempt.recipient.userId, attempt.recipient.name, attempt.recipient.phone),
+                attempt.note,
+            )
+        }
+        return Transaction(
+            id = CacheStore.PLACEHOLDER_PREFIX + attempt.key,
+            idempotencyKey = attempt.key,
+            type = type,
+            category = category,
+            amount = attempt.amount,
+            counterparty = counterparty,
+            note = note,
+            status = TransactionStatus.PENDING,
+            failureReason = null,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    private data class PlaceholderKind(
+        val type: TransactionType,
+        val category: Category,
+        val counterparty: Counterparty,
+        val note: String?,
+    )
+
     /** In memory, or a pending one rebuilt from the replica after a restart (NFR-REL-03). */
     private fun attempt(id: String): Attempt {
         attempts[id]?.let { return it }
         val row = cache.getByIdempotencyKey(id)
         val cp = row?.counterparty
-        if (row == null || row.type != TransactionType.TRANSFER_OUT || cp == null) throw CoreException(ErrorCode.NOT_FOUND, "No transfer $id")
+        val method = if (row?.type == TransactionType.TOP_UP) TopUpPolicy.methodOf(cp) else null
+        val merchant = cp?.takeIf { row.type == TransactionType.QR_PAYMENT && it.kind == CounterpartyKind.MERCHANT }
+        if (row == null || cp == null || (row.type != TransactionType.TRANSFER_OUT && method == null && merchant == null)) {
+            throw CoreException(ErrorCode.NOT_FOUND, "No transfer $id")
+        }
         val state = when (row.status) {
             TransactionStatus.PENDING -> TransferState.PENDING
             TransactionStatus.SUCCESS -> TransferState.SUCCESS
             else -> TransferState.FAILED
         }
-        val restored = Attempt(id, Contact(cp.id, cp.name, cp.phone ?: ""), row.amount, row.note, state).apply {
+        val restored = when {
+            method != null -> TopUpAttempt(id, method, row.amount, state)
+            merchant != null -> QrAttempt(id, merchant, row.category, null, row.amount, state)
+            else -> TransferAttempt(id, Contact(cp.id, cp.name, cp.phone ?: ""), row.amount, row.note, state)
+        }.apply {
             transaction = row
             if (row.status == TransactionStatus.FAILED) {
                 failureReason = row.failureReason ?: ErrorCode.SERVER_ERROR
@@ -324,11 +496,36 @@ internal class TransferFlow(
         val row = cache.getByIdempotencyKey(attempt.key) ?: return
         if (row.id.startsWith(CacheStore.PLACEHOLDER_PREFIX)) {
             cache.delete(row.id)
-            cache.adjustWallet(attempt.amount.minor, -attempt.amount.minor)
+            val held = heldDelta(attempt)
+            adjustWallet(-held.first to -held.second)
         }
     }
 
+    /** A change to the replica's wallet: balance, and today's outgoing total. */
+    private fun adjustWallet(delta: Pair<Long, Long>) {
+        if (delta.first != 0L || delta.second != 0L) cache.adjustWallet(delta.first, delta.second)
+    }
+
+    /**
+     * What the server counts while the attempt is PENDING: a held transfer or QR payment is already out of the
+     * balance and in today's total; a pending top-up isn't in the balance yet (ADR-0015 §3).
+     */
+    private fun heldDelta(attempt: Attempt): Pair<Long, Long> = when (attempt) {
+        is TransferAttempt, is QrAttempt -> -attempt.amount.minor to attempt.amount.minor
+        is TopUpAttempt -> NO_CHANGE
+    }
+
+    /** What a SUCCESS changes in all. A top-up never counts toward the daily limit. */
+    private fun settledDelta(attempt: Attempt): Pair<Long, Long> = when (attempt) {
+        is TransferAttempt, is QrAttempt -> -attempt.amount.minor to attempt.amount.minor
+        is TopUpAttempt -> attempt.amount.minor to 0L
+    }
+
     private fun cachedBalance(): Money? = cache.getWallet()?.first?.balance
+
+    /** A status check's answer once settled: the outcome and the replica's balance. */
+    private fun settledResult(attempt: Attempt): TransferResult =
+        result(attempt, TransferAuthOutcome.NOT_REQUIRED).copy(balance = cachedBalance())
 
     private fun result(attempt: Attempt, auth: TransferAuthOutcome): TransferResult {
         val failed = attempt.state == TransferState.FAILED
@@ -343,6 +540,8 @@ internal class TransferFlow(
     }
 
     companion object {
+        private val NO_CHANGE = 0L to 0L
+
         /** RFC 4122 version 4 from 16 random bytes, lowercase. */
         fun uuidV4(bytes: ByteArray): String {
             if (bytes.size != 16) throw CoreException(ErrorCode.INVALID_ARGUMENT, "uuidV4 needs 16 bytes")

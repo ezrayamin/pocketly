@@ -342,11 +342,50 @@ class TransferServerTest {
                 st.execute("PRAGMA user_version = 1")
             }
         }
-        assertEquals(2L, ServerDatabase.Schema.version)
+        assertEquals(5L, ServerDatabase.Schema.version)
         val api = FakeWalletApi(ServerStore(JdbcSqliteDriver(url, Properties(), ServerDatabase.Schema)), TimeZoneHolder()).also { it.open(DatasetConfig.DEFAULT) }
         assertEquals(TransactionStatus.FAILED, api.transfer(TransferRequest("u-01", Money(100)), "after-migration").status) // empty ledger
         java.sql.DriverManager.getConnection(url).use { c ->
-            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(2, rs.getInt(1)) } }
+            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(5, rs.getInt(1)) } }
+        }
+    }
+
+    /** ADR-0015 §4: a held settlement from version 2 has no reason and still settles as SERVER_ERROR. */
+    @Test
+    fun migratesAVersionTwoDatabase() = runBlocking {
+        val dir = Files.createTempDirectory("pocketly-").toFile().apply { deleteOnExit() }
+        val url = "jdbc:sqlite:" + dir.resolve("server.db").path
+        val now = DatasetConfig.DEFAULT.nowMillis!!
+        // A slice-6 database: version 2, settlements without failure_reason, one transfer held.
+        java.sql.DriverManager.getConnection(url).use { c ->
+            c.createStatement().use { st ->
+                st.execute(
+                    "CREATE TABLE server_transaction (id TEXT NOT NULL PRIMARY KEY, idempotency_key TEXT NOT NULL, type TEXT NOT NULL, " +
+                        "category TEXT NOT NULL, amount INTEGER NOT NULL, counterparty_kind TEXT, counterparty_id TEXT, counterparty_name TEXT, " +
+                        "counterparty_phone TEXT, note TEXT, status TEXT NOT NULL, failure_reason TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
+                )
+                st.execute("CREATE INDEX server_transaction_changes ON server_transaction(updated_at, id)")
+                st.execute("CREATE TABLE server_meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)")
+                st.execute(
+                    "CREATE TABLE server_transfer_key (idempotency_key TEXT NOT NULL PRIMARY KEY, recipient_id TEXT NOT NULL, " +
+                        "amount INTEGER NOT NULL, note TEXT, transaction_id TEXT NOT NULL)",
+                )
+                st.execute("CREATE TABLE server_pending_settlement (transaction_id TEXT NOT NULL PRIMARY KEY, resolve_at INTEGER NOT NULL, fails INTEGER NOT NULL)")
+                st.execute("INSERT INTO server_meta(key, value) VALUES ('seeded', '1'), ('frozenNowMillis', '$now')")
+                st.execute(
+                    "INSERT INTO server_transaction(id, idempotency_key, type, category, amount, status, created_at, updated_at) " +
+                        "VALUES ('trf-1', 'held-v2', 'TRANSFER_OUT', 'TRANSFER', 1000, 'PENDING', $now, $now)",
+                )
+                st.execute("INSERT INTO server_pending_settlement(transaction_id, resolve_at, fails) VALUES ('trf-1', ${now + 1}, 1)")
+                st.execute("PRAGMA user_version = 2")
+            }
+        }
+        val api = FakeWalletApi(ServerStore(JdbcSqliteDriver(url, Properties(), ServerDatabase.Schema)), TimeZoneHolder()).also { it.open(DatasetConfig.DEFAULT) }
+        api.advanceClock(1)
+        val settled = api.getTransaction("trf-1")
+        assertEquals(TransactionStatus.FAILED to ErrorCode.SERVER_ERROR, settled.status to settled.failureReason)
+        java.sql.DriverManager.getConnection(url).use { c ->
+            c.createStatement().use { st -> st.executeQuery("PRAGMA user_version").use { rs -> rs.next(); assertEquals(5, rs.getInt(1)) } }
         }
     }
 

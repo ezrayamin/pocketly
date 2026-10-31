@@ -1,25 +1,49 @@
 package com.pocketly.shared.data
 
+import com.pocketly.shared.domain.Category
 import com.pocketly.shared.domain.Contact
+import com.pocketly.shared.domain.Counterparty
 import com.pocketly.shared.domain.DatasetConfig
 import com.pocketly.shared.domain.Money
 import com.pocketly.shared.domain.NetworkSimulation
+import com.pocketly.shared.domain.NotificationKind
 import com.pocketly.shared.domain.OtpSendResult
 import com.pocketly.shared.domain.OtpVerifyResult
+import com.pocketly.shared.domain.TopUpMethod
 import com.pocketly.shared.domain.Transaction
 import com.pocketly.shared.domain.Wallet
+import kotlinx.coroutines.flow.Flow
 
 /** requirements §4.1 `TransferRequest`: what the idempotency key protects (ADR-0014). [note] is normalized. */
 data class TransferRequest(val recipientId: String, val amount: Money, val note: String? = null)
+
+/** ADR-0015: what a top-up's idempotency key protects. */
+data class TopUpRequest(val method: TopUpMethod, val amount: Money)
+
+/** ADR-0016: what a QR payment's idempotency key protects. */
+data class QrPaymentRequest(val merchantId: String, val requestId: String?, val amount: Money)
+
+/** ADR-0016 §4: what a scanned merchant code points at, from the server. [request]: dynamic code only. */
+data class PaymentTarget(val merchant: Counterparty, val category: Category, val request: OpenPaymentRequest?)
+
+data class OpenPaymentRequest(val id: String, val amount: Money, val expiresAt: Long)
 
 /** One page of server changes, ordered by (updatedAt, id). */
 data class ChangesPage(val items: List<Transaction>, val nextToken: String?, val hasMore: Boolean)
 
 /**
+ * One entry of the server's event log (ADR-0017 §1): requirements §4.1's `WalletEvent`. [seq] counts
+ * from 1 in log order (the notification's id is `evt-<seq>`); [transaction] is as it is now.
+ */
+data class WalletEvent(val seq: Long, val kind: NotificationKind, val transaction: Transaction, val createdAt: Long)
+
+/** A page of the event log, oldest first. */
+data class EventsPage(val items: List<WalletEvent>, val hasMore: Boolean)
+
+/**
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping FakeWalletApi for a real
  * implementation only changes `bridge/di/CoreModule.kt`. History reads the local replica
  * (ADR-0009), so the backend exposes a change feed instead of paged history.
- * topUp / payMerchant / incomingEvents() arrive with M4.
  * Mirrors packages/core-js/src/data/walletApi.ts.
  */
 interface WalletApi {
@@ -48,12 +72,47 @@ interface WalletApi {
      */
     suspend fun transfer(request: TransferRequest, idempotencyKey: String): Transaction
 
-    /** FR-TRF-09 status check: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+    /**
+     * FR-TOP-02/03 (ADR-0015 §4): adds money once per key, from a mocked payment method. Recorded
+     * PENDING on arrival, answered once processed: SUCCESS, or FAILED with PAYMENT_DECLINED. Keys
+     * share [transfer]'s table, so a key used for either kind conflicts with the other.
+     */
+    suspend fun topUp(request: TopUpRequest, idempotencyKey: String): Transaction
+
+    /**
+     * ADR-0016 §4: the merchant (and its open, unexpired payment request). INVALID_QR for an unknown
+     * merchant or request, or a request of another merchant; QR_EXPIRED; QR_ALREADY_PAID.
+     */
+    suspend fun getPaymentTarget(merchantId: String, requestId: String?): PaymentTarget
+
+    /**
+     * FR-QR-04 (ADR-0016 §4): as [transfer], for a merchant. A payment request is paid once: another
+     * key for a paid request is QR_ALREADY_PAID; a refusal leaves it open.
+     */
+    suspend fun payMerchant(request: QrPaymentRequest, idempotencyKey: String): Transaction
+
+    /**
+     * ADR-0016 §6: the user id of the account verified with [phone], for sessions from before
+     * verifyOtp returned it. A server that doesn't know the account yet (phone verified before it
+     * recorded one) takes this phone as it; another phone than the account's is NOT_FOUND.
+     */
+    suspend fun getAccountUserId(phone: String): String
+
+    /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
     suspend fun getTransferByKey(idempotencyKey: String): Transaction
+
+    /** ADR-0017 §1: the event log after [afterSeq], oldest first, at most [limit]. */
+    suspend fun getEvents(afterSeq: Long, limit: Int): EventsPage
+
+    /**
+     * ADR-0017 §1: "the log grew" signals (a websocket with a real backend). A signal carries nothing:
+     * the client reads [getEvents] after it, so a missed one costs a delay, never an event.
+     */
+    fun incomingEvents(): Flow<Unit>
 }
 
-/** What the server answers on an OTP check: the result, plus a session token when verified. */
-data class ServerOtpVerify(val result: OtpVerifyResult, val sessionToken: String? = null)
+/** What the server answers on an OTP check: the result, plus a session token and the account's user id (ADR-0016 §6) when verified. */
+data class ServerOtpVerify(val result: OtpVerifyResult, val sessionToken: String? = null, val userId: String? = null)
 
 /** Developer-menu controls (FR-DEV-*). Only the fake backend implements this. */
 interface FakeBackendControls {

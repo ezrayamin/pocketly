@@ -1,0 +1,128 @@
+{
+  "_comment": "Hand-written (F7, F8, ADR-0016). Both cores test against this file: Jest (core-js) and JUnit (shared/src/jvmTest). Signed QR payment messages are in biometric.json.",
+  "params": {
+    "maxLength": 256,
+    "idPattern": "^[A-Za-z0-9-]{1,32}$",
+    "minAmount": 100,
+    "fee": 0,
+    "idempotencyKeyPattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+  },
+  "parse": {
+    "_comment": "parseQr(text). Checked in this order: (1) over maxLength UTF-16 units: TOO_LONG. (2) Not 'pocketly://' followed by a kind of [a-z]+ ended by '/': MALFORMED. (3) A kind other than pay or user: UNKNOWN_KIND. (4) Then 'v' + digits ended by '?': other than v1 is UNSUPPORTED_VERSION; anything else there is MALFORMED. (5) The query: '&'-separated name=value pairs, each name exactly once, values matching idPattern, in any order; pay takes m (required) and r (optional), user takes u (required); nothing else (no fragment, empty, unknown or repeated parameter, trailing '&'): MALFORMED. Case-sensitive. Never throws.",
+    "cases": [
+      {"input": "pocketly://pay/v1?m=m-01", "expected": {"ok": true, "kind": "MERCHANT", "merchantId": "m-01"}},
+      {"input": "pocketly://pay/v1?m=m-01&r=pr-0001", "expected": {"ok": true, "kind": "MERCHANT", "merchantId": "m-01", "requestId": "pr-0001"}},
+      {"input": "pocketly://pay/v1?r=pr-0001&m=m-01", "expected": {"ok": true, "kind": "MERCHANT", "merchantId": "m-01", "requestId": "pr-0001"}},
+      {"input": "pocketly://user/v1?u=u-01", "expected": {"ok": true, "kind": "USER", "userId": "u-01"}},
+      {"input": "pocketly://user/v1?u=u-62397bbd6a8c", "expected": {"ok": true, "kind": "USER", "userId": "u-62397bbd6a8c"}},
+      {"input": "pocketly://pay/v1?m=ABCDEFGHIJKLMNOPQRSTUVWXYZ012345", "expected": {"ok": true, "kind": "MERCHANT", "merchantId": "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"}},
+      {"input": "", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "hello", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "https://example.com/pay?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "{\"m\":\"m-01\"}", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "POCKETLY://pay/v1?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": " pocketly://pay/v1?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01 ", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v2?m=m-01", "expected": {"ok": false, "reason": "UNSUPPORTED_VERSION"}},
+      {"input": "pocketly://user/v0?u=u-01", "expected": {"ok": false, "reason": "UNSUPPORTED_VERSION"}},
+      {"input": "pocketly://refund/v1?m=m-01", "expected": {"ok": false, "reason": "UNKNOWN_KIND"}},
+      {"input": "pocketly://dev/reset", "expected": {"ok": false, "reason": "UNKNOWN_KIND"}},
+      {"input": "pocketly://pay/v1", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01&", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01&m=m-02", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01&a=1500", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01&name=Corner%20Coffee", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?r=pr-0001", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01#x", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m%2D01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m_01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01\n", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://user/v1?u=u-01&m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://user/v1?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1/?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=m-01&r=pr-0001&r=pr-0002", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v1?m=café", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/vX?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}},
+      {"input": "pocketly://pay/v10?m=m-01", "expected": {"ok": false, "reason": "UNSUPPORTED_VERSION"}},
+      {"input": "pocketly://Pay/v1?m=m-01", "expected": {"ok": false, "reason": "MALFORMED"}}
+    ],
+    "tooLong": {
+      "_comment": "Generated cases: prefix + 'x' repeated to the given length (UTF-16 units). maxLength itself is fine to read (then MALFORMED: x isn't a valid id run); one more is TOO_LONG even though it starts like a valid code.",
+      "prefix": "pocketly://pay/v1?m=",
+      "cases": [
+        {"length": 256, "reason": "MALFORMED"},
+        {"length": 257, "reason": "TOO_LONG"},
+        {"length": 100000, "reason": "TOO_LONG"}
+      ]
+    }
+  },
+  "merchants": {
+    "_comment": "The server's merchant directory: the seed's MERCHANT counterparties (seedData.ts, SeedData.kt), with the category a payment to them gets.",
+    "items": [
+      {"id": "m-01", "name": "Corner Coffee", "category": "FOOD"},
+      {"id": "m-02", "name": "Noodle House", "category": "FOOD"},
+      {"id": "m-03", "name": "Metro Transit", "category": "TRANSPORT"},
+      {"id": "m-04", "name": "QuickRide", "category": "TRANSPORT"},
+      {"id": "m-05", "name": "Fresh Mart", "category": "SHOPPING"},
+      {"id": "m-06", "name": "Style Outlet", "category": "SHOPPING"},
+      {"id": "m-07", "name": "City Power", "category": "BILLS"},
+      {"id": "m-08", "name": "Net Fiber", "category": "BILLS"},
+      {"id": "m-09", "name": "Star Cinema", "category": "ENTERTAINMENT"},
+      {"id": "m-10", "name": "Game Arcade", "category": "ENTERTAINMENT"}
+    ]
+  },
+  "paymentRequests": {
+    "_comment": "Seeded by resetData on the fake server (ADR-0016 §4). expiresAt = seed now + expiresInMs (negative: already expired). paid: someone already paid it.",
+    "seeded": [
+      {"id": "pr-0001", "merchantId": "m-01", "amount": 1250, "expiresInMs": 31536000000, "paid": false},
+      {"id": "pr-0002", "merchantId": "m-02", "amount": 4500, "expiresInMs": -3600000, "paid": false},
+      {"id": "pr-0003", "merchantId": "m-02", "amount": 3000, "expiresInMs": 31536000000, "paid": true},
+      {"id": "pr-0004", "merchantId": "m-05", "amount": 2000000, "expiresInMs": 31536000000, "paid": false}
+    ]
+  },
+  "lookup": {
+    "_comment": "The server's lookup behind startQrPayment(merchantId, requestId?), on DEFAULT_DATASET. expect.amount/expiresInMs for a dynamic code; expect.error is the CoreError code. Expiry is the server clock's: expiresAt <= now is expired.",
+    "cases": [
+      {"merchantId": "m-01", "expect": {"merchantName": "Corner Coffee"}},
+      {"merchantId": "m-01", "requestId": "pr-0001", "expect": {"merchantName": "Corner Coffee", "amount": 1250, "expiresInMs": 31536000000}},
+      {"merchantId": "m-99", "expect": {"error": "INVALID_QR"}},
+      {"merchantId": "m-03", "requestId": "pr-0001", "expect": {"error": "INVALID_QR"}},
+      {"merchantId": "m-01", "requestId": "pr-9999", "expect": {"error": "INVALID_QR"}},
+      {"merchantId": "m-02", "requestId": "pr-0002", "expect": {"error": "QR_EXPIRED"}},
+      {"merchantId": "m-02", "requestId": "pr-0003", "expect": {"error": "QR_ALREADY_PAID"}}
+    ]
+  },
+  "server": {
+    "_comment": "The fake server's payMerchant endpoint, step by step on DEFAULT_DATASET (balance 1459085, usedToday 1578, daily limit 500000). Each step: payMerchant(request, key), or transfer(transfer, key) when the step has `transfer`. The key is checked first (same key + same request returns the original, even if the request has since been paid or has expired; a different request, or a transfer, is IDEMPOTENCY_CONFLICT), then the merchant and request as in `lookup`, then the amount (INVALID_ARGUMENT below minAmount, or not equal to the request's), then the balance and the daily limit (recorded FAILED, as transfers). A request is paid once a payment for it succeeds or is held PENDING; a refused or failed one leaves it open. Ids are qrp-<n>, counted separately from trf-<n> and tup-<n>; type QR_PAYMENT, category the merchant's, counterparty {MERCHANT, id, name}. balanceDelta / usedTodayDelta: change in getWallet() after the step.",
+    "steps": [
+      {"key": "k-1", "request": {"merchantId": "m-02", "amount": 4000}, "expect": {"status": "SUCCESS", "id": "qrp-1"}, "balanceDelta": -4000, "usedTodayDelta": 4000},
+      {"key": "k-1", "request": {"merchantId": "m-02", "amount": 4000}, "expect": {"sameAs": 0}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-1", "request": {"merchantId": "m-02", "amount": 4001}, "expect": {"error": "IDEMPOTENCY_CONFLICT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-1", "request": {"merchantId": "m-01", "amount": 4000}, "expect": {"error": "IDEMPOTENCY_CONFLICT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-1", "transfer": {"recipientId": "u-01", "amount": 4000}, "expect": {"error": "IDEMPOTENCY_CONFLICT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-2", "request": {"merchantId": "m-01", "requestId": "pr-0001", "amount": 1250}, "expect": {"status": "SUCCESS", "id": "qrp-2"}, "balanceDelta": -1250, "usedTodayDelta": 1250},
+      {"key": "k-2", "request": {"merchantId": "m-01", "requestId": "pr-0001", "amount": 1250}, "expect": {"sameAs": 5}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-2", "request": {"merchantId": "m-01", "amount": 1250}, "expect": {"error": "IDEMPOTENCY_CONFLICT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-3", "request": {"merchantId": "m-01", "requestId": "pr-0001", "amount": 1250}, "expect": {"error": "QR_ALREADY_PAID"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-4", "request": {"merchantId": "m-05", "requestId": "pr-0004", "amount": 100}, "expect": {"error": "INVALID_ARGUMENT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-5", "request": {"merchantId": "m-05", "requestId": "pr-0004", "amount": 2000000}, "expect": {"status": "FAILED", "failureReason": "INSUFFICIENT_FUNDS", "id": "qrp-3"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-6", "request": {"merchantId": "m-05", "requestId": "pr-0004", "amount": 2000000}, "expect": {"status": "FAILED", "failureReason": "INSUFFICIENT_FUNDS", "id": "qrp-4"}, "balanceDelta": 0, "usedTodayDelta": 0, "_note": "a refusal doesn't use up the code"},
+      {"key": "k-7", "request": {"merchantId": "m-02", "requestId": "pr-0002", "amount": 4500}, "expect": {"error": "QR_EXPIRED"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-8", "request": {"merchantId": "m-02", "requestId": "pr-0003", "amount": 3000}, "expect": {"error": "QR_ALREADY_PAID"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-9", "request": {"merchantId": "m-99", "amount": 100}, "expect": {"error": "INVALID_QR"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-10", "request": {"merchantId": "m-03", "requestId": "pr-0001", "amount": 1250}, "expect": {"error": "INVALID_QR"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-11", "request": {"merchantId": "m-03", "amount": 99}, "expect": {"error": "INVALID_ARGUMENT"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-12", "request": {"merchantId": "m-03", "amount": 495000}, "expect": {"status": "FAILED", "failureReason": "DAILY_LIMIT_EXCEEDED", "id": "qrp-5"}, "balanceDelta": 0, "usedTodayDelta": 0},
+      {"key": "k-13", "request": {"merchantId": "m-03", "amount": 250}, "expect": {"status": "SUCCESS", "id": "qrp-6"}, "balanceDelta": -250, "usedTodayDelta": 250}
+    ]
+  },
+  "myQr": {
+    "_comment": "ADR-0016 §6: the fake server gives a verified account a random user id, 'u-' + 12 lowercase hex digits, kept with its phone (the same phone verified again keeps it; another phone gets a new one) and across resetData. getMyQr returns pocketly://user/v1?u=<userId>. startTransfer(<this account's userId>) is INVALID_ARGUMENT (yourself), as for its phone.",
+    "userIdPattern": "^u-[0-9a-f]{12}$",
+    "payloadPrefix": "pocketly://user/v1?u="
+  }
+}

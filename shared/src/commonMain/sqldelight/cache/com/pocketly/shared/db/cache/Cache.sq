@@ -36,6 +36,17 @@ CREATE TABLE cache_meta (
   value TEXT NOT NULL
 );
 
+-- ADR-0017 §2: in-app notifications (FR-NOTIF-03), the newest NOTIFICATIONS_KEPT. id is the server
+-- event's (evt-<seq>), so an event delivered twice is one row. Version 2 (1.sqm).
+CREATE TABLE cache_notification (
+  id TEXT NOT NULL PRIMARY KEY,
+  seq INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  transaction_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  read INTEGER NOT NULL
+);
+
 upsertTransaction:
 INSERT OR REPLACE INTO cache_transaction(id, idempotency_key, type, category, amount, counterparty_kind, counterparty_id, counterparty_name, counterparty_phone, note, status, failure_reason, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -114,6 +125,26 @@ SELECT value FROM cache_meta WHERE key = ?;
 
 setMeta:
 INSERT OR REPLACE INTO cache_meta(key, value) VALUES (?, ?);
+
+insertNotification:
+INSERT OR IGNORE INTO cache_notification(id, seq, kind, transaction_id, created_at, read) VALUES (?, ?, ?, ?, ?, 0);
+
+-- The newest first.
+notifications:
+SELECT * FROM cache_notification ORDER BY seq DESC LIMIT ?;
+
+unreadCount:
+SELECT COUNT(*) AS n FROM cache_notification WHERE read = 0;
+
+markNotificationsRead:
+UPDATE cache_notification SET read = 1 WHERE read = 0;
+
+-- Keeps the newest :kept.
+trimNotifications:
+DELETE FROM cache_notification WHERE seq NOT IN (SELECT seq FROM cache_notification ORDER BY seq DESC LIMIT ?);
+
+deleteAllNotifications:
+DELETE FROM cache_notification;
 
 -- resetData and logout clear the replica, but the install id (ADR-0010) belongs to the install.
 deleteSyncMeta:

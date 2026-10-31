@@ -1,12 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { Contact } from '@pocketly/core-contract';
+import type { Contact, TransferState } from '@pocketly/core-contract';
 import { Avatar } from '../../components/Avatar';
-import { ChevronLeft, Delete, type LucideIcon } from '../../components/icons';
+import { Check, ChevronLeft, CircleAlert, CircleX, Clock, Delete, type LucideIcon } from '../../components/icons';
 import { colors, radius, spacing } from '../../theme/tokens';
 import { formatPhone } from '../auth/phoneFormat';
 
-/** Shared pieces of the Send flow screens (F5), after the "Pocketly Send Flow" design. */
+/**
+ * Shared pieces of the Send flow screens (F5), after the "Pocketly Send Flow" design. The Top-Up
+ * flow (F6) reuses them: the design has no Top-Up artboards (ADR-0015 §5).
+ */
 
 export function SendHeader({
   onBack,
@@ -154,8 +157,19 @@ export function RecipientRow({ contact, size = 44 }: { contact: Contact; size?: 
   );
 }
 
-/** FR-TRF-06: the processing screen, over whatever screen started the send. */
-export function ProcessingView({ amount, recipient }: { amount: string; recipient: string }) {
+/**
+ * FR-TRF-06: the processing screen, over whatever screen started the send ("Sending $150.00",
+ * "to Andi") or the top-up ("Adding $50.00", "from Card").
+ */
+export function ProcessingView({
+  title,
+  subtitle,
+  testID = 'send-processing',
+}: {
+  title: string;
+  subtitle: string;
+  testID?: string;
+}) {
   const spin = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -166,19 +180,39 @@ export function ProcessingView({ amount, recipient }: { amount: string; recipien
   }, [spin]);
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   return (
-    <View style={styles.processing} testID="send-processing">
+    <View style={styles.processing} testID={testID}>
       <Animated.View style={[styles.ring, { transform: [{ rotate }] }]} />
       <View
         style={styles.processingText}
         accessibilityLiveRegion="polite"
         accessible
-        accessibilityLabel={`Sending ${amount} to ${recipient}`}
+        accessibilityLabel={`${title} ${subtitle}`}
       >
-        <Text style={styles.processingTitle}>Sending {amount}</Text>
-        <Text style={styles.processingSub}>to {recipient}</Text>
+        <Text style={styles.processingTitle}>{title}</Text>
+        <Text style={styles.processingSub}>{subtitle}</Text>
         <Text style={styles.processingHint}>This usually takes a few seconds.</Text>
       </View>
     </View>
+  );
+}
+
+/** FR-TRF-07 "animated success": the check pops in. Status is never color alone (NFR-A11Y-03). */
+export function ResultIcon({ state, retryable }: { state: TransferState; retryable: boolean }) {
+  const scale = useRef(new Animated.Value(state === 'SUCCESS' ? 0.4 : 1)).current;
+  useEffect(() => {
+    if (state !== 'SUCCESS') return;
+    Animated.spring(scale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
+  }, [state, scale]);
+  const look =
+    state === 'SUCCESS'
+      ? { bg: colors.primary, Icon: Check, color: colors.onPrimary }
+      : state === 'PENDING'
+      ? { bg: colors.tertiaryDim, Icon: Clock, color: colors.tertiary }
+      : { bg: colors.dangerDim, Icon: retryable ? CircleAlert : CircleX, color: colors.danger };
+  return (
+    <Animated.View style={[styles.icon, { backgroundColor: look.bg, transform: [{ scale }] }]} testID="result-icon">
+      <look.Icon color={look.color} size={40} strokeWidth={2.4} />
+    </Animated.View>
   );
 }
 
@@ -321,6 +355,14 @@ const styles = StyleSheet.create({
   processingTitle: { color: colors.textPrimary, fontSize: 24, fontWeight: '700' },
   processingSub: { color: colors.textSecondary, fontSize: 16 },
   processingHint: { color: colors.textMuted, fontSize: 14, marginTop: spacing.sm },
+  icon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
   keypad: {
     flexDirection: 'row',
     flexWrap: 'wrap',

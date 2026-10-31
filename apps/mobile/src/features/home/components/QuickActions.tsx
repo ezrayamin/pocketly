@@ -7,15 +7,13 @@ import type { RootStackParamList } from '../../../navigation';
 import { ArrowUpRight, CreditCard, QrCode, ScanLine, type LucideIcon } from '../../../components/icons';
 import { colors } from '../../../theme/tokens';
 
-/**
- * FR-HOME-03. Send opens its flow (F5). Top-Up (F6), Pay (F7) and Receive (F8) are still
- * placeholders until those features exist.
- */
-const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: 'SendRecipient' }[] = [
+/** FR-HOME-03: Send (F5), Top-Up (F6), Pay by QR (F7) and Receive, My QR (F8). */
+type Route = 'SendRecipient' | 'TopUpAmount' | 'QrScan' | 'MyQr';
+const ACTIONS: { label: string; Icon: LucideIcon; primary?: boolean; route?: Route }[] = [
   { label: 'Send', Icon: ArrowUpRight, primary: true, route: 'SendRecipient' },
-  { label: 'Top-Up', Icon: CreditCard },
-  { label: 'Pay (QR)', Icon: ScanLine },
-  { label: 'Receive', Icon: QrCode },
+  { label: 'Top-Up', Icon: CreditCard, route: 'TopUpAmount' },
+  { label: 'Pay (QR)', Icon: ScanLine, route: 'QrScan' },
+  { label: 'Receive', Icon: QrCode, route: 'MyQr' },
 ];
 
 export function QuickActions() {
@@ -29,7 +27,7 @@ export function QuickActions() {
           onPress={
             route
               ? () => {
-                  flowMark('send-tap');
+                  if (route === 'SendRecipient') flowMark('send-tap'); // BM-07 times the Send flow only
                   navigation.navigate(route);
                 }
               : undefined

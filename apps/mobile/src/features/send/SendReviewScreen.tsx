@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,7 +11,9 @@ import { colors, radius, spacing } from '../../theme/tokens';
 import { formatPhone } from '../auth/phoneFormat';
 import { toUserError } from '../errors';
 import { PrimaryButton, ProcessingView, SendHeader, Summary, TextButton, sendStyles } from './components';
-import { biometricFallbackNotice, transferPrompt } from './sendCopy';
+import type { Payment } from './payment';
+import { paymentPrompt } from './payment';
+import { biometricFallbackNotice } from './sendCopy';
 import { useConfirmTransfer } from './useConfirmTransfer';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SendReview'>;
@@ -25,7 +27,8 @@ export function SendReviewScreen({ navigation, route }: Props) {
   const { review } = route.params;
   const [biometrics, setBiometrics] = useState<BiometricStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { sending, confirm } = useConfirmTransfer(review, navigation);
+  const payment: Payment = useMemo(() => ({ kind: 'TRANSFER', review }), [review]);
+  const { sending, confirm } = useConfirmTransfer(payment, navigation);
   const amount = core.formatMoney(review.amount);
 
   useEffect(() => flowMark('review-shown'), []); // BM-07
@@ -38,16 +41,13 @@ export function SendReviewScreen({ navigation, route }: Props) {
     flowMark('confirm-tap');
     setError(null);
     if (!biometrics?.enabled || !biometrics.available) {
-      navigation.navigate('SendPin', { review });
+      navigation.navigate('SendPin', { payment });
       return;
     }
     try {
-      const result = await confirm({
-        method: 'BIOMETRIC',
-        prompt: transferPrompt(biometrics.kind, amount, review.recipient.name),
-      });
+      const result = await confirm({ method: 'BIOMETRIC', prompt: paymentPrompt(payment, biometrics.kind, amount) });
       if (result?.state === 'DRAFT')
-        navigation.navigate('SendPin', { review, notice: biometricFallbackNotice(result.auth, biometrics.kind) });
+        navigation.navigate('SendPin', { payment, notice: biometricFallbackNotice(result.auth, biometrics.kind) });
     } catch (e) {
       setError(toUserError(e).message);
     }
@@ -92,7 +92,7 @@ export function SendReviewScreen({ navigation, route }: Props) {
         <PrimaryButton label="Confirm and send" onPress={onConfirm} busy={sending} testID="review-confirm" />
         <TextButton label="Edit amount" onPress={() => navigation.goBack()} testID="review-edit" accent />
       </View>
-      {sending && <ProcessingView amount={amount} recipient={review.recipient.name} />}
+      {sending && <ProcessingView title={`Sending ${amount}`} subtitle={`to ${review.recipient.name}`} />}
     </SafeAreaView>
   );
 }

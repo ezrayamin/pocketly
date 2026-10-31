@@ -148,6 +148,10 @@ data class NetworkSimulation(
     val seed: Int = 1,
     /** Client-side transfer timeout (FR-TRF-09, ADR-0014). Same default as TRANSFER_TIMEOUT_MS. */
     val writeTimeoutMs: Int = TransferPolicy.TIMEOUT_MS.toInt(),
+    /** FR-DEV, ADR-0015 §4: the payment method declines every top-up (FAILED, PAYMENT_DECLINED). */
+    val declineTopUps: Boolean = false,
+    /** ADR-0015 §4: a fixed top-up processing time, 0–60000, instead of the seeded draw (null). */
+    val topUpProcessingMs: Int? = null,
 ) {
     companion object {
         val NORMAL = NetworkSimulation(NetworkMode.NORMAL, failureRatePercent = 0)
@@ -261,3 +265,93 @@ data class TransferResult(
     /** [balance] unwrapped for Swift: a nullable value class is exported as an opaque `id`. */
     val balanceMinor: Long? get() = balance?.minor
 }
+
+// ── Top-up (F6, FR-TOP-01..03; ADR-0015) ────────────────────────────────
+
+/** FR-TOP-02: the mocked payment methods. Mirrors core-contract's TopUpMethod. */
+enum class TopUpMethod { BANK_TRANSFER, CARD }
+
+/** reviewTopUp: what the user confirms. confirmTransfer(id) sends it, with no auth. Mirrors TopUpReview. */
+data class TopUpReview(
+    /** The attempt's id: its idempotency key. */
+    val id: String,
+    val idempotencyKey: String,
+    val method: TopUpMethod,
+    val amount: Money,
+    val fee: Money,
+    val balanceAfter: Money,
+)
+
+// ── QR Pay & My QR (F7, F8, FR-QR-01..05; ADR-0016) ─────────────────────
+
+/** Mirrors core-contract's QrKind. */
+enum class QrKind { MERCHANT, USER }
+
+/** Mirrors core-contract's QrRejectReason. */
+enum class QrRejectReason { TOO_LONG, MALFORMED, UNSUPPORTED_VERSION, UNKNOWN_KIND }
+
+/** parseQr: what a code says, IDs only. Mirrors core-contract's QrCode. */
+data class QrCode(
+    val reason: QrRejectReason? = null,
+    val kind: QrKind? = null,
+    val merchantId: String? = null,
+    val requestId: String? = null,
+    val userId: String? = null,
+) {
+    val ok: Boolean get() = reason == null
+}
+
+/** startQrPayment. Mirrors core-contract's QrPaymentDraft. */
+data class QrPaymentDraft(
+    val merchant: Counterparty,
+    val requestId: String?,
+    /** Dynamic code only: the request's amount, locked. */
+    val amount: Money?,
+    val expiresAt: EpochMillis?,
+    val balance: Money,
+    val dailyRemaining: Money,
+    val minAmount: Money,
+    val maxAmount: Money,
+) {
+    /** [amount] unwrapped for Swift: a nullable value class is exported as an opaque `id`. */
+    val amountMinor: Long? get() = amount?.minor
+}
+
+/** reviewQrPayment. Mirrors core-contract's QrPaymentReview. */
+data class QrPaymentReview(
+    val id: String,
+    val idempotencyKey: String,
+    val merchant: Counterparty,
+    val requestId: String?,
+    val amount: Money,
+    val fee: Money,
+    val balanceAfter: Money,
+)
+
+// ── Notifications (F9, FR-NOTIF-01..03; ADR-0017) ───────────────────────
+
+/**
+ * MONEY_RECEIVED: an incoming transfer (FR-NOTIF-01). TRANSACTION_SETTLED: a transfer, top-up or QR
+ * payment this install saw PENDING settled SUCCESS or FAILED (FR-NOTIF-02).
+ */
+enum class NotificationKind { MONEY_RECEIVED, TRANSACTION_SETTLED }
+
+/** One in-app notification. The words are the app's. Mirrors core-contract's AppNotification. */
+data class AppNotification(
+    /** The server event's id (`evt-<n>`): unique, so an event delivered twice is one notification. */
+    val id: String,
+    val kind: NotificationKind,
+    /** The transaction as the event left it (TRANSACTION_SETTLED: SUCCESS or FAILED). */
+    val transaction: Transaction,
+    /** When the server logged the event. */
+    val createdAt: EpochMillis,
+    val read: Boolean,
+) {
+    companion object {
+        /** FR-NOTIF-03: how many the replica keeps; older ones are dropped. */
+        const val KEPT = 50
+    }
+}
+
+/** getNotifications (FR-NOTIF-03): from the replica, so it works offline. [items]: newest first. */
+data class NotificationList(val items: List<AppNotification>, val unreadCount: Int)

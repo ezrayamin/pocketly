@@ -66,6 +66,9 @@ namespace margelo::nitro::pocketly {
         case AmountRejectReason::BELOW_MINIMUM:
           static const auto fieldBELOW_MINIMUM = clazz->getStaticField<JAmountRejectReason>("BELOW_MINIMUM");
           return clazz->getStaticFieldValue(fieldBELOW_MINIMUM);
+        case AmountRejectReason::ABOVE_MAXIMUM:
+          static const auto fieldABOVE_MAXIMUM = clazz->getStaticField<JAmountRejectReason>("ABOVE_MAXIMUM");
+          return clazz->getStaticFieldValue(fieldABOVE_MAXIMUM);
         default:
           std::string stringValue = std::to_string(static_cast<int>(value));
           throw std::invalid_argument("Invalid enum value (" + stringValue + "!");

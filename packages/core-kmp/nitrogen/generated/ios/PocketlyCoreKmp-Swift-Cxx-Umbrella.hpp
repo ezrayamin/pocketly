@@ -12,6 +12,8 @@
 namespace margelo::nitro::pocketly { struct AmountCheck; }
 // Forward declaration of `AmountRejectReason` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class AmountRejectReason; }
+// Forward declaration of `AppNotification` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct AppNotification; }
 // Forward declaration of `AuthState` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct AuthState; }
 // Forward declaration of `BalanceCheck` to properly resolve imports.
@@ -50,6 +52,8 @@ namespace margelo::nitro::pocketly { struct DatasetSeed; }
 namespace margelo::nitro::pocketly { struct DayTotal; }
 // Forward declaration of `ErrorCode` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class ErrorCode; }
+// Forward declaration of `HybridNotificationSubscriptionSpec` to properly resolve imports.
+namespace margelo::nitro::pocketly { class HybridNotificationSubscriptionSpec; }
 // Forward declaration of `HybridPocketlyCoreSpec` to properly resolve imports.
 namespace margelo::nitro::pocketly { class HybridPocketlyCoreSpec; }
 // Forward declaration of `HybridPriceSubscriptionSpec` to properly resolve imports.
@@ -62,6 +66,10 @@ namespace margelo::nitro::pocketly { struct MoneyParseResult; }
 namespace margelo::nitro::pocketly { enum class NetworkMode; }
 // Forward declaration of `NetworkSimulation` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct NetworkSimulation; }
+// Forward declaration of `NotificationKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class NotificationKind; }
+// Forward declaration of `NotificationList` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct NotificationList; }
 // Forward declaration of `OtpSendOutcome` to properly resolve imports.
 namespace margelo::nitro::pocketly { enum class OtpSendOutcome; }
 // Forward declaration of `OtpSendResult` to properly resolve imports.
@@ -82,10 +90,24 @@ namespace margelo::nitro::pocketly { struct PinCheck; }
 namespace margelo::nitro::pocketly { enum class PinRejectReason; }
 // Forward declaration of `PriceTick` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct PriceTick; }
+// Forward declaration of `QrCode` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrCode; }
+// Forward declaration of `QrKind` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrKind; }
+// Forward declaration of `QrPaymentDraft` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentDraft; }
+// Forward declaration of `QrPaymentReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct QrPaymentReview; }
+// Forward declaration of `QrRejectReason` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class QrRejectReason; }
 // Forward declaration of `SpendingSummary` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct SpendingSummary; }
 // Forward declaration of `StaleInfo` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct StaleInfo; }
+// Forward declaration of `TopUpMethod` to properly resolve imports.
+namespace margelo::nitro::pocketly { enum class TopUpMethod; }
+// Forward declaration of `TopUpReview` to properly resolve imports.
+namespace margelo::nitro::pocketly { struct TopUpReview; }
 // Forward declaration of `TransactionPage` to properly resolve imports.
 namespace margelo::nitro::pocketly { struct TransactionPage; }
 // Forward declaration of `TransactionStatus` to properly resolve imports.
@@ -120,6 +142,7 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 // Include C++ defined types
 #include "AmountCheck.hpp"
 #include "AmountRejectReason.hpp"
+#include "AppNotification.hpp"
 #include "AuthState.hpp"
 #include "BalanceCheck.hpp"
 #include "BiometricEnableOutcome.hpp"
@@ -139,12 +162,15 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "DatasetSeed.hpp"
 #include "DayTotal.hpp"
 #include "ErrorCode.hpp"
+#include "HybridNotificationSubscriptionSpec.hpp"
 #include "HybridPocketlyCoreSpec.hpp"
 #include "HybridPriceSubscriptionSpec.hpp"
 #include "MoneyParseError.hpp"
 #include "MoneyParseResult.hpp"
 #include "NetworkMode.hpp"
 #include "NetworkSimulation.hpp"
+#include "NotificationKind.hpp"
+#include "NotificationList.hpp"
 #include "OtpSendOutcome.hpp"
 #include "OtpSendResult.hpp"
 #include "OtpVerifyOutcome.hpp"
@@ -155,8 +181,15 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include "PinCheck.hpp"
 #include "PinRejectReason.hpp"
 #include "PriceTick.hpp"
+#include "QrCode.hpp"
+#include "QrKind.hpp"
+#include "QrPaymentDraft.hpp"
+#include "QrPaymentReview.hpp"
+#include "QrRejectReason.hpp"
 #include "SpendingSummary.hpp"
 #include "StaleInfo.hpp"
+#include "TopUpMethod.hpp"
+#include "TopUpReview.hpp"
 #include "Transaction.hpp"
 #include "TransactionPage.hpp"
 #include "TransactionStatus.hpp"
@@ -191,6 +224,8 @@ namespace margelo::nitro::pocketly { struct Wallet; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridNotificationSubscriptionSpec_cxx` to properly resolve imports.
+namespace PocketlyCoreKmp { class HybridNotificationSubscriptionSpec_cxx; }
 // Forward declaration of `HybridPocketlyCoreSpec_cxx` to properly resolve imports.
 namespace PocketlyCoreKmp { class HybridPocketlyCoreSpec_cxx; }
 // Forward declaration of `HybridPriceSubscriptionSpec_cxx` to properly resolve imports.

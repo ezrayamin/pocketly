@@ -11,8 +11,8 @@ import com.pocketly.shared.data.currentTimeMillis
  * without writing. Mirrors packages/core-js/src/sync/ledgerSync.ts.
  */
 internal class LedgerSync(private val api: WalletApi, private val cache: CacheStore) {
-    suspend fun sync() {
-        val generation = cache.generation
+    /** [generation]: the replica's when the caller's refresh began (it may have done other work first). */
+    suspend fun sync(generation: Int = cache.generation) {
         var token = cache.syncToken()
         while (true) {
             val page = api.getChanges(token, PAGE_SIZE)

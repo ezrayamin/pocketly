@@ -1,7 +1,7 @@
 import { BIOMETRIC_CHALLENGE_TTL_MS, PIN_MAX_ATTEMPTS } from '@pocketly/core-contract';
 import type { Core } from '@pocketly/core-contract';
 import bio from '@pocketly/core-contract/fixtures/biometric.json';
-import { transferMessage, unlockMessage, utf8 } from '../src/security/biometricMessages';
+import { qrPaymentMessage, transferMessage, unlockMessage, utf8 } from '../src/security/biometricMessages';
 import { FakeBiometricSigner } from '../testing/fakeBiometricSigner';
 import { nodePinCrypto } from '../testing/nodePinCrypto';
 import { verifyTestPhone } from '@pocketly/core-contract/src/testing/onboarding';
@@ -21,6 +21,21 @@ describe('biometric messages and signatures (fixtures/biometric.json)', () => {
     expect(transferMessage({ amount, recipientId, idempotencyKey })).toBe(bio.transfer.message);
   });
 
+  it('builds the QR payment messages byte for byte, a static code\'s with request "-" (ADR-0016 §2)', () => {
+    for (const q of [bio.qrpay, bio.qrpayStatic]) {
+      const requestId = 'requestId' in q ? String(q.requestId) : undefined;
+      expect(qrPaymentMessage({ amount: q.amount, merchantId: q.merchantId, requestId, idempotencyKey: q.idempotencyKey })).toBe(
+        q.message,
+      );
+    }
+  });
+
+  it.each(bio.invalidQrPayments)('refuses a QR payment that can\'t be encoded unambiguously: $why', (q) => {
+    const requestId = typeof q.requestId === 'string' ? q.requestId : undefined; // null in the fixture: a static code
+    const approval = { amount: q.amount, merchantId: q.merchantId, requestId, idempotencyKey: q.idempotencyKey };
+    expect(() => qrPaymentMessage(approval)).toThrow(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
+  });
+
   it.each(bio.invalidTransfers)('refuses a transfer that can\'t be encoded unambiguously: $why', ({ amount, recipientId, idempotencyKey }) => {
     expect(() => transferMessage({ amount, recipientId, idempotencyKey })).toThrow(expect.objectContaining({ code: 'INVALID_ARGUMENT' }));
   });
@@ -29,6 +44,8 @@ describe('biometric messages and signatures (fixtures/biometric.json)', () => {
     const key = hex(bio.publicKeyHex);
     expect(nodePinCrypto.verifyP256(key, utf8(bio.unlock.message), hex(bio.unlock.signatureHex))).toBe(true);
     expect(nodePinCrypto.verifyP256(key, utf8(bio.transfer.message), hex(bio.transfer.signatureHex))).toBe(true);
+    expect(nodePinCrypto.verifyP256(key, utf8(bio.qrpay.message), hex(bio.qrpay.signatureHex))).toBe(true);
+    expect(nodePinCrypto.verifyP256(key, utf8(bio.qrpayStatic.message), hex(bio.qrpayStatic.signatureHex))).toBe(true);
   });
 
   it.each(bio.rejected)('rejects: $why', ({ message, signatureHex }) => {

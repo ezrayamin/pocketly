@@ -1,7 +1,21 @@
-import type { Contact, DatasetConfig, OtpSendResult, OtpVerifyResult, Transaction, Wallet } from '@pocketly/core-contract';
+import type {
+  Category,
+  Contact,
+  Counterparty,
+  DatasetConfig,
+  NotificationKind,
+  OtpSendResult,
+  OtpVerifyResult,
+  TopUpMethod,
+  Transaction,
+  Wallet,
+} from '@pocketly/core-contract';
 
-/** What the server answers on an OTP check: the result, plus a session token when verified. */
-export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string };
+/**
+ * What the server answers on an OTP check: the result, plus a session token and the account's
+ * user id (ADR-0016 §6) when verified.
+ */
+export type ServerOtpVerify = OtpVerifyResult & { sessionToken?: string; userId?: string };
 
 /** requirements §4.1 `TransferRequest`: what the idempotency key protects (ADR-0014). */
 export interface TransferRequest {
@@ -9,6 +23,29 @@ export interface TransferRequest {
   amount: number;
   /** Normalized (normalizeNote): absent, or one trimmed line. */
   note?: string;
+}
+
+/** ADR-0015: what a top-up's idempotency key protects. */
+export interface TopUpRequest {
+  method: TopUpMethod;
+  amount: number;
+}
+
+/** ADR-0016: what a QR payment's idempotency key protects. */
+export interface QrPaymentRequest {
+  merchantId: string;
+  /** A dynamic code's payment request. */
+  requestId?: string;
+  amount: number;
+}
+
+/** ADR-0016 §4: what a scanned merchant code points at, from the server. */
+export interface PaymentTarget {
+  merchant: Counterparty;
+  /** The category a payment to this merchant gets. */
+  category: Category;
+  /** Dynamic code only: still open and unexpired. */
+  request?: { id: string; amount: number; expiresAt: number };
 }
 
 /** One page of server changes, ordered by (updatedAt, id). */
@@ -19,10 +56,27 @@ export interface ChangesPage {
   hasMore: boolean;
 }
 
+/** One entry of the server's event log (ADR-0017 §1): requirements §4.1's `WalletEvent`. */
+export interface WalletEvent {
+  /** Counts from 1 in log order; the notification's id is `evt-<seq>`. */
+  seq: number;
+  kind: NotificationKind;
+  /** The transaction as it is now (a settled one: SUCCESS or FAILED). */
+  transaction: Transaction;
+  /** When the server logged it. */
+  createdAt: number;
+}
+
+/** A page of the event log, oldest first. */
+export interface EventsPage {
+  items: WalletEvent[];
+  hasMore: boolean;
+}
+
 /**
  * Backend boundary (requirements §4.1, NFR-ARCH-03). Swapping the fake for a real backend
  * only changes the wiring in `jsCore.ts`. History reads the local replica (ADR-0009), so the
- * backend exposes a change feed instead of paged history. Top-up/QR/events arrive with M4.
+ * backend exposes a change feed instead of paged history.
  * Mirrors shared/.../data/WalletApi.kt.
  */
 export interface WalletApi {
@@ -44,8 +98,38 @@ export interface WalletApi {
    * request is IDEMPOTENCY_CONFLICT. Business refusals come back as FAILED transactions.
    */
   transfer(request: TransferRequest, idempotencyKey: string): Promise<Transaction>;
-  /** FR-TRF-09 status check: the transaction recorded for this key, or NOT_FOUND (never arrived). */
+  /**
+   * FR-TOP-02/03 (ADR-0015 §4): adds money once per key, from a mocked payment method. Recorded
+   * PENDING on arrival, answered once processed: SUCCESS, or FAILED with PAYMENT_DECLINED. Keys
+   * share transfer()'s table, so a key used for either kind conflicts with the other.
+   */
+  topUp(request: TopUpRequest, idempotencyKey: string): Promise<Transaction>;
+  /**
+   * ADR-0016 §4: the merchant (and its open, unexpired payment request). INVALID_QR for an unknown
+   * merchant or request, or a request of another merchant; QR_EXPIRED; QR_ALREADY_PAID.
+   */
+  getPaymentTarget(merchantId: string, requestId?: string): Promise<PaymentTarget>;
+  /**
+   * FR-QR-04 (ADR-0016 §4): as transfer(), for a merchant. A payment request is paid once: another
+   * key for a paid request is QR_ALREADY_PAID; a refusal leaves it open.
+   */
+  payMerchant(request: QrPaymentRequest, idempotencyKey: string): Promise<Transaction>;
+  /**
+   * ADR-0016 §6: the user id of the account verified with `phone`, for sessions from before
+   * verifyOtp returned it. A server that doesn't know the account yet (phone verified before it
+   * recorded one) takes this phone as it; another phone than the account's is NOT_FOUND.
+   */
+  getAccountUserId(phone: string): Promise<string>;
+  /** FR-TRF-09 status check, any kind: the transaction recorded for this key, or NOT_FOUND (never arrived). */
   getTransferByKey(idempotencyKey: string): Promise<Transaction>;
+  /** ADR-0017 §1: the event log after `afterSeq`, oldest first, at most `limit`. */
+  getEvents(afterSeq: number, limit: number): Promise<EventsPage>;
+  /**
+   * ADR-0017 §1: "the log grew" signals (a websocket with a real backend). A signal carries nothing:
+   * the client reads getEvents after it, so a missed one costs a delay, never an event. Returns the
+   * unsubscribe. Kotlin: a Flow<Unit>.
+   */
+  incomingEvents(listener: () => void): () => void;
 }
 
 /** Developer-menu controls (FR-DEV-*). Only the fake backend implements this. */

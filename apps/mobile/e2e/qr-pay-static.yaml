@@ -1,0 +1,42 @@
+# NFR-TEST-04: QR Pay with a static merchant code (F7, ADR-0016). Maestro can't point a camera, so
+# the dev link hands the scanned text to the scanner screen (ADR-0016 §7).
+#   maestro test -e APP_ID=com.pocketly.kmp -e PIN=482915 apps/mobile/e2e/qr-pay-static.yaml
+# Maestro 2.11's driver dies on the vivo V2538 (benchmarking.md §5 note); there the same
+# checks are run with adb input. This flow is for devices where Maestro works.
+appId: ${APP_ID}
+---
+- stopApp
+- launchApp:
+    clearState: false
+    arguments:
+      pocketly.skipLock: true
+      pocketly.seed: 42
+      pocketly.transactionCount: 200
+      pocketly.network.mode: NORMAL
+      pocketly.network.failureRatePercent: 0
+- assertVisible:
+    id: "balance"
+- openLink: "pocketly://dev/scan?code=pocketly%3A%2F%2Fpay%2Fv1%3Fm%3Dm-01"
+- assertVisible: "Corner Coffee"
+- tapOn:
+    id: "amount-key-1"
+- tapOn:
+    id: "amount-key-2"
+- tapOn:
+    id: "amount-key-dot"
+- tapOn:
+    id: "amount-key-5"
+- tapOn:
+    id: "qr-amount-review"
+- assertVisible: "Pay $12.50"
+- tapOn:
+    id: "qr-review-confirm"
+- runFlow:
+    file: enter-pin.yaml
+- assertVisible:
+    id: "qr-result-success"
+- assertVisible: "Paid"
+- tapOn:
+    id: "qr-result-done"
+- assertVisible:
+    id: "balance"
