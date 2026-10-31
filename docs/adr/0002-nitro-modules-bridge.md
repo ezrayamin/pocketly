@@ -55,6 +55,11 @@ Two measurements point the same way:
   **Notifications** (`2026-11-01_mid-01`): 3 methods, 3 types, a second subscription HybridObject and its
   callback added 170 KB (1,953 → 2,123 KB), ~21 KB per item; a stream costs two items more than a
   request/response method, so share one subscription type across streams.
+  **Hidden symbols** (`2026-11-01_mid-02`): the figures above included every generated C++ symbol's exported name
+  (~30% of the library). Built with `-fvisibility=hidden` (only `JNI_OnLoad` exported) the library is 2,123 →
+  1,395 KB, and rebuilt at each spec version the steps above cost ~12, ~12, ~16 and ~13 KB per item.
+  **Estimation rule: ~13 KB of arm64 APK (~3 KB of download) per bridged method or type**, more for big structs;
+  count a stream's subscription object and callback as two items.
 - **Call overhead.** Every crossing costs a fixed amount, so many small calls lose to one
   batched call (BM-06).
 

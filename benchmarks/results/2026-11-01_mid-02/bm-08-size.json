@@ -1,0 +1,320 @@
+{
+  "scenario": "BM-08",
+  "measuredAt": "2026-10-31T19:12:09.797Z",
+  "unit": "bytes",
+  "note": "groups/nativeLibs are compressed sizes inside the APK; fileBytes is the APK file size",
+  "apks": [
+    {
+      "build": "jsCore",
+      "abi": "arm64-v8a",
+      "fileBytes": 36165099,
+      "groups": {
+        "nativeLibs": 29252312,
+        "dex": 1849325,
+        "jsBundle": 2722400,
+        "resources": 1992175,
+        "other": 61693
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 242048,
+        "libNitroModules.so": 981304,
+        "libQuickCrypto.so": 9351040,
+        "libSensitiveInfo.so": 739832,
+        "libappmodules.so": 1824800,
+        "libc++_shared.so": 1292904,
+        "libfbjni.so": 177000,
+        "libhermestooling.so": 141432,
+        "libhermesvm.so": 2477320,
+        "libimagepipeline.so": 8760,
+        "libjsi.so": 412696,
+        "libnative-filters.so": 277744,
+        "libnative-imagetranscoder.so": 585376,
+        "libop-sqlite.so": 1601088,
+        "libreact_codegen_rnscreens.so": 1209464,
+        "libreact_codegen_rnsvg.so": 773472,
+        "libreact_codegen_safeareacontext.so": 153096,
+        "libreactnative.so": 6898824,
+        "librnscreens.so": 104112
+      },
+      "jsBundleUncompressed": 2722400,
+      "openssl": {
+        "lib": "libQuickCrypto.so",
+        "opensslBytes": 4278007,
+        "cppBytes": 886029,
+        "opensslFraction": 0.8284231558416711,
+        "libGzippedBytes": 3447621
+      }
+    },
+    {
+      "build": "jsCore",
+      "abi": "armeabi-v7a",
+      "fileBytes": 27169249,
+      "groups": {
+        "nativeLibs": 20254784,
+        "dex": 1849325,
+        "jsBundle": 2722400,
+        "resources": 1992175,
+        "other": 61693
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 156464,
+        "libNitroModules.so": 697576,
+        "libQuickCrypto.so": 6476148,
+        "libSensitiveInfo.so": 521080,
+        "libappmodules.so": 1305252,
+        "libc++_shared.so": 872872,
+        "libfbjni.so": 119456,
+        "libhermestooling.so": 76548,
+        "libhermesvm.so": 1700248,
+        "libimagepipeline.so": 5876,
+        "libjsi.so": 289716,
+        "libnative-filters.so": 160224,
+        "libnative-imagetranscoder.so": 341072,
+        "libop-sqlite.so": 1086364,
+        "libreact_codegen_rnscreens.so": 862344,
+        "libreact_codegen_rnsvg.so": 566048,
+        "libreact_codegen_safeareacontext.so": 93572,
+        "libreactnative.so": 4870036,
+        "librnscreens.so": 53888
+      },
+      "jsBundleUncompressed": 2722400,
+      "openssl": {
+        "lib": "libQuickCrypto.so",
+        "opensslBytes": 3596304,
+        "cppBytes": 578011,
+        "opensslFraction": 0.8615315327185419,
+        "libGzippedBytes": 2606999
+      }
+    },
+    {
+      "build": "jsCore",
+      "abi": "x86_64",
+      "fileBytes": 37800282,
+      "groups": {
+        "nativeLibs": 30852512,
+        "dex": 1849325,
+        "jsBundle": 2722400,
+        "resources": 1992175,
+        "other": 61693
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 234088,
+        "libNitroModules.so": 968744,
+        "libQuickCrypto.so": 10062624,
+        "libSensitiveInfo.so": 722336,
+        "libappmodules.so": 2212400,
+        "libc++_shared.so": 1252080,
+        "libfbjni.so": 172952,
+        "libhermestooling.so": 138128,
+        "libhermesvm.so": 2591976,
+        "libimagepipeline.so": 8464,
+        "libjsi.so": 418872,
+        "libnative-filters.so": 270784,
+        "libnative-imagetranscoder.so": 720432,
+        "libop-sqlite.so": 1627936,
+        "libreact_codegen_rnscreens.so": 1228672,
+        "libreact_codegen_rnsvg.so": 865768,
+        "libreact_codegen_safeareacontext.so": 153088,
+        "libreactnative.so": 7102216,
+        "librnscreens.so": 100952
+      },
+      "jsBundleUncompressed": 2722400,
+      "openssl": {
+        "lib": "libQuickCrypto.so",
+        "opensslBytes": 4520783,
+        "cppBytes": 1067791,
+        "opensslFraction": 0.8089331911861595,
+        "libGzippedBytes": 3210747
+      }
+    },
+    {
+      "build": "jsCore",
+      "abi": "x86",
+      "fileBytes": 36256433,
+      "groups": {
+        "nativeLibs": 29332948,
+        "dex": 1849325,
+        "jsBundle": 2722400,
+        "resources": 1992175,
+        "other": 61693
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 218756,
+        "libNitroModules.so": 944768,
+        "libQuickCrypto.so": 8258464,
+        "libSensitiveInfo.so": 688420,
+        "libappmodules.so": 1715496,
+        "libc++_shared.so": 1254988,
+        "libfbjni.so": 166480,
+        "libhermestooling.so": 136716,
+        "libhermesvm.so": 3019744,
+        "libimagepipeline.so": 7040,
+        "libjsi.so": 437228,
+        "libnative-filters.so": 244700,
+        "libnative-imagetranscoder.so": 664736,
+        "libop-sqlite.so": 1698040,
+        "libreact_codegen_rnscreens.so": 1249416,
+        "libreact_codegen_rnsvg.so": 1013576,
+        "libreact_codegen_safeareacontext.so": 146440,
+        "libreactnative.so": 7370684,
+        "librnscreens.so": 97256
+      },
+      "jsBundleUncompressed": 2722400,
+      "openssl": {
+        "lib": "libQuickCrypto.so",
+        "opensslBytes": 3572964,
+        "cppBytes": 769339,
+        "opensslFraction": 0.8228269653223186,
+        "libGzippedBytes": 2895392
+      }
+    },
+    {
+      "build": "kmpCore",
+      "abi": "arm64-v8a",
+      "fileBytes": 25281366,
+      "groups": {
+        "nativeLibs": 18989032,
+        "dex": 2032509,
+        "jsBundle": 1931208,
+        "resources": 1992175,
+        "other": 61792
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 242048,
+        "libNitroModules.so": 981304,
+        "libPocketlyCoreKmp.so": 1428680,
+        "libappmodules.so": 1824800,
+        "libc++_shared.so": 1292904,
+        "libfbjni.so": 177000,
+        "libhermestooling.so": 141432,
+        "libhermesvm.so": 2477320,
+        "libimagepipeline.so": 8760,
+        "libjsi.so": 412696,
+        "libnative-filters.so": 277744,
+        "libnative-imagetranscoder.so": 585376,
+        "libreact_codegen_rnscreens.so": 1209464,
+        "libreact_codegen_rnsvg.so": 773472,
+        "libreact_codegen_safeareacontext.so": 153096,
+        "libreactnative.so": 6898824,
+        "librnscreens.so": 104112
+      },
+      "jsBundleUncompressed": 1931208
+    },
+    {
+      "build": "kmpCore",
+      "abi": "armeabi-v7a",
+      "fileBytes": 19365704,
+      "groups": {
+        "nativeLibs": 13083672,
+        "dex": 2032509,
+        "jsBundle": 1931208,
+        "resources": 1992175,
+        "other": 61792
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 156464,
+        "libNitroModules.so": 697576,
+        "libPocketlyCoreKmp.so": 912480,
+        "libappmodules.so": 1305252,
+        "libc++_shared.so": 872872,
+        "libfbjni.so": 119456,
+        "libhermestooling.so": 76548,
+        "libhermesvm.so": 1700248,
+        "libimagepipeline.so": 5876,
+        "libjsi.so": 289716,
+        "libnative-filters.so": 160224,
+        "libnative-imagetranscoder.so": 341072,
+        "libreact_codegen_rnscreens.so": 862344,
+        "libreact_codegen_rnsvg.so": 566048,
+        "libreact_codegen_safeareacontext.so": 93572,
+        "libreactnative.so": 4870036,
+        "librnscreens.so": 53888
+      },
+      "jsBundleUncompressed": 1931208
+    },
+    {
+      "build": "kmpCore",
+      "abi": "x86_64",
+      "fileBytes": 26130123,
+      "groups": {
+        "nativeLibs": 19816368,
+        "dex": 2032509,
+        "jsBundle": 1931208,
+        "resources": 1992175,
+        "other": 61792
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 234088,
+        "libNitroModules.so": 968744,
+        "libPocketlyCoreKmp.so": 1376752,
+        "libappmodules.so": 2212400,
+        "libc++_shared.so": 1252080,
+        "libfbjni.so": 172952,
+        "libhermestooling.so": 138128,
+        "libhermesvm.so": 2591976,
+        "libimagepipeline.so": 8464,
+        "libjsi.so": 418872,
+        "libnative-filters.so": 270784,
+        "libnative-imagetranscoder.so": 720432,
+        "libreact_codegen_rnscreens.so": 1228672,
+        "libreact_codegen_rnsvg.so": 865768,
+        "libreact_codegen_safeareacontext.so": 153088,
+        "libreactnative.so": 7102216,
+        "librnscreens.so": 100952
+      },
+      "jsBundleUncompressed": 1931208
+    },
+    {
+      "build": "kmpCore",
+      "abi": "x86",
+      "fileBytes": 26339368,
+      "groups": {
+        "nativeLibs": 20062480,
+        "dex": 2032509,
+        "jsBundle": 1931208,
+        "resources": 1992175,
+        "other": 61792
+      },
+      "nativeLibs": {
+        "libNitroDataScanner.so": 218756,
+        "libNitroModules.so": 944768,
+        "libPocketlyCoreKmp.so": 1374456,
+        "libappmodules.so": 1715496,
+        "libc++_shared.so": 1254988,
+        "libfbjni.so": 166480,
+        "libhermestooling.so": 136716,
+        "libhermesvm.so": 3019744,
+        "libimagepipeline.so": 7040,
+        "libjsi.so": 437228,
+        "libnative-filters.so": 244700,
+        "libnative-imagetranscoder.so": 664736,
+        "libreact_codegen_rnscreens.so": 1249416,
+        "libreact_codegen_rnsvg.so": 1013576,
+        "libreact_codegen_safeareacontext.so": 146440,
+        "libreactnative.so": 7370684,
+        "librnscreens.so": 97256
+      },
+      "jsBundleUncompressed": 1931208
+    }
+  ],
+  "keptClassesByOrigin": {
+    "jsCore": {
+      "other": 2920,
+      "react-native": 1503,
+      "nitro runtime": 96,
+      "kotlin stdlib": 179,
+      "kotlinx.coroutines": 112
+    },
+    "kmpCore": {
+      "other": 2923,
+      "react-native": 1493,
+      "nitro runtime": 52,
+      "core-kmp Nitro adapter": 180,
+      "pocketly-shared (KMP core)": 315,
+      "kotlin stdlib": 226,
+      "kotlinx.coroutines": 161,
+      "kotlinx.serialization": 122,
+      "koin": 27
+    }
+  }
+}

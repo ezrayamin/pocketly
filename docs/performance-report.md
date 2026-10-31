@@ -431,6 +431,7 @@ download; one that could use the platform's SQLite from JavaScript too would los
 | slice 7, top-up (`2026-10-30_mid-01`) | 34,637 KB | +1,136 KB | −10,282 KB | −3,924 KB |
 | slice 7, QR Pay and My QR (`2026-10-30_mid-02`) | 35,414 KB | +1,354 KB | −10,064 KB | −3,872 KB |
 | slice 7, notifications (`2026-11-01_mid-01`) | 35,444 KB | +1,509 KB | −9,909 KB | −3,838 KB |
+| slice 7, hidden bridge symbols + one ML Kit rule (`2026-11-01_mid-02`) | 35,317 KB | **+789 KB** | −10,629 KB | −3,938 KB |
 
 Roughly fixed while the app grew by 7 MB (navigation, FlashList, op-sqlite) up to slice 4. The
 bridge library grew by 101 KB with slice 4's new bridged types and methods (StaleInfo,
@@ -449,7 +450,11 @@ My QR** added 4 methods and 5 types, +211 KB of bridge (~23 KB each: QrPaymentDr
 far). The barcode scanner they brought costs both builds the same (~680 KB of APK, ~400 KB of download: its
 Nitro library, ML Kit's classes kept for R8, resources), so it leaves the comparison alone. **Notifications**
 added 3 methods, 3 types and a second subscription object with its callback: +170 KB of bridge (~21 KB per item),
-against 30 KB of JavaScript for the whole feature in jsCore and 16 KB of dex in kmpCore.
+against 30 KB of JavaScript for the whole feature in jsCore and 16 KB of dex in kmpCore. **Then the bridge library
+was built with hidden symbols** (`2026-11-01_mid-02`): it had exported every generated C++ symbol, and those names
+were ~30% of it. 2,123 → 1,395 KB, so the architecture's cost fell from +1,509 to +789 KB; re-measured at each
+spec version, a bridged method or type costs ~13 KB of APK (~3 KB of download), not ~18–23. The same session
+replaced the broad ML Kit keep rules with one (~130 KB less dex and download in both builds).
 
 ## Bridge overhead
 Overhead = end-to-end (timed in JS) − compute − storage (timed inside the core). For jsCore it is
